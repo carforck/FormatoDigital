@@ -1,0 +1,257 @@
+import { PLANTILLAS_ACTIVIDAD, permisoVacio, reporteVacio } from "./formatos";
+import type { Auditoria, Cliente, Config, Documento, Estado, Notificacion, Usuario } from "./types";
+
+/** Firma ficticia dibujada como SVG para los documentos de ejemplo. */
+export function firmaDemo(seed: number): string {
+  const r = (n: number) => Math.round(((Math.sin(seed * 97 + n * 13) + 1) / 2) * 30);
+  const d = `M10 ${40 + r(1) / 3} C 40 ${5 + r(2)}, 60 ${70 - r(3)}, 90 ${35 + r(4) / 4} S 140 ${10 + r(5)}, 170 ${40 + r(6) / 3} S 210 ${60 - r(7)}, 240 ${30 + r(8) / 3} M 60 ${55 + r(9) / 5} L 200 ${48 + r(10) / 5}`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="260" height="80" viewBox="0 0 260 80"><path d="${d}" fill="none" stroke="#1d3b8a" stroke-width="2.2" stroke-linecap="round"/></svg>`;
+  return `data:image/svg+xml;base64,${typeof btoa === "function" ? btoa(svg) : Buffer.from(svg).toString("base64")}`;
+}
+
+export const USUARIOS_SEED: Usuario[] = [
+  { id: "u-tec1", nombre: "Andrés Camacho Ruiz", cargo: "Ingeniero de campo", rol: "tecnico", email: "tecnico1@sotec.example", cedula: "1.000.000.001", activo: true },
+  { id: "u-tec2", nombre: "Julián Herrera Pacheco", cargo: "Técnico electrónico", rol: "tecnico", email: "tecnico2@sotec.example", cedula: "1.000.000.002", activo: true },
+  { id: "u-sup", nombre: "Andrea Ríos Martínez", cargo: "Coordinadora SST", rol: "supervisor", email: "sst@sotecse.com", cedula: "1.000.000.003", activo: true },
+  { id: "u-adm", nombre: "Gerencia SOTEC", cargo: "Gerente general", rol: "admin", email: "info@sotecse.com", activo: true },
+  { id: "u-cli", nombre: "Ing. Daniel Ortega", cargo: "Ing. de sistemas · Ladrillera Arcillas del Caribe", rol: "cliente", email: "sistemas@arcillas.example", clienteId: "c-clay", activo: true },
+];
+
+export const CLIENTES_SEED: Cliente[] = [
+  { id: "c-clay", nombre: "Ladrillera Arcillas del Caribe", direccion: "Pasacaballos, Cartagena", contacto: "Ing. Daniel Ortega", cargo: "Ing. sistemas", correo: "sistemas@arcillas.example", telefono: "3000000000", sitio: "Hornilla" },
+  { id: "c-tango", nombre: "Constructora Horizonte Azul", direccion: "Bocagrande, Cartagena", contacto: "Arq. Laura Gómez", cargo: "Residente de obra", correo: "obra@horizonteazul.example", telefono: "3001112233", sitio: "Torre Norte" },
+  { id: "c-puerto", nombre: "Centro Logístico Bahía", direccion: "Mamonal Km 5, Cartagena", contacto: "Mario Rivas", cargo: "Jefe de seguridad", correo: "seguridad@logisticabahia.example", telefono: "3014445566", sitio: "Patio 2" },
+  { id: "c-conj", nombre: "Conjunto Residencial Los Robles", direccion: "Urb. Residencial Los Robles", contacto: "Sofía Castro", cargo: "Administradora", correo: "admin@losrobles.example", telefono: "3157778899", sitio: "Portería principal" },
+];
+
+export const CONFIG_SEED: Config = {
+  empresa: "SOTEC",
+  nit: "900.000.000-0",
+  prefijoReporte: "RT",
+  prefijoPermiso: "PT",
+  exigirFirmaCliente: true,
+  vigenciaPermisoHoras: 12,
+};
+
+function codigo(pref: string, n: number, fecha: string) {
+  return `${pref}-${String(n).padStart(3, "0")}-${fecha.slice(2, 4)}`;
+}
+
+const DESCRIPCION_CLAY = `Se realiza intervención correctiva sobre el enlace de fibra óptica comprendido entre el nodo Molino 3 y el nodo Patio Ladrillo, debido a fallas recurrentes e intermitencias presentadas en la red de CCTV.
+
+Durante las labores de diagnóstico se identificó que un tramo de la fibra óptica se encontraba cristalizado y deteriorado, afectando la calidad de la transmisión de datos y generando inestabilidad en las comunicaciones del sistema de videovigilancia.
+
+Como acción correctiva, se efectuó el reemplazo del tramo de fibra óptica afectado, realizando las adecuaciones y conexiones necesarias para garantizar la integridad del enlace y la correcta transmisión de la información entre ambos nodos.
+
+Posteriormente se realizaron pruebas de conectividad y verificación de los servicios asociados, confirmando la estabilidad del enlace, la eliminación de las intermitencias y el correcto funcionamiento de la red de CCTV. El sistema queda operando bajo condiciones normales.`;
+
+interface Extra {
+  asunto: string;
+  tipo: string;
+  cliente: Cliente;
+  autor: Usuario;
+  fecha: string;
+  estado: Estado;
+}
+
+export function documentosSeed(): Documento[] {
+  const [tec1, tec2] = USUARIOS_SEED;
+  const sup = USUARIOS_SEED[2];
+  const [clay, tango, puerto, conj] = CLIENTES_SEED;
+  const docs: Documento[] = [];
+  let nR = 0;
+  let nP = 0;
+
+  const hist = (fecha: string, autor: Usuario, estado: Estado) => {
+    const h = [{ fecha: `${fecha}T08:10:00`, usuarioId: autor.id, accion: "Creó el documento" }];
+    if (estado !== "borrador") h.push({ fecha: `${fecha}T09:30:00`, usuarioId: autor.id, accion: "Envió a revisión" });
+    if (estado === "aprobado" || estado === "cerrado") h.push({ fecha: `${fecha}T11:00:00`, usuarioId: sup.id, accion: "Aprobó" });
+    if (estado === "rechazado") h.push({ fecha: `${fecha}T11:00:00`, usuarioId: sup.id, accion: "Rechazó", detalle: "Falta detallar las recomendaciones" } as never);
+    if (estado === "cerrado") h.push({ fecha: `${fecha}T17:00:00`, usuarioId: "u-cli", accion: "Cerró / firmó" });
+    return h;
+  };
+
+  // Reporte real del PDF
+  nR++;
+  docs.push({
+    id: "d-rt-clay",
+    tipo: "reporte",
+    codigo: codigo("RT", nR, "2026-05-26"),
+    consecutivo: nR,
+    estado: "cerrado",
+    autorId: tec1.id,
+    clienteId: clay.id,
+    creado: "2026-05-26T08:10:00",
+    actualizado: "2026-05-26T17:00:00",
+    historial: hist("2026-05-26", tec1, "cerrado"),
+    datos: {
+      ...reporteVacio("2026-05-26"),
+      tipoReporte: "Correctivo",
+      cliente: clay.nombre,
+      direccion: "Pasacaballos",
+      personaContactada: "Ing. José",
+      correo: clay.correo,
+      telefono: clay.telefono,
+      cargo: "Ing. sistemas",
+      asunto: "Reparación fibra óptica nodo Molino 3 – Patio Ladrillo",
+      descripcion: DESCRIPCION_CLAY,
+      recomendaciones: "Programar inspección semestral del tendido de fibra y proteger con tubería los tramos expuestos a calor de los hornos.",
+      nombreTecnico: "Ing. Andrés Camacho",
+      firmaTecnico: firmaDemo(1),
+      firmaCliente: firmaDemo(2),
+    },
+  });
+
+  // Permiso real del PDF
+  nP++;
+  const tpl = PLANTILLAS_ACTIVIDAD["Mantenimiento CCTV"];
+  docs.push({
+    id: "d-pt-clay",
+    tipo: "permiso",
+    codigo: codigo("PT", nP, "2026-05-26"),
+    consecutivo: nP,
+    estado: "aprobado",
+    autorId: tec1.id,
+    clienteId: clay.id,
+    creado: "2026-05-26T07:40:00",
+    actualizado: "2026-05-26T11:00:00",
+    historial: hist("2026-05-26", tec1, "aprobado"),
+    datos: {
+      ...permisoVacio("2026-05-26"),
+      hora: "09:00",
+      ampm: "AM",
+      cliente: clay.nombre,
+      sitioTrabajo: "Hornilla",
+      puestoProyecto: "Mantenimiento CCTV",
+      responsable: tec1.nombre,
+      actividades: "Mantenimiento sistema CCTV",
+      equipo: tpl.equipo,
+      equipoMenorCual: "Taladro",
+      peligros: tpl.peligros,
+      medidas: tpl.medidas,
+      epp: tpl.epp,
+      verificacion: ["SI", "SI", "SI", "SI", "SI", "SI"],
+      ejecutores: [
+        { nombre: "Andrés Camacho Ruiz", cedula: "1000000001", arlEps: "ARL Andina / EPS Vital", horaInicio: "09:00", horaFin: "16:00", firma: firmaDemo(3) },
+        { nombre: "Julián Herrera Pacheco", cedula: "1000000002", arlEps: "ARL Andina / EPS Vital", horaInicio: "09:00", horaFin: "16:00", firma: firmaDemo(4) },
+        { nombre: "Kevin Mendoza Ortiz", cedula: "1000000004", arlEps: "ARL Andina / EPS Vital", horaInicio: "15:00", horaFin: "16:00", firma: firmaDemo(5) },
+      ],
+      autoriza: sup.nombre,
+      firmaAutoriza: firmaDemo(6),
+      encargado: tec1.nombre,
+      firmaEncargado: firmaDemo(7),
+    },
+  });
+
+  // Histórico para el tablero
+  const extras: Extra[] = [
+    { asunto: "Instalación de 8 cámaras IP en bodega", tipo: "Instalación", cliente: puerto, autor: tec2, fecha: "2026-06-12", estado: "cerrado" },
+    { asunto: "Mantenimiento preventivo cerca eléctrica", tipo: "Preventivo", cliente: conj, autor: tec1, fecha: "2026-07-03", estado: "cerrado" },
+    { asunto: "Diagnóstico control de acceso torre B", tipo: "Diagnóstico", cliente: tango, autor: tec2, fecha: "2026-07-21", estado: "aprobado" },
+    { asunto: "Configuración NVR y monitoreo remoto", tipo: "Instalación", cliente: clay, autor: tec1, fecha: "2026-08-09", estado: "cerrado" },
+    { asunto: "Revisión sistema de detección de incendio", tipo: "Preventivo", cliente: puerto, autor: tec2, fecha: "2026-09-02", estado: "aprobado" },
+    { asunto: "Cambio de fuente en cámara PTZ", tipo: "Correctivo", cliente: conj, autor: tec1, fecha: "2026-09-25", estado: "rechazado" },
+    { asunto: "Cableado estructurado oficina obra", tipo: "Instalación", cliente: tango, autor: tec2, fecha: "2026-10-14", estado: "en_revision" },
+    { asunto: "Mantenimiento preventivo CCTV hornos", tipo: "Preventivo", cliente: clay, autor: tec1, fecha: "2026-10-17", estado: "en_revision" },
+    { asunto: "Ajuste de alarmas perimetrales", tipo: "Correctivo", cliente: conj, autor: tec1, fecha: "2026-10-19", estado: "borrador" },
+  ];
+  extras.forEach((e, i) => {
+    nR++;
+    docs.push({
+      id: `d-rt-${i}`,
+      tipo: "reporte",
+      codigo: codigo("RT", nR, e.fecha),
+      consecutivo: nR,
+      estado: e.estado,
+      autorId: e.autor.id,
+      clienteId: e.cliente.id,
+      creado: `${e.fecha}T08:10:00`,
+      actualizado: `${e.fecha}T11:00:00`,
+      motivoRechazo: e.estado === "rechazado" ? "Falta detallar las recomendaciones y la firma del cliente." : undefined,
+      historial: hist(e.fecha, e.autor, e.estado),
+      datos: {
+        ...reporteVacio(e.fecha),
+        tipoReporte: e.tipo,
+        cliente: e.cliente.nombre,
+        direccion: e.cliente.direccion,
+        personaContactada: e.cliente.contacto,
+        correo: e.cliente.correo,
+        telefono: e.cliente.telefono,
+        cargo: e.cliente.cargo,
+        asunto: e.asunto,
+        descripcion: `Se atiende la solicitud "${e.asunto.toLowerCase()}". Se verifican equipos, conexiones y alimentación; se ejecutan los ajustes requeridos y se realizan pruebas de funcionamiento con el cliente. El sistema queda operando en condiciones normales.`,
+        recomendaciones: e.estado === "rechazado" ? "" : "Mantener el plan de mantenimiento preventivo trimestral.",
+        nombreTecnico: e.autor.nombre,
+        firmaTecnico: e.estado === "borrador" ? "" : firmaDemo(10 + i),
+        firmaCliente: e.estado === "cerrado" ? firmaDemo(30 + i) : "",
+      },
+    });
+  });
+
+  const permisosExtra: Extra[] = [
+    { asunto: "Trabajo en alturas", tipo: "", cliente: tango, autor: tec2, fecha: "2026-07-21", estado: "cerrado" },
+    { asunto: "Trabajo eléctrico", tipo: "", cliente: puerto, autor: tec2, fecha: "2026-09-02", estado: "cerrado" },
+    { asunto: "Cableado estructurado", tipo: "", cliente: tango, autor: tec2, fecha: "2026-10-14", estado: "aprobado" },
+    { asunto: "Trabajo en alturas", tipo: "", cliente: clay, autor: tec1, fecha: "2026-10-20", estado: "en_revision" },
+  ];
+  permisosExtra.forEach((e, i) => {
+    nP++;
+    const t = PLANTILLAS_ACTIVIDAD[e.asunto];
+    docs.push({
+      id: `d-pt-${i}`,
+      tipo: "permiso",
+      codigo: codigo("PT", nP, e.fecha),
+      consecutivo: nP,
+      estado: e.estado,
+      autorId: e.autor.id,
+      clienteId: e.cliente.id,
+      creado: `${e.fecha}T07:30:00`,
+      actualizado: `${e.fecha}T11:00:00`,
+      historial: hist(e.fecha, e.autor, e.estado),
+      datos: {
+        ...permisoVacio(e.fecha),
+        hora: "07:30",
+        cliente: e.cliente.nombre,
+        sitioTrabajo: e.cliente.sitio,
+        puestoProyecto: e.asunto,
+        responsable: e.autor.nombre,
+        actividades: `${e.asunto} en ${e.cliente.sitio}`,
+        equipo: t.equipo,
+        peligros: t.peligros,
+        medidas: t.medidas,
+        epp: t.epp,
+        verificacion: ["SI", "SI", "SI", "SI", "SI", "SI"],
+        ejecutores: [
+          { nombre: e.autor.nombre, cedula: (e.autor.cedula ?? "").replace(/\./g, ""), arlEps: "ARL Andina / EPS Vital", horaInicio: "07:30", horaFin: "16:00", firma: firmaDemo(50 + i) },
+        ],
+        autoriza: e.estado === "en_revision" ? "" : sup.nombre,
+        firmaAutoriza: e.estado === "en_revision" ? "" : firmaDemo(60 + i),
+        encargado: e.autor.nombre,
+        firmaEncargado: firmaDemo(70 + i),
+        cierreAreaLimpia: e.estado === "cerrado" ? "SI" : "",
+        cierraNombre: e.estado === "cerrado" ? sup.nombre : "",
+        firmaCierre: e.estado === "cerrado" ? firmaDemo(80 + i) : "",
+      },
+    });
+  });
+
+  return docs;
+}
+
+export function notificacionesSeed(): Notificacion[] {
+  return [
+    { id: "n1", para: "supervisor", texto: "Andrés Camacho envió el permiso PT-005-26 a revisión", docId: "d-pt-3", fecha: "2026-10-20T07:45:00", leida: false },
+    { id: "n2", para: "supervisor", texto: "Andrés Camacho envió el reporte RT-010-26 a revisión", docId: "d-rt-7", fecha: "2026-10-17T15:20:00", leida: false },
+    { id: "n3", para: "u-tec1", texto: "Tu reporte RT-008-26 fue rechazado: falta detallar las recomendaciones", docId: "d-rt-5", fecha: "2026-09-25T11:00:00", leida: false },
+    { id: "n4", para: "cliente", texto: "SOTEC compartió el reporte RT-001-26 para tu firma", docId: "d-rt-clay", fecha: "2026-05-26T12:00:00", leida: true },
+  ];
+}
+
+export function auditoriaSeed(): Auditoria[] {
+  return [
+    { id: "a1", fecha: "2026-10-20T07:45:00", usuarioId: "u-tec1", accion: "Envió a revisión", detalle: "PT-005-26" },
+    { id: "a2", fecha: "2026-10-17T15:20:00", usuarioId: "u-tec1", accion: "Envió a revisión", detalle: "RT-010-26" },
+    { id: "a3", fecha: "2026-10-14T10:00:00", usuarioId: "u-sup", accion: "Aprobó", detalle: "PT-004-26" },
+    { id: "a4", fecha: "2026-09-25T11:00:00", usuarioId: "u-sup", accion: "Rechazó", detalle: "RT-008-26" },
+  ];
+}

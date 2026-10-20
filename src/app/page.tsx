@@ -19,6 +19,7 @@ import { HeroDemo } from "@/components/landing/HeroDemo";
 import { AccesoRoles, Calculadora, Contacto, Faq, VitrinaFormatos } from "@/components/landing/Interactivos";
 import { FuncionesBento } from "@/components/landing/FuncionesBento";
 import { LottieDigitaliza } from "@/components/landing/LottieDigitaliza";
+import { NormasReferencia } from "@/components/landing/NormasReferencia";
 import { PapelVsDigital } from "@/components/landing/PapelVsDigital";
 
 const FORMATOS_TIPICOS = [
@@ -273,6 +274,8 @@ export default function Landing() {
           <span className="mt-6 inline-block rounded-full bg-sotec px-4 py-2 text-sm font-medium text-white">+ el formato que tú necesites</span>
         </div>
       </section>
+
+      <NormasReferencia />
 
       {/* Planes */}
       <section id="planes" className="container scroll-mt-16 py-20">

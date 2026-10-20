@@ -4,11 +4,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 REMOTO=$(git remote get-url origin)
-rm -rf out
+# El build de Pages usa su propia carpeta (.next-pages) para no chocar con `npm run dev`;
+# con output: "export" el sitio estático queda dentro de esa carpeta.
+SALIDA=.next-pages
+rm -rf "$SALIDA"
 GITHUB_PAGES=true npx next build
-touch out/.nojekyll
+touch "$SALIDA/.nojekyll"
 TMP=$(mktemp -d)
-cp -r out/. "$TMP"
+cp -r "$SALIDA/." "$TMP"
 cd "$TMP"
 git init -q -b gh-pages
 git add -A

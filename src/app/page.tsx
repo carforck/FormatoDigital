@@ -2,47 +2,24 @@
 import Link from "next/link";
 import {
   ArrowRight,
-  BarChart3,
-  Bot,
   Building,
   Building2,
-  ClipboardCheck,
   FileCheck2,
-  FileX2,
   Fingerprint,
-  History,
-  Layers,
   Lock,
-  PenLine,
-  Search,
   ShieldCheck,
-  Smartphone,
   Timer,
-  Users,
 } from "lucide-react";
 
 import { asset } from "@/lib/base";
 import { FondoInteractivo } from "@/components/fx/FondoInteractivo";
-import { Contador, Icono, ProgresoScroll, Reveal, Spotlight, TextoRotativo } from "@/components/fx/Reveal";
+import { Contador, Icono, ProgresoScroll, Reveal, TextoRotativo } from "@/components/fx/Reveal";
 import { GraficasImpacto } from "@/components/landing/GraficasImpacto";
 import { HeroDemo } from "@/components/landing/HeroDemo";
 import { AccesoRoles, Calculadora, Contacto, Faq, VitrinaFormatos } from "@/components/landing/Interactivos";
+import { FuncionesBento } from "@/components/landing/FuncionesBento";
 import { LottieDigitaliza } from "@/components/landing/LottieDigitaliza";
-
-const FUNCIONES = [
-  { icon: Bot, t: "Asistente que guía paso a paso", d: "Pregunta, valida y llena el formato por ti. Nadie deja un campo en blanco ni lo diligencia mal." },
-  { icon: FileCheck2, t: "Fiel a tu formato original", d: "Mismo código, versión y estructura de control documental. Lo que el auditor conoce, ahora digital." },
-  { icon: PenLine, t: "Firmas en el celular", d: "Técnicos, ejecutores, supervisores y clientes firman con el dedo, con fecha y hora." },
-  { icon: ClipboardCheck, t: "Flujo de aprobación", d: "Borrador → revisión → aprobado → cerrado. Si se rechaza, vuelve al autor con el motivo." },
-  { icon: ShieldCheck, t: "Reglas de tu SGC", d: "Las validaciones del sistema de gestión se cumplen solas: sin arnés no hay trabajo en alturas." },
-  { icon: Users, t: "Roles y accesos", d: "Cada persona ve y hace solo lo que le corresponde: campo, SST, gerencia o cliente." },
-  { icon: History, t: "Trazabilidad y auditoría", d: "Quién creó, cambió, aprobó y firmó cada documento. Evidencia lista para ISO y SG-SST." },
-  { icon: BarChart3, t: "Tablero de indicadores", d: "Documentos por mes, por cliente y por estado para decidir con datos." },
-  { icon: Search, t: "Búsqueda instantánea", d: "Encuentra cualquier reporte por código, cliente o texto en segundos, no en el archivador." },
-  { icon: Building2, t: "Portal del cliente", d: "Tu cliente consulta y firma sus reportes en línea. Servicio más profesional." },
-  { icon: Layers, t: "Plantillas inteligentes", d: "Elige la actividad y se precargan peligros, medidas y EPP. Duplica un documento en un clic." },
-  { icon: Smartphone, t: "PDF y celular", d: "Funciona en cualquier dispositivo y descarga el PDF idéntico al formato aprobado." },
-];
+import { PapelVsDigital } from "@/components/landing/PapelVsDigital";
 
 const FORMATOS_TIPICOS = [
   "Permisos de trabajo",
@@ -183,46 +160,11 @@ export default function Landing() {
       <section className="container py-20">
         <Reveal className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">El papel le cuesta a tu empresa más de lo que parece</h2>
-          <p className="mt-3 text-slate-600">Formatos incompletos, firmas pendientes, carpetas que nadie encuentra el día de la auditoría.</p>
+          <p className="mt-3 text-slate-600">Cada problema del formato en papel, con la solución que lo elimina.<span className="hidden md:inline"> Pasa el mouse por una fila.</span><span className="md:hidden"> Toca «Después» para ver el cambio.</span></p>
         </Reveal>
-        <div className="mt-12 grid gap-6 md:grid-cols-2">
-          <Reveal className="rounded-3xl border border-rose-100 bg-rose-50/60 p-7">
-            <p className="group flex items-center gap-2 font-semibold text-rose-800">
-              <Icono><FileX2 className="h-5 w-5" /></Icono> Hoy, en papel
-            </p>
-            <ul className="mt-4 space-y-3 text-slate-700">
-              {[
-                "Campos en blanco o mal diligenciados que se detectan tarde",
-                "El técnico vuelve a la oficina para entregar y escanear",
-                "Permisos firmados sin verificar EPP ni condiciones",
-                "Horas buscando un reporte para el cliente o el auditor",
-                "Sin indicadores: nadie sabe cuántos trabajos se hicieron",
-              ].map((x) => (
-                <li key={x} className="flex gap-2">
-                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" /> {x}
-                </li>
-              ))}
-            </ul>
-          </Reveal>
-          <Reveal delay={150} className="rounded-3xl border border-sotec-green/40 bg-sotec-soft p-7">
-            <p className="flex items-center gap-2 font-semibold text-sotec-greenDeep">
-              <Icono><FileCheck2 className="h-5 w-5" /></Icono> Con FormatoDigital
-            </p>
-            <ul className="mt-4 space-y-3 text-slate-700">
-              {[
-                "El asistente valida cada respuesta antes de avanzar",
-                "Se diligencia y firma en campo, desde el celular",
-                "Las reglas del SG-SST bloquean lo que no cumple",
-                "Cualquier documento aparece en segundos con su historial",
-                "Tablero en tiempo real por cliente, mes y estado",
-              ].map((x) => (
-                <li key={x} className="flex gap-2">
-                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sotec-greenDeep" /> {x}
-                </li>
-              ))}
-            </ul>
-          </Reveal>
-        </div>
+        <Reveal className="mx-auto mt-12 max-w-5xl">
+          <PapelVsDigital />
+        </Reveal>
       </section>
 
       {/* Vitrina de los dos formatos */}
@@ -260,26 +202,13 @@ export default function Landing() {
       {/* Funcionalidades */}
       <section id="funciones" className="scroll-mt-16 bg-slate-50 py-20">
         <div className="container">
-          <h2 className="max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">Todo lo que tu sistema de gestión necesita, en un solo lugar</h2>
-          <Spotlight className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {FUNCIONES.map((f, k) => (
-              <Reveal key={f.t} delay={(k % 3) * 100}>
-              <div
-                data-spot
-                className="group relative h-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 transition hover:-translate-y-0.5 hover:border-sotec-green hover:shadow-md"
-              >
-                <span aria-hidden className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{ background: "radial-gradient(260px circle at var(--mx) var(--my), rgba(146,208,80,0.18), transparent 70%)" }} />
-                <span className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-sotec text-sotec-green transition group-hover:rotate-6 group-hover:bg-sotec-green group-hover:text-sotec">
-                  <Icono efecto={k % 2 ? "bounce" : "wiggle"}>
-                    <f.icon className="h-5 w-5" />
-                  </Icono>
-                </span>
-                <p className="relative mt-4 font-semibold">{f.t}</p>
-                <p className="relative mt-1 text-sm text-slate-600">{f.d}</p>
-              </div>
-              </Reveal>
-            ))}
-          </Spotlight>
+          <Reveal className="max-w-2xl">
+            <p className="text-sm font-semibold uppercase tracking-wider text-sotec-greenDeep">Funcionalidades</p>
+            <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Todo lo que tu sistema de gestión necesita, en un solo lugar</h2>
+          </Reveal>
+          <Reveal className="mt-12">
+            <FuncionesBento />
+          </Reveal>
         </div>
       </section>
 

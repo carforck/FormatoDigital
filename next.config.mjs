@@ -7,7 +7,8 @@ const basePath = pages ? "/FormatoDigital" : "";
 
 /** @type {import("next").NextConfig} */
 const nextConfig = {
-  ...(pages && { output: "export", trailingSlash: true }),
+  // Carpeta propia para no chocar con `npm run dev` si está corriendo
+  ...(pages && { output: "export", trailingSlash: true, distDir: ".next-pages" }),
   basePath,
   images: { unoptimized: true },
   env: { NEXT_PUBLIC_BASE_PATH: basePath },

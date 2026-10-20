@@ -13,7 +13,8 @@ npm run dev   # http://localhost:3100
 ```
 
 Publicar en GitHub Pages: `npm run deploy` (compila con `GITHUB_PAGES=true`, exporta
-el sitio estático bajo `/FormatoDigital` y lo sube a la rama `gh-pages`).
+el sitio estático bajo `/FormatoDigital` en `.next-pages/` y lo sube a la rama `gh-pages`;
+puede correr aunque `npm run dev` esté encendido).
 
 - `/` landing comercial · `/acceso` entrar por rol sin credenciales · `/app` aplicativo
 - Roles: Técnico de campo, Coordinador SST, Administrador, Cliente (cambio en vivo con «Ver como»)

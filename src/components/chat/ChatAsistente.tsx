@@ -306,7 +306,7 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
                 ) : (
                   <div className="flex gap-2">
                     <Input
-                      autoFocus
+                      autoFocus={i > 0}
                       type={paso.tipo === "fecha" ? "date" : paso.tipo === "hora" ? "time" : paso.tipo === "email" ? "email" : paso.tipo === "tel" ? "tel" : "text"}
                       value={valor}
                       onChange={(e) => setValor(e.target.value)}

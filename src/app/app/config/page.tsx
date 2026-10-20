@@ -4,6 +4,7 @@ import { useState } from "react";
 import { RotateCcw, Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/corporativo";
 import { Input } from "@/components/ui/input";
 import { FORMATOS } from "@/lib/formatos";
 import { CONFIG_SEED } from "@/lib/seed";
@@ -17,10 +18,7 @@ export default function Config() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Configuración</h1>
-        <p className="text-sm text-slate-500">Control documental de los formatos y reglas del flujo.</p>
-      </div>
+      <PageHeader etiqueta="Administración" titulo="Configuración" descripcion="Control documental de los formatos y reglas del flujo." />
 
       <section className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
         <label className="text-sm">

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Check, Minus, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Avatar, PageHeader } from "@/components/ui/corporativo";
 import { Input } from "@/components/ui/input";
 import { ETIQUETA_ROL } from "@/lib/formatos";
 import { ACCIONES, DESCRIPCION_ACCION, puede } from "@/lib/permisos";
@@ -18,12 +19,9 @@ export default function Usuarios() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Usuarios y roles</h1>
-        <p className="text-sm text-slate-500">Asigna el rol de cada persona; el menú y los permisos cambian al instante.</p>
-      </div>
+      <PageHeader etiqueta="Administración" titulo="Usuarios y roles" descripcion="Asigna el rol de cada persona; el menú y los permisos cambian al instante." />
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>
@@ -36,10 +34,16 @@ export default function Usuarios() {
             {demo.usuarios.map((u) => (
               <tr key={u.id}>
                 <td className="px-4 py-2.5">
-                  <p className="font-medium">{u.nombre}</p>
-                  <p className="text-xs text-slate-500">
-                    {u.cargo} · {u.email}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <Avatar nombre={u.nombre} className="hidden sm:inline-flex" />
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-900">{u.nombre}</p>
+                      <p className="text-xs text-slate-500">
+                        {u.cargo}
+                        <span className="hidden sm:inline"> · {u.email}</span>
+                      </p>
+                    </div>
+                  </div>
                 </td>
                 <td className="px-4">
                   <select
@@ -65,7 +69,7 @@ export default function Usuarios() {
       </div>
 
       <form
-        className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-4"
+        className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
         onSubmit={(e) => {
           e.preventDefault();
           demo.actualizarUsuario({ id: `u-${Date.now()}`, ...nuevo, activo: true, clienteId: nuevo.rol === "cliente" ? demo.clientes[0].id : undefined });
@@ -96,7 +100,7 @@ export default function Usuarios() {
         </Button>
       </form>
 
-      <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <h2 className="px-4 pt-4 font-semibold">Matriz de permisos</h2>
         <table className="mt-2 w-full text-sm">
           <thead className="text-xs text-slate-500">

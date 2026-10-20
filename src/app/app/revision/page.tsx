@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AlertTriangle, CheckCircle2, FileText, HardHat } from "lucide-react";
 
 import { EstadoBadge, fechaCorta } from "@/components/ui/badges";
+import { PageHeader } from "@/components/ui/corporativo";
 import { FORMATOS } from "@/lib/formatos";
 import { rutaDoc } from "@/lib/base";
 import { useDemo } from "@/lib/store";
@@ -18,7 +19,7 @@ export default function Revision() {
   const tarjeta = (d: (typeof cola)[number], cta: string) => {
     const p = faltantes(d);
     return (
-      <Link key={d.id} href={rutaDoc(d.id)} className="block rounded-xl border border-slate-200 bg-white p-4 transition hover:border-sotec-greenDeep hover:shadow-sm">
+      <Link key={d.id} href={rutaDoc(d.id)} className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-sotec-greenDeep hover:shadow-md">
         <div className="flex items-center gap-2">
           {d.tipo === "reporte" ? <FileText className="h-4 w-4 text-slate-500" /> : <HardHat className="h-4 w-4 text-slate-500" />}
           <span className="font-mono text-sm font-semibold">{d.codigo}</span>
@@ -46,10 +47,7 @@ export default function Revision() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Revisión y aprobación</h1>
-        <p className="text-sm text-slate-500">Los documentos llegan validados por el sistema; tú decides si se aprueban o vuelven al autor con el motivo.</p>
-      </div>
+      <PageHeader etiqueta="Gestión SST" titulo="Revisión y aprobación" descripcion="Los documentos llegan validados por el sistema; tú decides si se aprueban o vuelven al autor con el motivo." />
       <section>
         <h2 className="mb-2 font-semibold">Por revisar ({cola.length})</h2>
         {cola.length === 0 ? (

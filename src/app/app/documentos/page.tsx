@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { FileText, HardHat, Search } from "lucide-react";
 
 import { EstadoBadge, fechaCorta } from "@/components/ui/badges";
+import { PageHeader } from "@/components/ui/corporativo";
 import { ETIQUETA_ESTADO, FORMATOS } from "@/lib/formatos";
 import { rutaDoc } from "@/lib/base";
 import { useDemo } from "@/lib/store";
@@ -12,9 +14,23 @@ import type { Estado, TipoDoc } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { avance } from "@/lib/validar";
 
-export default function Documentos() {
+export default function Page() {
+  return (
+    <Suspense>
+      <ConClave />
+    </Suspense>
+  );
+}
+
+function ConClave() {
+  const q = useSearchParams().get("q") ?? "";
+  return <Documentos key={q} />;
+}
+
+function Documentos() {
   const demo = useDemo();
-  const [q, setQ] = useState("");
+  const inicial = useSearchParams().get("q") ?? "";
+  const [q, setQ] = useState(inicial);
   const [tipo, setTipo] = useState<TipoDoc | "">("");
   const [estado, setEstado] = useState<Estado | "">("");
   const [cliente, setCliente] = useState("");
@@ -35,7 +51,7 @@ export default function Documentos() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Documentos</h1>
+      <PageHeader titulo="Documentos" descripcion="Reportes técnicos y permisos de trabajo, con su estado y avance." etiqueta={`${FORMATOS.reporte.codigo} · ${FORMATOS.permiso.codigo}`} />
       <div className="flex flex-wrap gap-2">
         <label className="relative min-w-[220px] flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
@@ -66,7 +82,7 @@ export default function Documentos() {
         )}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-sm">
           <thead className="hidden bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 md:table-header-group">
             <tr>

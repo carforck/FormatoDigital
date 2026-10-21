@@ -15,3 +15,5 @@ grant execute on function auth.uid() to anon, authenticated;
 -- Igual que Supabase: los roles de la API tienen privilegios de tabla y RLS decide
 alter default privileges in schema public grant select, insert, update, delete on tables to anon, authenticated;
 alter default privileges in schema public grant usage, select on sequences to anon, authenticated;
+-- Supabase también da EXECUTE a anon/authenticated en cada función nueva
+alter default privileges in schema public grant execute on functions to anon, authenticated;

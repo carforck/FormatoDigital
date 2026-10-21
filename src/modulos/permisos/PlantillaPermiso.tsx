@@ -78,7 +78,8 @@ export function PlantillaPermiso({ datos, codigoDoc, editar, firmar, resaltar, e
   const filas = Math.max(5, datos.ejecutores.length);
 
   return (
-    <article className="doc-print mx-auto w-full max-w-[794px] bg-white p-5 text-[10.5px] leading-snug shadow-sm ring-1 ring-slate-200 sm:p-8">
+    <div className="doc-zona">
+    <article className="doc-print doc-compacto mx-auto w-full max-w-[794px] bg-white p-5 text-[10.5px] leading-snug shadow-sm ring-1 ring-slate-200 sm:p-8">
       <Encabezado tipo="permiso" codigoDoc={codigoDoc} />
 
       <table className="mt-1 w-full border-collapse border border-black">
@@ -277,5 +278,6 @@ export function PlantillaPermiso({ datos, codigoDoc, editar, firmar, resaltar, e
         </div>
       </div>
     </article>
+    </div>
   );
 }

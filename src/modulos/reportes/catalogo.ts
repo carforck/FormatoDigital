@@ -18,5 +18,6 @@ export function reporteVacio(fecha: string): DatosReporte {
     nombreTecnico: "",
     firmaTecnico: "",
     firmaCliente: "",
+    fotos: [],
   };
 }

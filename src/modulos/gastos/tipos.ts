@@ -1,24 +1,37 @@
 /**
- * Gasto de un trabajo (materiales, transporte, viáticos…).
- * Refleja public.gastos (0003_finanzas.sql). ESTRUCTURA PROVISIONAL: se
- * ajustará al formato de gastos que envíe SOTEC; sus campos propios van en `datos`.
+ * FO-GSST-25 · Formato de legalización y registro de gastos operativos (SOTEC).
+ * Se guarda como un documento más (documentos.datos en la base de datos), con
+ * el mismo flujo: borrador → en revisión → aprobado (Vo.Bo.) → cerrado (reembolsado).
  */
-export type CategoriaGasto = "materiales" | "transporte" | "alimentacion" | "hospedaje" | "herramienta" | "otro";
-export type EstadoGasto = "pendiente" | "aprobado" | "rechazado" | "reembolsado";
+export type TipoGasto = "Transporte" | "Alimentación" | "Hospedaje" | "Materiales" | "Otros";
 
-export interface Gasto {
+export interface ItemGasto {
   id: string;
-  organizacionId: string;
-  ordenId?: string;
-  tecnicoId: string;
   fecha: string;
-  categoria: CategoriaGasto;
+  tipo: TipoGasto;
   descripcion: string;
-  valor: number;
-  soporteId?: string; // foto del recibo en archivos
-  datos: Record<string, unknown>;
-  estado: EstadoGasto;
-  motivoRechazo?: string;
-  revisadoPor?: string;
-  revisadoAt?: string;
+  /** N° de recibo o factura */
+  recibo: string;
+  cantidad: number;
+  valorUnitario: number;
+  /** Foto de la factura o recibo (JPEG comprimido; ruta de Storage en producción). */
+  soporte: string;
 }
+
+export interface DatosGasto {
+  fecha: string;
+  centroCostos: string;
+  colaborador: string;
+  cedula: string;
+  cargo: string;
+  telefono: string;
+  clienteObra: string;
+  items: ItemGasto[];
+  observaciones: string;
+  firmaColaborador: string;
+  voboNombre: string;
+  firmaVobo: string;
+}
+
+export const totalItemGasto = (i: ItemGasto) => i.cantidad * i.valorUnitario;
+export const totalGastos = (d: Pick<DatosGasto, "items">) => d.items.reduce((a, i) => a + totalItemGasto(i), 0);

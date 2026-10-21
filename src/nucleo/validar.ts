@@ -4,7 +4,9 @@ import type { Documento } from "./tipos";
 
 /** Pendientes antes de enviar a revisión, según las reglas del módulo del documento. */
 export function faltantes(doc: Documento): string[] {
-  return doc.tipo === "reporte" ? DOCUMENTOS.reporte.faltantes(doc.datos) : DOCUMENTOS.permiso.faltantes(doc.datos);
+  if (doc.tipo === "reporte") return DOCUMENTOS.reporte.faltantes(doc.datos);
+  if (doc.tipo === "permiso") return DOCUMENTOS.permiso.faltantes(doc.datos);
+  return DOCUMENTOS.gasto.faltantes(doc.datos);
 }
 
 /** Porcentaje de diligenciamiento para la barra de progreso. */

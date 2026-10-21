@@ -1,5 +1,6 @@
 import { PLANTILLAS_ACTIVIDAD, permisoVacio } from "@/modulos/permisos/catalogo";
 import { reporteVacio } from "@/modulos/reportes/catalogo";
+import type { CuentaCobro } from "@/modulos/cobros/tipos";
 import type { Auditoria, Cliente, Config, Documento, Estado, Notificacion, Usuario } from "@/nucleo/tipos";
 
 /** Firma ficticia dibujada como SVG para los documentos de ejemplo. */
@@ -28,11 +29,68 @@ export const CLIENTES_SEED: Cliente[] = [
 export const CONFIG_SEED: Config = {
   empresa: "SOTEC",
   nit: "900.000.000-0",
+  ciudad: "Cartagena de Indias",
   prefijoReporte: "RT",
   prefijoPermiso: "PT",
+  prefijoCobro: "CC",
+  prefijoGasto: "LG",
   exigirFirmaCliente: true,
   vigenciaPermisoHoras: 12,
+  ivaPorcentaje: 19,
+  banco: "Banco de Ejemplo",
+  tipoCuenta: "Ahorros",
+  numeroCuenta: "000-000000-00",
+  titularCuenta: "SOTEC",
 };
+
+/** Cuentas de cobro de ejemplo: SOTEC le cobra a sus clientes por servicios ya cerrados. */
+export function cuentasSeed(): CuentaCobro[] {
+  return [
+    {
+      id: "cc-1",
+      codigo: "CC-001-26",
+      consecutivo: 1,
+      clienteId: "c-puerto",
+      fecha: "2026-06-20",
+      concepto: "Instalación de cámaras IP en bodega",
+      items: [
+        { id: "i1", documentoId: "d-rt-0", descripcion: "Instalación de 8 cámaras IP en bodega", cantidad: 8, valorUnitario: 380000 },
+        { id: "i2", descripcion: "Cableado y canaleta", cantidad: 1, valorUnitario: 650000 },
+      ],
+      ivaPorcentaje: 19,
+      notas: "Pago a 30 días.",
+      estado: "pagada",
+      creadoPor: "u-adm",
+      creado: "2026-06-20T10:00:00",
+      actualizado: "2026-07-15T09:00:00",
+      historial: [
+        { fecha: "2026-06-20T10:00:00", usuarioId: "u-adm", accion: "Creó la cuenta de cobro" },
+        { fecha: "2026-06-20T10:20:00", usuarioId: "u-adm", accion: "Emitió" },
+        { fecha: "2026-06-20T10:25:00", usuarioId: "u-adm", accion: "Envió por correo", detalle: "seguridad@logisticabahia.example" },
+        { fecha: "2026-07-15T09:00:00", usuarioId: "u-adm", accion: "Marcó como pagada" },
+      ],
+    },
+    {
+      id: "cc-2",
+      codigo: "CC-002-26",
+      consecutivo: 2,
+      clienteId: "c-clay",
+      fecha: "2026-08-12",
+      concepto: "Configuración NVR y monitoreo remoto",
+      items: [{ id: "i1", documentoId: "d-rt-3", descripcion: "Configuración NVR y monitoreo remoto", cantidad: 1, valorUnitario: 1200000 }],
+      ivaPorcentaje: 19,
+      notas: "",
+      estado: "emitida",
+      creadoPor: "u-adm",
+      creado: "2026-08-12T15:00:00",
+      actualizado: "2026-08-12T15:10:00",
+      historial: [
+        { fecha: "2026-08-12T15:00:00", usuarioId: "u-adm", accion: "Creó la cuenta de cobro" },
+        { fecha: "2026-08-12T15:10:00", usuarioId: "u-adm", accion: "Emitió" },
+      ],
+    },
+  ];
+}
 
 function codigo(pref: string, n: number, fecha: string) {
   return `${pref}-${String(n).padStart(3, "0")}-${fecha.slice(2, 4)}`;
@@ -232,6 +290,45 @@ export function documentosSeed(): Documento[] {
         cierreAreaLimpia: e.estado === "cerrado" ? "SI" : "",
         cierraNombre: e.estado === "cerrado" ? sup.nombre : "",
         firmaCierre: e.estado === "cerrado" ? firmaDemo(80 + i) : "",
+      },
+    });
+  });
+
+  // Legalizaciones de gastos (FO-GSST-25)
+  const factura = (n: number) =>
+    `data:image/svg+xml;base64,${(typeof btoa === "function" ? btoa : (x: string) => Buffer.from(x).toString("base64"))(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400"><rect width="300" height="400" fill="#fff"/><rect x="20" y="20" width="260" height="40" fill="#e2e8f0"/><text x="150" y="46" font-family="Arial" font-size="16" text-anchor="middle">RECIBO No. ${n}</text>${[90, 120, 150, 180, 210, 240].map((y) => `<rect x="30" y="${y}" width="${150 + ((y * n) % 90)}" height="10" fill="#cbd5e1"/>`).join("")}<rect x="30" y="320" width="240" height="2" fill="#94a3b8"/><text x="270" y="350" font-family="Arial" font-size="18" text-anchor="end" font-weight="bold">TOTAL</text><text x="150" y="385" font-family="Arial" font-size="11" fill="#64748b" text-anchor="middle">Imagen ilustrativa</text></svg>`,
+    )}`;
+  const gastos: { autor: Usuario; cliente: Cliente; fecha: string; estado: Estado; items: [string, string, string, number][] }[] = [
+    { autor: tec1, cliente: clay, fecha: "2026-10-10", estado: "cerrado", items: [["Transporte", "Taxi Cartagena – Pasacaballos ida y vuelta", "TX-4821", 60000], ["Alimentación", "Almuerzo comisión de servicio", "FE-10233", 25000], ["Materiales", "Conectores y fusionadora (alquiler)", "FV-778", 180000]] },
+    { autor: tec2, cliente: tango, fecha: "2026-10-16", estado: "en_revision", items: [["Transporte", "Parqueadero obra Torre Norte", "P-2231", 12000], ["Materiales", "Canaleta y amarres", "FV-1290", 95000]] },
+  ];
+  gastos.forEach((g, i) => {
+    const n = i + 1;
+    docs.push({
+      id: `d-lg-${i}`,
+      tipo: "gasto",
+      codigo: `LG-${String(n).padStart(3, "0")}-${g.fecha.slice(2, 4)}`,
+      consecutivo: n,
+      estado: g.estado,
+      autorId: g.autor.id,
+      clienteId: g.cliente.id,
+      creado: `${g.fecha}T17:00:00`,
+      actualizado: `${g.fecha}T18:00:00`,
+      historial: hist(g.fecha, g.autor, g.estado),
+      datos: {
+        fecha: g.fecha,
+        centroCostos: `${g.cliente.nombre} · ${g.cliente.sitio}`,
+        colaborador: g.autor.nombre,
+        cedula: (g.autor.cedula ?? "").replace(/\./g, ""),
+        cargo: g.autor.cargo,
+        telefono: "",
+        clienteObra: g.cliente.nombre,
+        items: g.items.map(([tipo, descripcion, recibo, valor], k) => ({ id: `${i}-${k}`, fecha: g.fecha, tipo: tipo as never, descripcion, recibo, cantidad: 1, valorUnitario: valor, soporte: factura(k + 1) })),
+        observaciones: "Gastos de la comisión de servicio en sitio del cliente.",
+        firmaColaborador: firmaDemo(90 + i),
+        voboNombre: g.estado === "cerrado" ? sup.nombre : "",
+        firmaVobo: g.estado === "cerrado" ? firmaDemo(95 + i) : "",
       },
     });
   });

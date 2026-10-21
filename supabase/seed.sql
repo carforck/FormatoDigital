@@ -14,9 +14,12 @@ from o, (values
   ('reporte',      'FO-GSST-22', 'Formato de reporte técnico', '01', '2020-03-01', 'RT'),
   ('permiso',      'F-GSST-13',  'Permiso de trabajo',         '01', '2019-03-01', 'PT'),
   ('cuenta_cobro', 'CC-01',      'Cuenta de cobro',            '01', null,         'CC'),
-  ('orden',        'OS-01',      'Orden de servicio',          '01', null,         'OS')
+  ('orden',        'OS-01',      'Orden de servicio',          '01', null,         'OS'),
+  ('gasto',        'FO-GSST-25', 'Formato de legalización y registro de gastos operativos', '01', '2020-03-01', 'LG')
 ) as f(clave, codigo, nombre, version, fecha, prefijo)
 on conflict (organizacion_id, clave) do nothing;
+
+update public.formatos set visible_cliente = false where clave = 'gasto';
 
 with o as (select id from public.organizaciones where slug = 'sotec')
 insert into public.clientes (organizacion_id, nombre, direccion, contacto, cargo, correo, telefono)

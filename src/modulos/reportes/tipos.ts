@@ -1,3 +1,11 @@
+/** Foto del registro fotográfico (hoja anexa del reporte). */
+export interface FotoReporte {
+  id: string;
+  src: string; // JPEG comprimido (data URL en la demo; ruta de Storage en producción)
+  descripcion: string;
+  etiqueta: "antes" | "despues" | "";
+}
+
 /** FO-GSST-22 · Formato de reporte técnico: contenido del formato. */
 export interface DatosReporte {
   fecha: string;
@@ -14,4 +22,6 @@ export interface DatosReporte {
   nombreTecnico: string;
   firmaTecnico: string; // data URL
   firmaCliente: string; // data URL
+  /** Registro fotográfico: sale en una hoja anexa con el mismo encabezado. */
+  fotos?: FotoReporte[];
 }

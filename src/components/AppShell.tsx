@@ -16,10 +16,12 @@ import {
   LogOut,
   Menu,
   Plus,
+  Receipt,
   ScrollText,
   Search,
   Settings,
   Users,
+  Wallet,
   X,
 } from "lucide-react";
 
@@ -45,13 +47,15 @@ const GRUPOS: { titulo: string; items: Item[] }[] = [
       { href: "/app", label: "Tablero", icon: LayoutDashboard },
       { href: "/app/nuevo/reporte", label: "Nuevo reporte técnico", icon: FileText, req: "crear" },
       { href: "/app/nuevo/permiso", label: "Nuevo permiso de trabajo", icon: HardHat, req: "crear" },
+      { href: "/app/nuevo/gasto", label: "Legalizar gastos", icon: Wallet, req: "crear" },
       { href: "/app/documentos", label: "Documentos", icon: FolderOpen, contador: "borradores" },
     ],
   },
   {
-    titulo: "Gestión SST",
+    titulo: "Gestión",
     items: [
       { href: "/app/revision", label: "Revisión y aprobación", icon: ClipboardCheck, req: "revisar", contador: "revision" },
+      { href: "/app/cobros", label: "Cuentas de cobro", icon: Receipt, req: "ver_cobros" },
       { href: "/app/clientes", label: "Clientes", icon: Building2, req: "clientes" },
     ],
   },
@@ -68,6 +72,8 @@ const GRUPOS: { titulo: string; items: Item[] }[] = [
 /** Rutas que exigen un permiso específico. */
 const RUTAS: [string, Accion][] = [
   ["/app/nuevo", "crear"],
+  ["/app/cobros/nueva", "cobros"],
+  ["/app/cobros", "ver_cobros"],
   ["/app/revision", "revisar"],
   ["/app/clientes", "clientes"],
   ["/app/usuarios", "usuarios"],
@@ -79,9 +85,13 @@ const RUTAS: [string, Accion][] = [
 const TITULOS: [string, string][] = [
   ["/app/nuevo/reporte", "Nuevo reporte técnico"],
   ["/app/nuevo/permiso", "Nuevo permiso de trabajo"],
+  ["/app/nuevo/gasto", "Legalización de gastos"],
   ["/app/documentos/ver", "Detalle del documento"],
   ["/app/documentos", "Documentos"],
   ["/app/revision", "Revisión y aprobación"],
+  ["/app/cobros/nueva", "Nueva cuenta de cobro"],
+  ["/app/cobros/ver", "Detalle de la cuenta de cobro"],
+  ["/app/cobros", "Cuentas de cobro"],
   ["/app/clientes", "Clientes"],
   ["/app/usuarios", "Usuarios y roles"],
   ["/app/config", "Configuración"],
@@ -217,7 +227,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex items-center justify-between px-4 pb-4 pt-5">
           <Link href="/app" className="flex items-center gap-2.5">
             <span className="rounded-lg bg-white px-2 py-1.5">
-              <img src={asset("/sotec-logo.png")} alt="SOTEC" className="h-6 w-auto" />
+              <img src={asset("/sotec-logo-v3.png")} alt="SOTEC" className="h-10 w-auto" />
             </span>
           </Link>
           <button className="rounded p-1 text-white/70 hover:text-white lg:hidden" onClick={() => setMenu(false)} aria-label="Cerrar menú">
@@ -426,6 +436,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {[
               { href: "/app/nuevo/reporte", t: "Reporte técnico", d: "FO-GSST-22 · visita, diagnóstico y firma del cliente", icon: FileText },
               { href: "/app/nuevo/permiso", t: "Permiso de trabajo", d: "F-GSST-13 · peligros, EPP y grupo ejecutor", icon: HardHat },
+              { href: "/app/nuevo/gasto", t: "Legalización de gastos", d: "FO-GSST-25 · gastos con foto de la factura", icon: Wallet },
             ].map((o) => (
               <Link key={o.href} href={o.href} className="mb-2 flex items-center gap-3 rounded-xl border border-slate-200 p-3 hover:border-sotec-green">
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sotec text-sotec-green">

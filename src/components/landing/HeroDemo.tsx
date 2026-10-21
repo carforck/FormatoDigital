@@ -50,7 +50,7 @@ export function HeroDemo() {
         <div className="rounded-2xl bg-white p-3 font-[Arial] text-[10px] text-black shadow-2xl">
           <div className="flex items-center justify-between border border-black px-1.5 py-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={asset("/sotec-logo.png")} alt="" className="h-5 w-auto" />
+            <img src={asset("/sotec-logo-v3.png")} alt="" className="h-7 w-auto" />
             <span className="text-[8px] font-bold">FO-GSST-22</span>
           </div>
           <p className="mt-1 bg-sotec-green py-0.5 text-center font-bold">DATOS GENERALES</p>

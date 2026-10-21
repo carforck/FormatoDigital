@@ -1,5 +1,5 @@
 import type { Paso, ValorPaso } from "@/components/chat/ChatAsistente";
-import type { Cliente, TipoDoc } from "@/nucleo/tipos";
+import type { Cliente, TipoDoc, Usuario } from "@/nucleo/tipos";
 
 /** Contexto que el generador le pasa a un módulo para armar los pasos del asistente. */
 export interface ContextoAsistente<D> {
@@ -18,7 +18,7 @@ export interface ContextoAsistente<D> {
 export interface ModuloDocumento<D> {
   clave: TipoDoc;
   /** Contenido inicial del formato para un usuario. */
-  vacio: (hoy: string, usuarioNombre: string) => D;
+  vacio: (hoy: string, usuario: Usuario) => D;
   /** Preguntas del asistente conversacional, en orden. */
   pasos: (ctx: ContextoAsistente<D>) => Paso[];
   /** Aplica una respuesta del asistente; devuelve el cambio y, opcional, un mensaje para el chat. */

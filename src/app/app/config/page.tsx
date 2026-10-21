@@ -44,6 +44,38 @@ export default function Config() {
           <span className="text-xs text-slate-500">Vigencia del permiso (horas)</span>
           <Input type="number" min={1} max={24} value={c.vigenciaPermisoHoras} onChange={(e) => setC({ ...c, vigenciaPermisoHoras: Number(e.target.value) })} />
         </label>
+        <label className="text-sm">
+          <span className="text-xs text-slate-500">Prefijo cuenta de cobro</span>
+          <Input value={c.prefijoCobro} maxLength={4} onChange={(e) => setC({ ...c, prefijoCobro: e.target.value.toUpperCase() })} />
+          <span className="text-xs text-slate-500">Próximo: {c.prefijoCobro}-NNN-{yy}</span>
+        </label>
+        <label className="text-sm">
+          <span className="text-xs text-slate-500">Ciudad (encabezado de la cuenta)</span>
+          <Input value={c.ciudad} onChange={(e) => setC({ ...c, ciudad: e.target.value })} />
+        </label>
+        <label className="text-sm">
+          <span className="text-xs text-slate-500">IVA por defecto (%)</span>
+          <Input type="number" min={0} max={100} value={c.ivaPorcentaje} onChange={(e) => setC({ ...c, ivaPorcentaje: Number(e.target.value) })} />
+        </label>
+        <label className="text-sm">
+          <span className="text-xs text-slate-500">Banco</span>
+          <Input value={c.banco} onChange={(e) => setC({ ...c, banco: e.target.value })} />
+        </label>
+        <label className="text-sm">
+          <span className="text-xs text-slate-500">Tipo de cuenta</span>
+          <select value={c.tipoCuenta} onChange={(e) => setC({ ...c, tipoCuenta: e.target.value })} className="h-10 w-full rounded-md border border-slate-200 bg-white px-2">
+            <option>Ahorros</option>
+            <option>Corriente</option>
+          </select>
+        </label>
+        <label className="text-sm">
+          <span className="text-xs text-slate-500">Número de cuenta</span>
+          <Input value={c.numeroCuenta} onChange={(e) => setC({ ...c, numeroCuenta: e.target.value })} />
+        </label>
+        <label className="text-sm">
+          <span className="text-xs text-slate-500">Titular de la cuenta</span>
+          <Input value={c.titularCuenta} onChange={(e) => setC({ ...c, titularCuenta: e.target.value })} />
+        </label>
         <label className="flex items-center gap-2 self-end pb-2 text-sm">
           <input type="checkbox" checked={c.exigirFirmaCliente} onChange={(e) => setC({ ...c, exigirFirmaCliente: e.target.checked })} />
           Exigir firma del cliente para cerrar el reporte

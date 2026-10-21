@@ -1086,6 +1086,145 @@ drop trigger if exists trg_crear_perfil on auth.users;
 create trigger trg_crear_perfil after insert on auth.users
   for each row execute function public.crear_perfil();
 
+-- ======================== supabase/migrations/0006_endurecer_funciones.sql
+-- ============================================================================
+-- FormatoDigital — 0006 Endurecimiento (Security Advisor de Supabase)
+--
+-- Supabase otorga EXECUTE a anon y authenticated en cada función nueva del
+-- esquema public; las migraciones anteriores solo lo retiraban de PUBLIC.
+--  1. Funciones de trigger: nadie las invoca por la API.
+--  2. crear_enlace_firma: solo usuarios con sesión.
+--  3. Consecutivos: ya no se reservan por fuera de la creación del documento
+--     (evita "quemar" números y dejar huecos en la numeración del SGC).
+--     crear_documento y crear_cuenta_cobro pasan a SECURITY DEFINER con sus
+--     propias verificaciones de rol y pertenencia.
+-- Se mantienen abiertas a propósito: documento_por_enlace y firmar_con_enlace
+-- (el cliente firma sin cuenta) y las funciones auxiliares que usan las
+-- políticas RLS (rol_en, es_miembro, tiene_rol, cliente_de, comparte_org).
+-- ============================================================================
+
+-- 1. Funciones de trigger
+revoke execute on function
+  public.touch_updated_at(), public.documentos_flujo(), public.documentos_creado(),
+  public.gastos_flujo(), public.cuentas_cobro_recalcular(), public.cuentas_cobro_flujo(),
+  public.cuenta_items_bloqueo(), public.crear_perfil()
+  from public, anon, authenticated;
+
+-- 2. Pedir firma requiere sesión
+revoke execute on function public.crear_enlace_firma(uuid, text, text) from anon;
+revoke execute on function public.registrar_auditoria(uuid, text, text, uuid, jsonb) from anon, authenticated;
+
+-- 3. Consecutivos solo a través de la creación del documento o la cuenta
+revoke execute on function public.siguiente_consecutivo(uuid, text, int) from anon, authenticated;
+
+create or replace function public.crear_documento(org uuid, clave_formato text, datos jsonb default '{}'::jsonb,
+                                                   orden uuid default null, cliente uuid default null)
+returns public.documentos
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  f public.formatos;
+  n int;
+  anio int := extract(year from now())::int;
+  doc public.documentos;
+begin
+  if auth.uid() is null or not public.tiene_rol(org, array['admin', 'supervisor', 'tecnico']) then
+    raise exception 'Sin permiso para crear documentos en esta organización' using errcode = '42501';
+  end if;
+  if cliente is not null and not exists (select 1 from public.clientes where id = cliente and organizacion_id = org) then
+    raise exception 'El cliente no pertenece a esta organización' using errcode = '42501';
+  end if;
+  if orden is not null and not exists (select 1 from public.ordenes_servicio where id = orden and organizacion_id = org) then
+    raise exception 'La orden no pertenece a esta organización' using errcode = '42501';
+  end if;
+  select * into f from public.formatos where organizacion_id = org and clave = clave_formato and activo;
+  if not found then
+    raise exception 'Formato % no habilitado en esta organización', clave_formato using errcode = 'P0002';
+  end if;
+  n := public.siguiente_consecutivo(org, clave_formato, anio);
+  insert into public.documentos (organizacion_id, formato_id, orden_id, cliente_id, codigo, consecutivo, autor_id, datos)
+  values (org, f.id, orden, cliente, format('%s-%s-%s', f.prefijo, lpad(n::text, 3, '0'), right(anio::text, 2)), n, auth.uid(), coalesce(datos, '{}'::jsonb))
+  returning * into doc;
+  return doc;
+end;
+$$;
+
+create or replace function public.crear_cuenta_cobro(org uuid, cliente uuid, concepto text, orden uuid default null)
+returns public.cuentas_cobro
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  f public.formatos;
+  n int;
+  anio int := extract(year from now())::int;
+  c public.cuentas_cobro;
+begin
+  if auth.uid() is null or not public.tiene_rol(org, array['admin', 'supervisor']) then
+    raise exception 'Sin permiso para crear cuentas de cobro en esta organización' using errcode = '42501';
+  end if;
+  if not exists (select 1 from public.clientes where id = cliente and organizacion_id = org) then
+    raise exception 'El cliente no pertenece a esta organización' using errcode = '42501';
+  end if;
+  if orden is not null and not exists (select 1 from public.ordenes_servicio where id = orden and organizacion_id = org) then
+    raise exception 'La orden no pertenece a esta organización' using errcode = '42501';
+  end if;
+  select * into f from public.formatos where organizacion_id = org and clave = 'cuenta_cobro' and activo;
+  if not found then
+    raise exception 'Formato cuenta_cobro no habilitado en esta organización' using errcode = 'P0002';
+  end if;
+  n := public.siguiente_consecutivo(org, 'cuenta_cobro', anio);
+  insert into public.cuentas_cobro (organizacion_id, orden_id, cliente_id, codigo, consecutivo, concepto, creado_por)
+  values (org, orden, cliente, format('%s-%s-%s', f.prefijo, lpad(n::text, 3, '0'), right(anio::text, 2)), n, concepto, auth.uid())
+  returning * into c;
+  return c;
+end;
+$$;
+
+revoke execute on function public.crear_documento(uuid, text, jsonb, uuid, uuid), public.crear_cuenta_cobro(uuid, uuid, text, uuid) from public, anon;
+grant execute on function public.crear_documento(uuid, text, jsonb, uuid, uuid), public.crear_cuenta_cobro(uuid, uuid, text, uuid) to authenticated;
+
+-- ======================== supabase/migrations/0007_gastos_como_formato.sql
+-- ============================================================================
+-- FormatoDigital — 0007 Legalización de gastos como formato (FO-GSST-25)
+--
+-- SOTEC entregó su formato de gastos: una legalización con varios gastos, sus
+-- soportes (foto de cada factura), firma del colaborador y Vo.Bo. Encaja en el
+-- modelo general de documentos (flujo, historial, firmas, archivos), así que
+-- la tabla provisional `gastos` de 0003 deja de usarse.
+-- Los ítems viven en documentos.datos.items y las fotos en `archivos`
+-- (tipo 'soporte'), igual que el registro fotográfico del reporte.
+-- ============================================================================
+drop table if exists public.gastos cascade;
+drop function if exists public.gastos_flujo();
+
+insert into public.formatos (organizacion_id, clave, codigo, nombre, version, fecha_version, prefijo)
+select o.id, 'gasto', 'FO-GSST-25', 'Formato de legalización y registro de gastos operativos', '01', date '2020-03-01', 'LG'
+from public.organizaciones o
+where o.slug = 'sotec'
+on conflict (organizacion_id, clave) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Formatos internos: el portal del cliente no los muestra (p. ej. los gastos
+-- son de la operación interna de la empresa, aunque se carguen a su obra).
+-- ---------------------------------------------------------------------------
+alter table public.formatos add column if not exists visible_cliente boolean not null default true;
+update public.formatos set visible_cliente = false where clave = 'gasto';
+
+drop policy if exists documentos_ver on public.documentos;
+create policy documentos_ver on public.documentos for select to authenticated
+  using (
+    deleted_at is null and (
+      public.tiene_rol(organizacion_id, array['admin', 'supervisor'])
+      or (autor_id = auth.uid() and public.es_miembro(organizacion_id))
+      or (cliente_id = public.cliente_de(organizacion_id) and estado in ('aprobado', 'cerrado')
+          and exists (select 1 from public.formatos f where f.id = formato_id and f.visible_cliente))
+    )
+  );
+
 -- ======================== supabase/seed.sql
 -- ============================================================================
 -- Datos iniciales del piloto: organización SOTEC, sus formatos y clientes.
@@ -1103,9 +1242,12 @@ from o, (values
   ('reporte',      'FO-GSST-22', 'Formato de reporte técnico', '01', '2020-03-01', 'RT'),
   ('permiso',      'F-GSST-13',  'Permiso de trabajo',         '01', '2019-03-01', 'PT'),
   ('cuenta_cobro', 'CC-01',      'Cuenta de cobro',            '01', null,         'CC'),
-  ('orden',        'OS-01',      'Orden de servicio',          '01', null,         'OS')
+  ('orden',        'OS-01',      'Orden de servicio',          '01', null,         'OS'),
+  ('gasto',        'FO-GSST-25', 'Formato de legalización y registro de gastos operativos', '01', '2020-03-01', 'LG')
 ) as f(clave, codigo, nombre, version, fecha, prefijo)
 on conflict (organizacion_id, clave) do nothing;
+
+update public.formatos set visible_cliente = false where clave = 'gasto';
 
 with o as (select id from public.organizaciones where slug = 'sotec')
 insert into public.clientes (organizacion_id, nombre, direccion, contacto, cargo, correo, telefono)

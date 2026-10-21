@@ -7,7 +7,7 @@ import { faltantesPermiso } from "./validar";
 /** Módulo F-GSST-13 · Permiso de trabajo. */
 export const moduloPermisos: ModuloDocumento<DatosPermiso> = {
   clave: "permiso",
-  vacio: (hoy, usuarioNombre) => ({ ...permisoVacio(hoy), responsable: usuarioNombre, encargado: usuarioNombre }),
+  vacio: (hoy, u) => ({ ...permisoVacio(hoy), responsable: u.nombre, encargado: u.nombre }),
   totalComprobaciones: 16,
   titulo: (d) => d.actividades,
   faltantes: faltantesPermiso,

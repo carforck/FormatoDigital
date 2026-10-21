@@ -1,15 +1,17 @@
+import type { DatosGasto } from "@/modulos/gastos/tipos";
 import type { DatosPermiso } from "@/modulos/permisos/tipos";
 import type { DatosReporte } from "@/modulos/reportes/tipos";
 
 // Los tipos propios de cada formato viven en su módulo; se reexportan aquí por comodidad.
-export type { DatosReporte } from "@/modulos/reportes/tipos";
+export type { DatosReporte, FotoReporte } from "@/modulos/reportes/tipos";
 export type { DatosPermiso, Ejecutor, SiNoNa } from "@/modulos/permisos/tipos";
+export type { DatosGasto, ItemGasto } from "@/modulos/gastos/tipos";
 
 export type Rol = "tecnico" | "supervisor" | "admin" | "cliente";
 
 export type Estado = "borrador" | "en_revision" | "aprobado" | "rechazado" | "cerrado";
 
-export type TipoDoc = "reporte" | "permiso";
+export type TipoDoc = "reporte" | "permiso" | "gasto";
 
 export interface Usuario {
   id: string;
@@ -63,7 +65,11 @@ export interface DocPermiso extends DocBase {
   datos: DatosPermiso;
 }
 
-export type Documento = DocReporte | DocPermiso;
+export interface DocGasto extends DocBase {
+  tipo: "gasto";
+  datos: DatosGasto;
+}
+export type Documento = DocReporte | DocPermiso | DocGasto;
 
 export interface Notificacion {
   id: string;
@@ -85,8 +91,28 @@ export interface Auditoria {
 export interface Config {
   empresa: string;
   nit: string;
+  ciudad: string;
   prefijoReporte: string;
   prefijoPermiso: string;
+  prefijoCobro: string;
+  prefijoGasto: string;
   exigirFirmaCliente: boolean;
   vigenciaPermisoHoras: number;
+  /** Datos que salen en la cuenta de cobro */
+  ivaPorcentaje: number;
+  banco: string;
+  tipoCuenta: string;
+  numeroCuenta: string;
+  titularCuenta: string;
+}
+
+/** Enlace de firma remota: el cliente firma sin cuenta. */
+export interface EnlaceFirma {
+  token: string;
+  docId: string;
+  campo: "firmaCliente";
+  correo: string;
+  creado: string;
+  expira: string;
+  usado?: string;
 }

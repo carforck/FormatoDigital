@@ -11,7 +11,7 @@ export function Encabezado({ tipo, codigoDoc }: { tipo: TipoDoc; codigoDoc?: str
       <tbody>
         <tr>
           <td rowSpan={3} className="w-[30%] border border-black p-2">
-            <img src={asset("/sotec-logo.png")} alt="SOTEC" className="mx-auto h-10 w-auto object-contain" />
+            <img src={asset("/sotec-logo-v3.png")} alt="SOTEC" className="mx-auto h-14 w-auto object-contain" />
           </td>
           <td rowSpan={3} className="border border-black p-2 text-center font-serif text-[13px] font-bold uppercase">
             {f.nombre}

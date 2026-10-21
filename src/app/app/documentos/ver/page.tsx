@@ -3,18 +3,23 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { ArrowLeft, Check, CheckCircle2, Copy, Lock, PenLine, Printer, SendHorizonal, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, Copy, Link2, Lock, PenLine, Printer, Receipt, Send, SendHorizonal, Trash2, X } from "lucide-react";
+
+import { EnviarDocumento } from "@/components/EnviarDocumento";
 
 import { FirmaPad } from "@/components/docs/FirmaPad";
 import { PlantillaPermiso } from "@/modulos/permisos/PlantillaPermiso";
+import { PlantillaGasto } from "@/modulos/gastos/PlantillaGasto";
 import { PlantillaReporte } from "@/modulos/reportes/PlantillaReporte";
 import { Button } from "@/components/ui/button";
 import { EstadoBadge } from "@/components/ui/badges";
 import { FORMATOS } from "@/nucleo/catalogos";
 import { puede, puedeEditarDoc, puedeVerDoc } from "@/nucleo/permisos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
+import { rutaCuenta, urlPublica } from "@/nucleo/rutas";
 import type { DatosPermiso } from "@/nucleo/tipos";
 import { faltantes } from "@/nucleo/validar";
+import { clienteDoc } from "@/modulos/registro";
 
 function Detalle() {
   const params = useSearchParams();
@@ -27,6 +32,7 @@ function Detalle() {
   const [firma, setFirma] = useState<null | "aprobar" | "cliente" | "cierre">(null);
   const [rechazo, setRechazo] = useState<string | null>(null);
   const [cierre, setCierre] = useState<Partial<DatosPermiso>>({ cierreAreaLimpia: "", cierraNombre: u.nombre, firmaCierre: "" });
+  const [envio, setEnvio] = useState<null | { enlace?: string }>(null);
 
   if (!doc || !puedeVerDoc(u, doc)) {
     return (
@@ -47,6 +53,15 @@ function Detalle() {
   const firmaCliente = doc.tipo === "reporte" && doc.estado === "aprobado" && (u.rol === "cliente" || puede(u.rol, "revisar"));
   const nombre = (uid: string) => demo.usuarios.find((x) => x.id === uid)?.nombre ?? "Sistema";
   const datosVista = doc.tipo === "permiso" && cierraPermiso ? { ...doc.datos, ...cierre } : doc.datos;
+  const cliente = demo.clientes.find((c) => c.id === doc.clienteId);
+  const correoCliente = doc.tipo === "reporte" ? doc.datos.correo || cliente?.correo || "" : cliente?.correo || "";
+  const telCliente = doc.tipo === "reporte" ? doc.datos.telefono || cliente?.telefono || "" : cliente?.telefono || "";
+  const interno = u.rol !== "cliente";
+  const pedirFirma = interno && doc.tipo === "reporte" && (doc.estado === "aprobado" || doc.estado === "en_revision") && !doc.datos.firmaCliente;
+  const cuenta = doc.tipo === "reporte" ? demo.cuentaDeReporte(doc.id) : undefined;
+  const puedeCobrar = doc.tipo === "reporte" && (doc.estado === "aprobado" || doc.estado === "cerrado") && !cuenta && puede(u.rol, "cobros");
+  const empresa = demo.config.empresa;
+  const contacto = doc.tipo === "reporte" ? doc.datos.personaContactada : cliente?.contacto;
 
   return (
     <div className="space-y-4">
@@ -70,7 +85,7 @@ function Detalle() {
             <span className="font-mono">{doc.codigo}</span> <EstadoBadge estado={doc.estado} />
           </h1>
           <p className="text-sm text-slate-500">
-            {doc.datos.cliente} · por {nombre(doc.autorId)}
+            {clienteDoc(doc)} · por {nombre(doc.autorId)}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -86,8 +101,8 @@ function Detalle() {
           )}
           {revisa && (
             <>
-              <Button onClick={() => (doc.tipo === "permiso" ? setFirma("aprobar") : demo.aprobar(doc.id))}>
-                <Check className="h-4 w-4" /> Aprobar{doc.tipo === "permiso" ? " y firmar" : ""}
+              <Button onClick={() => (doc.tipo === "reporte" ? demo.aprobar(doc.id) : setFirma("aprobar"))}>
+                <Check className="h-4 w-4" /> {doc.tipo === "gasto" ? "Dar Vo.Bo. y firmar" : doc.tipo === "permiso" ? "Aprobar y firmar" : "Aprobar"}
               </Button>
               <Button variant="outline" className="border-rose-200 text-rose-700 hover:bg-rose-50" onClick={() => setRechazo("")}>
                 <X className="h-4 w-4" /> Rechazar
@@ -110,6 +125,32 @@ function Detalle() {
               <Copy className="h-4 w-4" /> Duplicar
             </Button>
           )}
+          {doc.tipo === "gasto" && doc.estado === "aprobado" && puede(u.rol, "revisar") && (
+            <Button onClick={() => demo.cerrar(doc.id, {})}>
+              <CheckCircle2 className="h-4 w-4" /> Marcar como reembolsado
+            </Button>
+          )}
+          {pedirFirma && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                const token = demo.crearEnlaceFirma(doc.id, correoCliente);
+                setEnvio({ enlace: urlPublica("/firmar", `t=${token}`) });
+              }}
+            >
+              <Link2 className="h-4 w-4" /> Pedir firma al cliente
+            </Button>
+          )}
+          {interno && doc.tipo !== "gasto" && doc.estado !== "borrador" && (
+            <Button variant="outline" onClick={() => setEnvio({})}>
+              <Send className="h-4 w-4" /> Enviar
+            </Button>
+          )}
+          {puedeCobrar && (
+            <Button variant="outline" onClick={() => router.push(`/app/cobros/nueva?cliente=${doc.clienteId}&reporte=${doc.id}`)}>
+              <Receipt className="h-4 w-4" /> Crear cuenta de cobro
+            </Button>
+          )}
           <Button variant="outline" onClick={() => window.print()}>
             <Printer className="h-4 w-4" /> PDF
           </Button>
@@ -129,6 +170,12 @@ function Detalle() {
           )}
         </div>
       </div>
+
+      {cuenta && puede(u.rol, "ver_cobros") && (
+        <Link href={rutaCuenta(cuenta.id)} className="print:hidden flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 hover:bg-sky-100">
+          <Receipt className="h-4 w-4" /> Este reporte ya se cobró en la cuenta de cobro <strong className="font-mono">{cuenta.codigo}</strong> →
+        </Link>
+      )}
 
       {doc.estado === "rechazado" && doc.motivoRechazo && (
         <p className="print:hidden rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
@@ -165,6 +212,8 @@ function Detalle() {
         <div className="overflow-x-auto rounded-lg bg-slate-100 p-2 sm:p-4">
           {doc.tipo === "reporte" ? (
             <PlantillaReporte datos={doc.datos} codigoDoc={doc.codigo} />
+          ) : doc.tipo === "gasto" ? (
+            <PlantillaGasto datos={doc.datos} codigoDoc={doc.codigo} />
           ) : (
             <PlantillaPermiso
               datos={datosVista as DatosPermiso}
@@ -194,7 +243,7 @@ function Detalle() {
 
       {firma && (
         <FirmaPad
-          titulo={firma === "aprobar" ? "Firma de quien autoriza" : firma === "cliente" ? "Firma del cliente" : "Firma de quien cierra"}
+          titulo={firma === "aprobar" ? (doc.tipo === "gasto" ? "Firma del Vo.Bo." : "Firma de quien autoriza") : firma === "cliente" ? "Firma del cliente" : "Firma de quien cierra"}
           onCerrar={() => setFirma(null)}
           onGuardar={(url) => {
             if (firma === "aprobar") demo.aprobar(doc.id, url);
@@ -202,6 +251,23 @@ function Detalle() {
             if (firma === "cierre") setCierre((c) => ({ ...c, firmaCierre: url }));
             setFirma(null);
           }}
+        />
+      )}
+
+      {envio && (
+        <EnviarDocumento
+          titulo={envio.enlace ? `Pedir firma de ${doc.codigo}` : `Enviar ${doc.codigo}`}
+          correo={correoCliente}
+          telefono={telCliente}
+          asunto={`${f.corto} ${doc.codigo} · ${empresa}`}
+          mensaje={
+            envio.enlace
+              ? `Cordial saludo${contacto ? `, ${contacto}` : ""}.\n\n${empresa} le comparte ${f.el} ${f.corto.toLowerCase()} ${doc.codigo} del servicio realizado en ${clienteDoc(doc)}. Por favor revíselo y fírmelo desde su celular en el siguiente enlace (válido por 7 días):`
+              : `Cordial saludo${contacto ? `, ${contacto}` : ""}.\n\n${empresa} le comparte ${f.el} ${f.corto.toLowerCase()} ${doc.codigo} (${f.codigo}) correspondiente a ${clienteDoc(doc)}. Quedamos atentos a cualquier inquietud.`
+          }
+          enlace={envio.enlace}
+          onEnviado={(canal, destino) => demo.registrarEnvio({ docId: doc.id }, canal, destino)}
+          onCerrar={() => setEnvio(null)}
         />
       )}
 

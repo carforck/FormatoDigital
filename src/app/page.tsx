@@ -108,7 +108,7 @@ export default function Landing() {
         <div className="container flex flex-col items-center gap-6 py-8 md:flex-row">
           <div className="flex items-center gap-4">
             <span className="rounded-xl bg-white px-3 py-2 shadow-sm ring-1 ring-slate-200">
-              <img src={asset("/sotec-logo.png")} alt="SOTEC" className="h-10 w-auto" />
+              <img src={asset("/sotec-logo-v3.png")} alt="SOTEC" className="h-14 w-auto" />
             </span>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-sotec-greenDeep">Caso de cliente</p>

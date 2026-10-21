@@ -21,7 +21,7 @@ export default function Acceso() {
         </Link>
         <div className="mt-6 flex items-center gap-3">
           <span className="rounded-md bg-white px-2 py-1.5">
-            <img src={asset("/sotec-logo.png")} alt="SOTEC" className="h-8 w-auto" />
+            <img src={asset("/sotec-logo-v3.png")} alt="SOTEC" className="h-12 w-auto" />
           </span>
           <span className="text-sm text-white/60">Prototipo de demostración</span>
         </div>

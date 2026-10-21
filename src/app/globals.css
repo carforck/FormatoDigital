@@ -40,7 +40,24 @@
   html, body { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body * { visibility: hidden; }
   .doc-print, .doc-print * { visibility: visible; }
-  .doc-print { position: absolute !important; inset: 0 0 auto 0 !important; width: 100% !important; margin: 0 !important; padding: 1cm !important; box-shadow: none !important; border: 0 !important; }
+  /* La zona del documento se fija arriba; sus hojas (formato + anexos) van una por página */
+  .doc-zona { position: absolute !important; inset: 0 0 auto 0 !important; width: 100% !important; margin: 0 !important; }
+  .doc-zona > * + * { margin-top: 0 !important; }
+  .doc-print { width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0.8cm 1cm !important; box-shadow: none !important; border: 0 !important; --tw-ring-shadow: 0 0 #0000 !important; }
+  .doc-print + .doc-print { break-before: page; page-break-before: always; }
+  .break-inside-avoid { break-inside: avoid; }
+  /* Reporte técnico: un poco más compacto para caber en una hoja carta */
+  .doc-ajustado { font-size: 10.6px !important; line-height: 1.3 !important; padding: 0.6cm 0.9cm !important; }
+  .doc-ajustado .h-14 { height: 2.9rem !important; }
+  .doc-ajustado .h-12 { height: 2.4rem !important; }
+  /* Formatos densos (permiso de trabajo): caben en una hoja como el original */
+  .doc-compacto { font-size: 8.6px !important; line-height: 1.22 !important; padding: 0.5cm 0.7cm !important; }
+  .doc-compacto .h-12 { height: 1.9rem !important; }
+  .doc-compacto .h-6 { height: 0.95rem !important; }
+  .doc-compacto .p-1\.5 { padding: 0.15rem 0.3rem !important; }
+  .doc-compacto .gap-y-1 { row-gap: 0 !important; }
+  .doc-compacto .h-3 { height: 0.55rem !important; width: 0.55rem !important; }
+  .doc-compacto .h-5 { height: 0.85rem !important; }
   .print\:hidden { display: none !important; }
 }
 

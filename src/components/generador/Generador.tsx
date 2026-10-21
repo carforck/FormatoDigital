@@ -8,12 +8,13 @@ import { ChatAsistente, type ValorPaso } from "@/components/chat/ChatAsistente";
 import { FirmaPad } from "@/components/docs/FirmaPad";
 import { Button } from "@/components/ui/button";
 import { PlantillaPermiso, type CampoFirmaPermiso } from "@/modulos/permisos/PlantillaPermiso";
-import { moduloDe } from "@/modulos/registro";
+import { clienteDoc, moduloDe } from "@/modulos/registro";
+import { PlantillaGasto } from "@/modulos/gastos/PlantillaGasto";
 import { PlantillaReporte } from "@/modulos/reportes/PlantillaReporte";
 import { FORMATOS } from "@/nucleo/catalogos";
 import { hoy, useDemo } from "@/nucleo/datos/DemoProvider";
 import { rutaDoc } from "@/nucleo/rutas";
-import type { DatosPermiso, DatosReporte, DocPermiso, DocReporte, Documento, TipoDoc } from "@/nucleo/tipos";
+import type { DatosGasto, DatosPermiso, DatosReporte, DocGasto, DocPermiso, DocReporte, Documento, TipoDoc } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 import { avance, faltantes } from "@/nucleo/validar";
 
@@ -38,8 +39,10 @@ export function Generador({ tipo, existente }: Props) {
     const n = demo.nuevoId(tipo);
     const base = { ...n, estado: "borrador" as const, autorId: usuario.id, clienteId: "", creado: hoy(), actualizado: hoy(), historial: [] };
     return tipo === "reporte"
-      ? ({ ...base, tipo, datos: moduloDe("reporte").vacio(hoy(), usuario.nombre) } as DocReporte)
-      : ({ ...base, tipo, datos: moduloDe("permiso").vacio(hoy(), usuario.nombre) } as DocPermiso);
+      ? ({ ...base, tipo, datos: moduloDe("reporte").vacio(hoy(), usuario) } as DocReporte)
+      : tipo === "permiso"
+        ? ({ ...base, tipo, datos: moduloDe("permiso").vacio(hoy(), usuario) } as DocPermiso)
+        : ({ ...base, tipo, datos: moduloDe("gasto").vacio(hoy(), usuario) } as DocGasto);
   });
   const [resaltar, setResaltar] = useState<string | undefined>();
   const [firmando, setFirmando] = useState<string | null>(null);
@@ -50,7 +53,7 @@ export function Generador({ tipo, existente }: Props) {
   const pct = avance(doc);
 
   /** Mezcla un cambio parcial en el contenido del formato. */
-  const editar = (cambio: Partial<DatosReporte> | Partial<DatosPermiso>) => setDoc((d) => ({ ...d, datos: { ...d.datos, ...cambio } }) as Documento);
+  const editar = (cambio: Partial<DatosReporte> | Partial<DatosPermiso> | Partial<DatosGasto>) => setDoc((d) => ({ ...d, datos: { ...d.datos, ...cambio } }) as Documento);
 
   // Los módulos están tipados por formato; el generador los trata de forma uniforme.
   const mod = modulo as unknown as {
@@ -64,7 +67,7 @@ export function Generador({ tipo, existente }: Props) {
     if (id === "cliente") {
       const c = demo.clientes.find((x) => x.nombre === v);
       if (!c) {
-        setDoc((d) => ({ ...d, clienteId: "", datos: { ...d.datos, cliente: v as string } }) as Documento);
+        setDoc((d) => ({ ...d, clienteId: "", datos: { ...d.datos, [d.tipo === "gasto" ? "clienteObra" : "cliente"]: v as string } }) as Documento);
         return;
       }
       const r = mod.alElegirCliente(c);
@@ -93,7 +96,7 @@ export function Generador({ tipo, existente }: Props) {
       setVista("doc");
       return;
     }
-    const clienteId = doc.clienteId || demo.clientes.find((c) => c.nombre === doc.datos.cliente)?.id || "";
+    const clienteId = doc.clienteId || demo.clientes.find((c) => c.nombre === clienteDoc(doc))?.id || "";
     const g = demo.guardar({ ...doc, clienteId });
     if (enviar) demo.enviar(g.id);
     router.push(rutaDoc(g.id, `&ok=${enviar ? "enviado" : "guardado"}`));
@@ -119,7 +122,7 @@ export function Generador({ tipo, existente }: Props) {
             {f.codigo} · v{f.version}
           </p>
           <h1 className="text-xl font-semibold">
-            {existente ? "Continuar" : "Nuevo"} {f.corto.toLowerCase()} <span className="font-mono text-base text-slate-500">{doc.codigo}</span>
+            {existente ? "Continuar" : f.nuevo} {f.corto.toLowerCase()} <span className="font-mono text-base text-slate-500">{doc.codigo}</span>
           </h1>
         </div>
         <div className="flex items-center gap-2">
@@ -147,7 +150,7 @@ export function Generador({ tipo, existente }: Props) {
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[400px_1fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[400px_1fr] [&>*]:min-w-0">
         <div className={cn("lg:sticky lg:top-20 lg:h-[calc(100vh-7rem)] print:hidden", vista !== "chat" && "hidden lg:block")}>
           <ChatAsistente
             titulo="Asistente SOTEC"
@@ -162,7 +165,7 @@ export function Generador({ tipo, existente }: Props) {
             bienvenida={
               existente
                 ? `Retomamos ${doc.codigo}. Edita lo que necesites directamente en el formato.${doc.motivoRechazo ? `\n\nMotivo del rechazo: ${doc.motivoRechazo}` : ""}`
-                : `Hola, ${usuario.nombre.split(" ")[0]}. Te guío para diligenciar el ${f.corto.toLowerCase()} (${f.codigo}). Lo que respondas aparece al instante en el formato.`
+                : `Hola, ${usuario.nombre.split(" ")[0]}. Te guío para diligenciar ${f.el} ${f.corto.toLowerCase()} (${f.codigo}). Lo que respondas aparece al instante en el formato.`
             }
             acciones={acciones}
           />
@@ -190,8 +193,10 @@ export function Generador({ tipo, existente }: Props) {
           <div className="overflow-x-auto rounded-lg bg-slate-100 p-2 sm:p-4">
             {doc.tipo === "reporte" ? (
               <PlantillaReporte datos={doc.datos} codigoDoc={doc.codigo} editar={editar} firmar={(c) => setFirmando(c)} resaltar={resaltar} />
-            ) : (
+            ) : doc.tipo === "permiso" ? (
               <PlantillaPermiso datos={doc.datos} codigoDoc={doc.codigo} editar={editar} firmar={(c: CampoFirmaPermiso) => setFirmando(c)} resaltar={resaltar} />
+            ) : (
+              <PlantillaGasto datos={doc.datos} codigoDoc={doc.codigo} editar={editar} firmar={(c) => setFirmando(c)} resaltar={resaltar} />
             )}
           </div>
           <div className="lg:hidden print:hidden">{acciones}</div>

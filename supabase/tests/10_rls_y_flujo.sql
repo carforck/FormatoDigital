@@ -173,28 +173,30 @@ select pg_temp.como('00000000-0000-0000-0000-0000000000a1');
 do $$ begin assert (select count(*) from public.auditoria) >= 5, 'el admin ve la auditoría'; end $$;
 reset role;
 
--- ------------------------------------------------- 7. gastos
+-- ------------------------------------------------- 7. legalización de gastos (FO-GSST-25 como documento)
+insert into public.formatos (organizacion_id, clave, codigo, nombre, prefijo)
+values ('10000000-0000-0000-0000-000000000001', 'gasto', 'FO-GSST-25', 'Legalización de gastos', 'LG');
 select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
-with x as (insert into public.gastos (organizacion_id, categoria, descripcion, valor)
-  values ('10000000-0000-0000-0000-000000000001', 'materiales', 'Conectores de fibra', 85000) returning id)
-insert into ctx select 'g1', id from x;
+insert into ctx select 'lg', (public.crear_documento('10000000-0000-0000-0000-000000000001', 'gasto',
+  '{"items":[{"tipo":"Transporte","descripcion":"Taxi","recibo":"TX-1","cantidad":1,"valorUnitario":60000}]}', null, 'c0000000-0000-0000-0000-000000000001')).id;
 do $$ begin
-  update public.gastos set estado = 'aprobado' where id = (select v::uuid from ctx where k = 'g1');
-  raise exception 'FALLO: el técnico aprobó su gasto';
-exception when insufficient_privilege then null; end $$;
+  assert (select codigo from public.documentos where id = (select v::uuid from ctx where k = 'lg')) like 'LG-001-%', 'código LG-001';
+  assert to_regclass('public.gastos') is null, 'la tabla provisional gastos ya no existe';
+end $$;
 reset role;
 select pg_temp.como('00000000-0000-0000-0000-0000000000a4');
-do $$ begin assert (select count(*) from public.gastos) = 0, 'el técnico 2 no ve gastos ajenos'; end $$;
+do $$ begin assert (select count(*) from public.documentos where codigo like 'LG-%') = 0, 'el técnico 2 no ve legalizaciones ajenas'; end $$;
+reset role;
+update public.formatos set visible_cliente = false where clave = 'gasto';
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+update public.documentos set estado = 'en_revision' where id = (select v::uuid from ctx where k = 'lg');
 reset role;
 select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
-update public.gastos set estado = 'aprobado' where id = (select v::uuid from ctx where k = 'g1');
-do $$ begin assert (select revisado_por from public.gastos where id = (select v::uuid from ctx where k = 'g1')) = '00000000-0000-0000-0000-0000000000a2', 'registra quién revisó'; end $$;
+update public.documentos set estado = 'aprobado' where id = (select v::uuid from ctx where k = 'lg');
 reset role;
-select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
-do $$ begin
-  update public.gastos set valor = 1 where id = (select v::uuid from ctx where k = 'g1');
-  raise exception 'FALLO: modificó un gasto ya aprobado';
-exception when insufficient_privilege then null; end $$;
+select pg_temp.como('00000000-0000-0000-0000-0000000000a5');
+do $$ begin assert (select count(*) from public.documentos where codigo like 'LG-%') = 0, 'el cliente no ve legalizaciones de gastos aunque estén aprobadas'; end $$;
+do $$ begin assert (select count(*) from public.documentos where codigo like 'RT-%') = 2, 'el cliente sigue viendo sus 2 reportes (cerrado y aprobado)'; end $$;
 reset role;
 
 -- ------------------------------------------------- 8. cuentas de cobro
@@ -221,6 +223,28 @@ do $$ begin assert (select count(*) from public.cuentas_cobro) = 0, 'el técnico
 reset role;
 select pg_temp.como('00000000-0000-0000-0000-0000000000a5');
 do $$ begin assert (select count(*) from public.cuentas_cobro) = 1, 'el cliente ve su cuenta emitida'; end $$;
+reset role;
+
+-- ------------------------------------------------- 9. endurecimiento (0006)
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+do $$ begin
+  perform public.siguiente_consecutivo('10000000-0000-0000-0000-000000000001', 'reporte');
+  raise exception 'FALLO: reservó un consecutivo por fuera de crear_documento';
+exception when insufficient_privilege then null; end $$;
+do $$ begin
+  perform public.crear_documento('10000000-0000-0000-0000-000000000001', 'reporte', '{}', null, 'c0000000-0000-0000-0000-000000000009');
+  raise exception 'FALLO: creó un documento con un cliente de otra empresa';
+exception when insufficient_privilege then null; end $$;
+do $$ begin
+  perform public.crear_cuenta_cobro('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'x');
+  raise exception 'FALLO: un técnico creó una cuenta de cobro';
+exception when insufficient_privilege then null; end $$;
+reset role;
+select pg_temp.como(null);
+do $$ begin
+  perform public.crear_enlace_firma((select v::uuid from ctx where k = 'rt2'), '');
+  raise exception 'FALLO: un anónimo pidió una firma';
+exception when insufficient_privilege then null; end $$;
 reset role;
 
 select 'OK: todas las pruebas pasaron' as resultado;

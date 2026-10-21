@@ -13,6 +13,7 @@ import { puede } from "@/nucleo/permisos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import type { Documento, Estado } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
+import { clienteDoc, tituloDoc } from "@/modulos/registro";
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 // Paleta validada con validate_palette.js (modo claro): pasa las 6 comprobaciones.
@@ -20,7 +21,7 @@ const C_REPORTE = "#4F6FD0";
 const C_PERMISO = "#4E9A2A";
 
 function titulo(d: Documento) {
-  return d.tipo === "reporte" ? d.datos.asunto : d.datos.actividades;
+  return tituloDoc(d);
 }
 
 export default function Tablero() {
@@ -125,7 +126,7 @@ export default function Tablero() {
                       <span className="block truncate text-sm font-medium text-slate-900">
                         <span className="font-mono">{d.codigo}</span> · {titulo(d)}
                       </span>
-                      <span className="block truncate text-xs text-slate-500">{d.datos.cliente}</span>
+                      <span className="block truncate text-xs text-slate-500">{clienteDoc(d)}</span>
                     </span>
                     <span className="flex shrink-0 items-center gap-1 rounded-lg bg-sotec-soft px-2.5 py-1 text-xs font-semibold text-sotec-greenDeep group-hover:bg-sotec group-hover:text-sotec-green">
                       {accion === "Firmar" && <PenLine className="h-3.5 w-3.5" />}
@@ -252,7 +253,7 @@ export default function Tablero() {
                       <span className="font-mono">{d.codigo}</span> · {titulo(d)}
                     </p>
                     <p className="truncate text-xs text-slate-500">
-                      {FORMATOS[d.tipo].corto} · {d.datos.cliente} · {fechaCorta(d.creado)}
+                      {FORMATOS[d.tipo].corto} · {clienteDoc(d)} · {fechaCorta(d.creado)}
                     </p>
                   </div>
                   <EstadoBadge estado={d.estado} />

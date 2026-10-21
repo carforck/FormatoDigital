@@ -1,8 +1,10 @@
 import type { Estado, Rol, TipoDoc } from "./tipos";
 
-export const FORMATOS: Record<TipoDoc, { codigo: string; nombre: string; version: string; fecha: string; corto: string }> = {
-  reporte: { codigo: "FO-GSST-22", nombre: "Formato de reporte técnico", version: "01", fecha: "01/03/2020", corto: "Reporte técnico" },
-  permiso: { codigo: "F-GSST-13", nombre: "Permiso de trabajo", version: "01", fecha: "01/03/2019", corto: "Permiso de trabajo" },
+/** `el` / `nuevo` concuerdan con el género del nombre corto («el reporte», «la legalización»). */
+export const FORMATOS: Record<TipoDoc, { codigo: string; nombre: string; version: string; fecha: string; corto: string; el: "el" | "la"; nuevo: "Nuevo" | "Nueva" }> = {
+  reporte: { codigo: "FO-GSST-22", nombre: "Formato de reporte técnico", version: "01", fecha: "01/03/2020", corto: "Reporte técnico", el: "el", nuevo: "Nuevo" },
+  permiso: { codigo: "F-GSST-13", nombre: "Permiso de trabajo", version: "01", fecha: "01/03/2019", corto: "Permiso de trabajo", el: "el", nuevo: "Nuevo" },
+  gasto: { codigo: "FO-GSST-25", nombre: "Formato de legalización y registro de gastos operativos", version: "01", fecha: "01/03/2020", corto: "Legalización de gastos", el: "la", nuevo: "Nueva" },
 };
 
 export const ETIQUETA_ESTADO: Record<Estado, string> = {

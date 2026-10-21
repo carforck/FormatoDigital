@@ -1,7 +1,8 @@
 import type { ModuloDocumento } from "./contrato";
+import { moduloGastos } from "./gastos";
 import { moduloPermisos } from "./permisos";
 import { moduloReportes } from "./reportes";
-import type { DatosPermiso, DatosReporte, TipoDoc } from "@/nucleo/tipos";
+import type { DatosGasto, DatosPermiso, DatosReporte, Documento, TipoDoc } from "@/nucleo/tipos";
 
 /**
  * Registro central de módulos de la plataforma.
@@ -24,19 +25,30 @@ export interface InfoModulo {
 }
 
 export const MODULOS: InfoModulo[] = [
-  { clave: "nucleo", nombre: "Núcleo", descripcion: "Usuarios y roles, clientes y sitios, firmas, archivos, correo, PDF, consecutivos y auditoría.", estado: "activo", relaciona: ["todos"] },
+  { clave: "nucleo", nombre: "Núcleo", descripcion: "Usuarios y roles, clientes y sitios, firmas (en sitio y por enlace), archivos, envío por correo y WhatsApp, PDF, consecutivos y auditoría.", estado: "activo", relaciona: ["todos"] },
   { clave: "ordenes", nombre: "Órdenes de servicio", descripcion: "Eje de cada trabajo: une permisos, reportes, fotos, gastos y cuentas de cobro.", estado: "en_construccion", relaciona: ["permisos", "reportes", "gastos", "cobros"] },
   { clave: "permisos", nombre: "Permisos de trabajo", descripcion: "Peligros, medidas, EPP, verificación y grupo ejecutor con firmas.", estado: "activo", formato: "F-GSST-13", relaciona: ["ordenes"] },
-  { clave: "reportes", nombre: "Reportes técnicos", descripcion: "Diagnóstico, acción y resultado, firma del técnico y del cliente; registro fotográfico como hoja anexa.", estado: "activo", formato: "FO-GSST-22", relaciona: ["ordenes", "cobros"] },
-  { clave: "gastos", nombre: "Gastos", descripcion: "Materiales, transporte y viáticos con foto del soporte y aprobación. Se ajusta al formato de SOTEC.", estado: "planeado", relaciona: ["ordenes"] },
-  { clave: "cobros", nombre: "Cuentas de cobro", descripcion: "SOTEC le cobra a su cliente por el servicio, con ítems tomados de los reportes técnicos.", estado: "planeado", relaciona: ["ordenes", "reportes"] },
+  { clave: "reportes", nombre: "Reportes técnicos", descripcion: "Diagnóstico, acción y resultado; registro fotográfico como hoja anexa; firma del técnico y del cliente en sitio o por enlace.", estado: "activo", formato: "FO-GSST-22", relaciona: ["ordenes", "cobros"] },
+  { clave: "gastos", nombre: "Legalización de gastos", descripcion: "Transporte, alimentación, hospedaje y materiales con la foto de cada factura, Vo.Bo. de administración y reembolso.", estado: "activo", formato: "FO-GSST-25", relaciona: ["ordenes", "cobros"] },
+  { clave: "cobros", nombre: "Cuentas de cobro", descripcion: "SOTEC le cobra a su cliente por el servicio, con ítems tomados de los reportes técnicos, IVA y valor en letras.", estado: "activo", relaciona: ["ordenes", "reportes"] },
 ];
 
 /** Módulos de documentos diligenciables disponibles en el generador. */
-export const DOCUMENTOS: { reporte: ModuloDocumento<DatosReporte>; permiso: ModuloDocumento<DatosPermiso> } = {
+export const DOCUMENTOS: { reporte: ModuloDocumento<DatosReporte>; permiso: ModuloDocumento<DatosPermiso>; gasto: ModuloDocumento<DatosGasto> } = {
   reporte: moduloReportes,
   permiso: moduloPermisos,
+  gasto: moduloGastos,
 };
+
+/** Cliente u obra al que pertenece un documento (cada formato lo nombra distinto). */
+export function clienteDoc(d: Documento): string {
+  return d.tipo === "gasto" ? d.datos.clienteObra : d.datos.cliente;
+}
+
+/** Texto principal de un documento para listados, según su módulo. */
+export function tituloDoc(d: Documento): string {
+  return d.tipo === "reporte" ? DOCUMENTOS.reporte.titulo(d.datos) : d.tipo === "permiso" ? DOCUMENTOS.permiso.titulo(d.datos) : DOCUMENTOS.gasto.titulo(d.datos);
+}
 
 export function moduloDe<T extends TipoDoc>(tipo: T) {
   return DOCUMENTOS[tipo];

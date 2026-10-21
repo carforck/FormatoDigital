@@ -9,6 +9,7 @@ import { FORMATOS } from "@/nucleo/catalogos";
 import { rutaDoc } from "@/nucleo/rutas";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { faltantes } from "@/nucleo/validar";
+import { clienteDoc, tituloDoc } from "@/modulos/registro";
 
 export default function Revision() {
   const demo = useDemo();
@@ -27,9 +28,9 @@ export default function Revision() {
             <EstadoBadge estado={d.estado} />
           </span>
         </div>
-        <p className="mt-2 line-clamp-2 text-sm font-medium">{d.tipo === "reporte" ? d.datos.asunto : d.datos.actividades}</p>
+        <p className="mt-2 line-clamp-2 text-sm font-medium">{tituloDoc(d)}</p>
         <p className="text-xs text-slate-500">
-          {FORMATOS[d.tipo].corto} · {d.datos.cliente} · {autor(d.autorId)} · {fechaCorta(d.creado)}
+          {FORMATOS[d.tipo].corto} · {clienteDoc(d)} · {autor(d.autorId)} · {fechaCorta(d.creado)}
         </p>
         {p.length === 0 ? (
           <p className="mt-2 flex items-center gap-1 text-xs text-emerald-700">

@@ -20,7 +20,7 @@ Finalmente se realizan pruebas de funcionamiento junto con ${d.personaContactada
 /** Módulo FO-GSST-22 · Reporte técnico. */
 export const moduloReportes: ModuloDocumento<DatosReporte> = {
   clave: "reporte",
-  vacio: (hoy, usuarioNombre) => ({ ...reporteVacio(hoy), nombreTecnico: usuarioNombre }),
+  vacio: (hoy, u) => ({ ...reporteVacio(hoy), nombreTecnico: u.nombre }),
   totalComprobaciones: 10,
   titulo: (d) => d.asunto,
   faltantes: faltantesReporte,
@@ -67,11 +67,27 @@ export const moduloReportes: ModuloDocumento<DatosReporte> = {
       pregunta: "¿Alguna recomendación para el cliente?",
       sugerencias: ["Programar mantenimiento preventivo trimestral.", "Proteger con tubería los tramos de cable expuestos.", "Instalar UPS para respaldo eléctrico de los equipos."],
     },
+    {
+      id: "fotos",
+      tipo: "fotos",
+      resaltar: "fotos",
+      pregunta: "¿Agregamos el registro fotográfico? Toma o sube fotos del antes y el después.",
+      ayuda: "Salen en una hoja anexa del reporte con el mismo encabezado. En el formato puedes escribir la descripción de cada foto.",
+    },
     { id: "nombreTecnico", tipo: "texto", resaltar: "nombreTecnico", pregunta: "Nombre del técnico que firma", sugerencias: [usuarioNombre] },
     { id: "firmaTecnico", tipo: "firma", resaltar: "firmaTecnico", pregunta: "Firma del técnico. Puedes firmar con el dedo desde el celular." },
   ],
 
-  aplicar: (id, valor) => ({ cambio: { [id]: valor } as Partial<DatosReporte> }),
+  aplicar: (id, valor, datos) => {
+    if (id === "fotos") {
+      const nuevas = valor as NonNullable<DatosReporte["fotos"]>;
+      return {
+        cambio: { fotos: [...(datos.fotos ?? []), ...nuevas] },
+        mensaje: nuevas.length ? `Agregué ${nuevas.length} foto(s) a la hoja «Registro fotográfico». Escribe la descripción de cada una en el formato.` : undefined,
+      };
+    }
+    return { cambio: { [id]: valor } as Partial<DatosReporte> };
+  },
 };
 
 export type { DatosReporte } from "./tipos";

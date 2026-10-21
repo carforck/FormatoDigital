@@ -13,6 +13,7 @@ import { useDemo } from "@/nucleo/datos/DemoProvider";
 import type { Estado, TipoDoc } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 import { avance } from "@/nucleo/validar";
+import { clienteDoc, tituloDoc } from "@/modulos/registro";
 
 export default function Page() {
   return (
@@ -41,7 +42,7 @@ function Documentos() {
     .filter((d) => !cliente || d.clienteId === cliente)
     .filter((d) => {
       if (!q.trim()) return true;
-      const t = `${d.codigo} ${d.datos.cliente} ${d.tipo === "reporte" ? `${d.datos.asunto} ${d.datos.descripcion}` : `${d.datos.actividades} ${d.datos.responsable}`}`.toLowerCase();
+      const t = `${d.codigo} ${clienteDoc(d)} ${tituloDoc(d)} ${JSON.stringify(d.datos)}`.toLowerCase();
       return t.includes(q.toLowerCase());
     })
     .sort((a, b) => b.creado.localeCompare(a.creado));
@@ -61,6 +62,7 @@ function Documentos() {
           <option value="">Todos los formatos</option>
           <option value="reporte">Reporte técnico</option>
           <option value="permiso">Permiso de trabajo</option>
+          <option value="gasto">Legalización de gastos</option>
         </select>
         <select className={sel} value={estado} onChange={(e) => setEstado(e.target.value as Estado | "")} aria-label="Estado">
           <option value="">Todos los estados</option>
@@ -104,9 +106,9 @@ function Documentos() {
                       {d.tipo === "reporte" ? <FileText className="h-4 w-4 text-slate-500" /> : <HardHat className="h-4 w-4 text-slate-500" />}
                       <span className="font-mono">{d.codigo}</span>
                     </Link>
-                    <p className="truncate text-xs text-slate-500 md:max-w-xs">{d.tipo === "reporte" ? d.datos.asunto : d.datos.actividades}</p>
+                    <p className="truncate text-xs text-slate-500 md:max-w-xs">{tituloDoc(d)}</p>
                   </td>
-                  <td className="block px-4 md:table-cell">{d.datos.cliente}</td>
+                  <td className="block px-4 md:table-cell">{clienteDoc(d)}</td>
                   <td className="block px-4 text-slate-600 md:table-cell">{autor(d.autorId)}</td>
                   <td className="inline-block px-4 text-slate-600 md:table-cell">{fechaCorta(d.creado)}</td>
                   <td className="hidden px-4 md:table-cell">

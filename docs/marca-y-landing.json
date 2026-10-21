@@ -1,0 +1,385 @@
+{
+  "producto": "FormatoDigital",
+  "cliente_piloto": "SOTEC",
+  "url_demo": "https://carforck.github.io/FormatoDigital/",
+  "paleta": {
+    "marca": {
+      "grafito": {
+        "hex": "#1F1F1F",
+        "uso": "Color principal: fondos oscuros, barra lateral, botones primarios (del logo)"
+      },
+      "tinta": {
+        "hex": "#111111",
+        "uso": "Texto sobre fondos claros cuando se necesita máximo contraste"
+      },
+      "verde": {
+        "hex": "#92D050",
+        "uso": "Acento y decoración: encabezados de los formatos FO-GSST-22 / F-GSST-13, CTA sobre fondo oscuro. No usar para texto sobre blanco (contraste bajo)"
+      },
+      "verde_texto": {
+        "hex": "#3F7A12",
+        "uso": "Verde para texto y enlaces sobre blanco (cumple WCAG AA)"
+      },
+      "verde_logo": {
+        "hex": "#6CC24A",
+        "uso": "Verde del logo anterior; referencia"
+      },
+      "verde_logo_v3": {
+        "hex": "#3BA30E",
+        "uso": "Verde dominante del logo v3.0"
+      },
+      "verde_suave": {
+        "hex": "#F1F8E9",
+        "uso": "Fondos suaves, chips, celdas destacadas"
+      },
+      "fondo_app": {
+        "hex": "#F5F7F3",
+        "uso": "Fondo general del aplicativo"
+      },
+      "franja_demo": {
+        "hex": "#141414",
+        "uso": "Franja superior «Entorno de demostración»"
+      }
+    },
+    "interfaz_hsl": {
+      "background": "0 0% 100%",
+      "foreground": "0 0% 10%",
+      "primary": "0 0% 12%",
+      "primary_foreground": "0 0% 98%",
+      "secondary": "90 30% 95%",
+      "muted": "90 10% 96%",
+      "muted_foreground": "0 0% 40%",
+      "accent": "90 35% 92%",
+      "destructive": "350 80% 50%",
+      "border": "90 8% 88%",
+      "input": "90 8% 85%",
+      "ring": "95 60% 35%",
+      "radio_bordes": "0.6rem"
+    },
+    "estados_documento": {
+      "borrador": {
+        "fondo": "#F1F5F9",
+        "texto": "#334155"
+      },
+      "en_revision": {
+        "fondo": "#FFFBEB",
+        "texto": "#92400E"
+      },
+      "aprobado": {
+        "fondo": "#ECFDF5",
+        "texto": "#065F46"
+      },
+      "rechazado": {
+        "fondo": "#FFF1F2",
+        "texto": "#9F1239"
+      },
+      "cerrado": {
+        "fondo": "#F0F9FF",
+        "texto": "#075985"
+      }
+    },
+    "graficas": {
+      "nota": "Validada con validate_palette.js (modo claro): pasa las 6 comprobaciones de color, daltonismo y contraste",
+      "papel_o_reportes": "#4F6FD0",
+      "digital_o_permisos": "#4E9A2A",
+      "rejilla": "#E7E9E4",
+      "texto_tenue": "#71717A"
+    },
+    "formatos": {
+      "FO-GSST-22 Reporte técnico": {
+        "encabezados": "#92D050",
+        "texto": "#000000"
+      },
+      "F-GSST-13 Permiso de trabajo": {
+        "encabezados": "#92D050",
+        "texto": "#000000"
+      },
+      "FO-GSST-25 Legalización de gastos": {
+        "principal": "#2E7D32",
+        "claro": "#F1F8E9",
+        "etiquetas": "#F8FAFC"
+      }
+    }
+  },
+  "tipografia": {
+    "interfaz": "Geist Sans",
+    "documentos": "Arial / Helvetica (igual que los formatos originales)",
+    "codigos": "monoespaciada del sistema (RT-001-26, CC-001-26…)"
+  },
+  "logo": {
+    "archivo": "public/sotec-logo-v3.png",
+    "version": "3.0",
+    "fondo": "transparente",
+    "lema": "¡Tu acceso eficaz a la seguridad tecnológica!"
+  },
+  "landing": {
+    "navegacion": [
+      "Caso SOTEC",
+      "Impacto",
+      "Funcionalidades",
+      "Roles",
+      "Ahorro",
+      "Planes",
+      "Preguntas"
+    ],
+    "cta_principal": "Probar la demo",
+    "hero": {
+      "etiqueta": "Calidad · SG-SST · ISO 9001",
+      "titulo": "Digitalizamos y optimizamos cualquier formato de tu sistema de gestión.",
+      "texto_rotativo": [
+        "permisos de trabajo",
+        "reportes técnicos",
+        "inspecciones de EPP",
+        "análisis de trabajo seguro",
+        "actas y listas de chequeo",
+        "cuentas de cobro"
+      ],
+      "subtitulo": "De papel, Word o Excel a un formulario guiado con firmas, aprobaciones y trazabilidad lista para auditoría. Para pequeñas y grandes empresas.",
+      "botones": [
+        "Probar la demo con SOTEC",
+        "Solicitar propuesta"
+      ],
+      "nota": "Sin registro ni contraseña · datos de ejemplo",
+      "animacion": "Lottie: papel → escáner → campos validados → celular → check"
+    },
+    "caso_cliente": {
+      "empresa": "SOTEC · seguridad electrónica y telecomunicaciones",
+      "servicios": "CCTV, control de acceso, cercas eléctricas, fibra óptica y energía solar",
+      "cifras": [
+        {
+          "valor": "2",
+          "texto": "formatos del SG-SST digitalizados"
+        },
+        {
+          "valor": "−82%",
+          "texto": "tiempo de diligenciamiento*"
+        },
+        {
+          "valor": "0",
+          "texto": "formatos en papel por archivar"
+        }
+      ]
+    },
+    "asi_se_llena": {
+      "titulo": "El técnico conversa; el formato se diligencia solo",
+      "puntos": [
+        "Autocompleta desde el directorio",
+        "Bloquea campos inválidos",
+        "Redacción asistida",
+        "Firma y envío en un toque"
+      ]
+    },
+    "papel_vs_digital": {
+      "titulo": "El papel le cuesta a tu empresa más de lo que parece",
+      "pares": [
+        {
+          "papel": "Campos en blanco o mal diligenciados que se detectan tarde",
+          "digital": "El asistente valida cada respuesta antes de avanzar",
+          "dato": "99 % completos"
+        },
+        {
+          "papel": "El técnico vuelve a la oficina para entregar y escanear",
+          "digital": "Se diligencia y firma en campo, desde el celular",
+          "dato": "0 viajes a la oficina"
+        },
+        {
+          "papel": "Permisos firmados sin verificar EPP ni condiciones",
+          "digital": "Las reglas del SG-SST bloquean lo que no cumple",
+          "dato": "Bloqueo automático"
+        },
+        {
+          "papel": "Horas buscando un reporte para el cliente o el auditor",
+          "digital": "Cualquier documento aparece en segundos con su historial",
+          "dato": "De 20 min a segundos"
+        },
+        {
+          "papel": "Sin indicadores: nadie sabe cuántos trabajos se hicieron",
+          "digital": "Tablero en tiempo real por cliente, mes y estado",
+          "dato": "En tiempo real"
+        }
+      ],
+      "cta": "¿Cuánto le cuesta el papel a tu empresa? Calcúlalo"
+    },
+    "caso_formatos": {
+      "titulo": "Sus dos formatos del SG-SST, ya digitales y funcionando",
+      "formatos": [
+        "FO-GSST-22 · Reporte técnico",
+        "F-GSST-13 · Permiso de trabajo"
+      ]
+    },
+    "como_funciona": [
+      {
+        "paso": "01",
+        "titulo": "Levantamos tu formato",
+        "texto": "Nos compartes el formato en papel, Word, Excel o PDF y cómo lo usa tu equipo."
+      },
+      {
+        "paso": "02",
+        "titulo": "Lo digitalizamos fiel",
+        "texto": "Misma estructura y control documental, más reglas de validación de tu SGC."
+      },
+      {
+        "paso": "03",
+        "titulo": "Tu equipo lo diligencia",
+        "texto": "Con el asistente, desde el celular o el computador, con firma en pantalla."
+      },
+      {
+        "paso": "04",
+        "titulo": "Apruebas y auditas",
+        "texto": "Revisión, cierre, PDF, indicadores y trazabilidad completa."
+      }
+    ],
+    "funcionalidades": {
+      "titulo": "Todo lo que tu sistema de gestión necesita, en un solo lugar",
+      "destacadas": [
+        {
+          "titulo": "Asistente paso a paso",
+          "texto": "Pregunta, valida y ubica cada respuesta en el campo correcto del formato."
+        },
+        {
+          "titulo": "Reglas de tu SGC",
+          "texto": "Lo que no cumple no se envía: sin arnés no hay trabajo en alturas."
+        },
+        {
+          "titulo": "Firma en el celular",
+          "texto": "Técnicos, ejecutores, supervisores y clientes firman con el dedo."
+        }
+      ],
+      "resto": [
+        "Fiel al formato original",
+        "Flujo de aprobación",
+        "Roles y accesos",
+        "Trazabilidad",
+        "Tablero de indicadores",
+        "Búsqueda instantánea",
+        "Portal del cliente",
+        "Plantillas inteligentes",
+        "PDF y celular"
+      ]
+    },
+    "roles": {
+      "titulo": "Entra a la demo con el perfil que quieras",
+      "perfiles": [
+        "Técnico de campo",
+        "Coordinador SST",
+        "Administrador",
+        "Portal del cliente"
+      ]
+    },
+    "impacto": {
+      "titulo": "Menos tiempo, menos errores, cero papeles perdidos",
+      "indicadores": [
+        {
+          "valor": "82%",
+          "texto": "menos tiempo por formato"
+        },
+        {
+          "valor": "99%",
+          "texto": "formatos completos al primer intento"
+        },
+        {
+          "valor": "0",
+          "texto": "documentos perdidos"
+        },
+        {
+          "valor": "24/7",
+          "texto": "acceso para auditoría"
+        }
+      ],
+      "graficas": [
+        "Minutos por formato en cada etapa (papel 50 min vs. digital 9 min)",
+        "Formatos completos al primer intento (62 % → 99 %)"
+      ],
+      "nota": "Cifras ilustrativas de un piloto típico de digitalización"
+    },
+    "calculadora": {
+      "titulo": "¿Cuánto tiempo pierde tu equipo en papeleo?",
+      "supuesto_digital_min": 9,
+      "predeterminados": {
+        "formatos_mes": 120,
+        "min_papel": 50,
+        "costo_hora_cop": 25000
+      }
+    },
+    "formatos_que_digitalizamos": [
+      "Permisos de trabajo",
+      "Análisis de trabajo seguro (ATS)",
+      "Reportes técnicos",
+      "Inspección de EPP",
+      "Listas de chequeo",
+      "Inspección de extintores",
+      "Órdenes de servicio",
+      "Actas de reunión",
+      "Entrega de dotación",
+      "Reporte de incidentes",
+      "Cuentas de cobro",
+      "Solicitud de permisos laborales",
+      "Control de asistencia a capacitaciones",
+      "Inspección preoperacional de vehículos"
+    ],
+    "marco_referencia": {
+      "titulo": "Diseñado para apoyar tu cumplimiento de",
+      "normas": [
+        "ISO 9001:2015 · Gestión de la calidad",
+        "ISO 45001:2018 · Seguridad y salud en el trabajo",
+        "Decreto 1072 de 2015 · SG-SST en Colombia",
+        "Resolución 0312 de 2019 · Estándares mínimos del SG-SST"
+      ],
+      "aclaracion": "FormatoDigital es una herramienta de apoyo a la gestión; no otorga certificación ni está avalada por ISO u organismos certificadores. Las normas se mencionan solo como referencia."
+    },
+    "planes": [
+      {
+        "nombre": "Esencial",
+        "para": "Pequeñas empresas y contratistas",
+        "incluye": [
+          "Hasta 3 formatos digitalizados",
+          "Asistente, firmas y PDF",
+          "Roles básicos: campo y supervisión",
+          "Tablero de indicadores"
+        ]
+      },
+      {
+        "nombre": "Empresarial",
+        "para": "Medianas empresas con varias áreas",
+        "destacado": "El más elegido",
+        "incluye": [
+          "Hasta 10 formatos",
+          "Flujos de aprobación por área",
+          "Portal para clientes",
+          "Auditoría y exportación de datos"
+        ]
+      },
+      {
+        "nombre": "Corporativo",
+        "para": "Grandes empresas y grupos",
+        "incluye": [
+          "Formatos ilimitados y multi-sede",
+          "Integración con ERP, correo y nube",
+          "Inicio de sesión corporativo",
+          "Acompañamiento y soporte dedicado"
+        ]
+      }
+    ],
+    "faq": [
+      "¿Qué formatos pueden digitalizar?",
+      "¿El documento sigue siendo válido para la auditoría?",
+      "¿Sirve para una empresa pequeña?",
+      "¿Funciona en el celular, en campo?",
+      "¿Qué pasa con nuestros datos?",
+      "¿Cuánto tarda la implementación?"
+    ],
+    "contacto": {
+      "titulo": "Digitalicemos tu primer formato",
+      "texto": "Cuéntanos qué formatos usa tu equipo y te mostramos cómo se verían funcionando, como lo hicimos con SOTEC.",
+      "campos": [
+        "Nombre",
+        "Empresa",
+        "Correo",
+        "Tamaño de la empresa",
+        "¿Qué formatos quieres digitalizar?"
+      ],
+      "nota": "El formulario de la demo no envía datos"
+    },
+    "pie": "* Cifras ilustrativas de un piloto típico (50 min en papel frente a 9 min digital por formato)."
+  }
+}

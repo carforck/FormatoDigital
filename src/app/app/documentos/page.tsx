@@ -7,12 +7,12 @@ import { FileText, HardHat, Search } from "lucide-react";
 
 import { EstadoBadge, fechaCorta } from "@/components/ui/badges";
 import { PageHeader } from "@/components/ui/corporativo";
-import { ETIQUETA_ESTADO, FORMATOS } from "@/lib/formatos";
-import { rutaDoc } from "@/lib/base";
-import { useDemo } from "@/lib/store";
-import type { Estado, TipoDoc } from "@/lib/types";
+import { ETIQUETA_ESTADO, FORMATOS } from "@/nucleo/catalogos";
+import { rutaDoc } from "@/nucleo/rutas";
+import { useDemo } from "@/nucleo/datos/DemoProvider";
+import type { Estado, TipoDoc } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
-import { avance } from "@/lib/validar";
+import { avance } from "@/nucleo/validar";
 
 export default function Page() {
   return (

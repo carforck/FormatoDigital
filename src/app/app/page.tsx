@@ -7,11 +7,11 @@ import { ArrowRight, CheckCircle2, Clock, FileText, HardHat, PenLine, Timer, XCi
 import { Contador } from "@/components/fx/Reveal";
 import { EstadoBadge, fechaCorta } from "@/components/ui/badges";
 import { fechaLarga, nombreCorto, saludo } from "@/components/ui/corporativo";
-import { rutaDoc } from "@/lib/base";
-import { ETIQUETA_ROL, FORMATOS } from "@/lib/formatos";
-import { puede } from "@/lib/permisos";
-import { useDemo } from "@/lib/store";
-import type { Documento, Estado } from "@/lib/types";
+import { rutaDoc } from "@/nucleo/rutas";
+import { ETIQUETA_ROL, FORMATOS } from "@/nucleo/catalogos";
+import { puede } from "@/nucleo/permisos";
+import { useDemo } from "@/nucleo/datos/DemoProvider";
+import type { Documento, Estado } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];

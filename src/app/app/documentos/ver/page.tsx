@@ -6,15 +6,15 @@ import { Suspense, useState } from "react";
 import { ArrowLeft, Check, CheckCircle2, Copy, Lock, PenLine, Printer, SendHorizonal, Trash2, X } from "lucide-react";
 
 import { FirmaPad } from "@/components/docs/FirmaPad";
-import { PlantillaPermiso } from "@/components/docs/PlantillaPermiso";
-import { PlantillaReporte } from "@/components/docs/PlantillaReporte";
+import { PlantillaPermiso } from "@/modulos/permisos/PlantillaPermiso";
+import { PlantillaReporte } from "@/modulos/reportes/PlantillaReporte";
 import { Button } from "@/components/ui/button";
 import { EstadoBadge } from "@/components/ui/badges";
-import { FORMATOS } from "@/lib/formatos";
-import { puede, puedeEditarDoc, puedeVerDoc } from "@/lib/permisos";
-import { useDemo } from "@/lib/store";
-import type { DatosPermiso } from "@/lib/types";
-import { faltantes } from "@/lib/validar";
+import { FORMATOS } from "@/nucleo/catalogos";
+import { puede, puedeEditarDoc, puedeVerDoc } from "@/nucleo/permisos";
+import { useDemo } from "@/nucleo/datos/DemoProvider";
+import type { DatosPermiso } from "@/nucleo/tipos";
+import { faltantes } from "@/nucleo/validar";
 
 function Detalle() {
   const params = useSearchParams();

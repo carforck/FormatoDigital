@@ -24,10 +24,10 @@ import {
 } from "lucide-react";
 
 import { Avatar } from "@/components/ui/corporativo";
-import { asset, rutaDoc } from "@/lib/base";
-import { ETIQUETA_ROL } from "@/lib/formatos";
-import { puede, type Accion } from "@/lib/permisos";
-import { useDemo } from "@/lib/store";
+import { asset, rutaDoc } from "@/nucleo/rutas";
+import { ETIQUETA_ROL } from "@/nucleo/catalogos";
+import { puede, type Accion } from "@/nucleo/permisos";
+import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { cn } from "@/lib/utils";
 
 interface Item {

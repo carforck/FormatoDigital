@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import "./globals.css";
 
-import { DemoProvider } from "@/lib/store";
+import { DemoProvider } from "@/nucleo/datos/DemoProvider";
 
 export const metadata: Metadata = {
   title: "FormatoDigital · Demo SOTEC",

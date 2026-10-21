@@ -1,5 +1,5 @@
-import { COLOR_ESTADO, ETIQUETA_ESTADO } from "@/lib/formatos";
-import type { Estado } from "@/lib/types";
+import { COLOR_ESTADO, ETIQUETA_ESTADO } from "@/nucleo/catalogos";
+import type { Estado } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 
 export function EstadoBadge({ estado }: { estado: Estado }) {

@@ -4,28 +4,18 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Eye, MessageSquare, Printer, Save, SendHorizonal } from "lucide-react";
 
-import { ChatAsistente, type Paso, type ValorPaso } from "@/components/chat/ChatAsistente";
+import { ChatAsistente, type ValorPaso } from "@/components/chat/ChatAsistente";
 import { FirmaPad } from "@/components/docs/FirmaPad";
-import { PlantillaPermiso, type CampoFirmaPermiso } from "@/components/docs/PlantillaPermiso";
-import { PlantillaReporte } from "@/components/docs/PlantillaReporte";
 import { Button } from "@/components/ui/button";
-import {
-  EPP,
-  EQUIPO_REQUERIDO,
-  FORMATOS,
-  MEDIDAS,
-  PELIGROS,
-  PLANTILLAS_ACTIVIDAD,
-  PREGUNTAS_VERIFICACION,
-  TIPOS_REPORTE,
-  permisoVacio,
-  reporteVacio,
-} from "@/lib/formatos";
-import { rutaDoc } from "@/lib/base";
-import { hoy, useDemo } from "@/lib/store";
-import type { DatosPermiso, DatosReporte, DocPermiso, DocReporte, Documento, Ejecutor, SiNoNa, TipoDoc } from "@/lib/types";
+import { PlantillaPermiso, type CampoFirmaPermiso } from "@/modulos/permisos/PlantillaPermiso";
+import { moduloDe } from "@/modulos/registro";
+import { PlantillaReporte } from "@/modulos/reportes/PlantillaReporte";
+import { FORMATOS } from "@/nucleo/catalogos";
+import { hoy, useDemo } from "@/nucleo/datos/DemoProvider";
+import { rutaDoc } from "@/nucleo/rutas";
+import type { DatosPermiso, DatosReporte, DocPermiso, DocReporte, Documento, TipoDoc } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
-import { avance, faltantes } from "@/lib/validar";
+import { avance, faltantes } from "@/nucleo/validar";
 
 interface Props {
   tipo: TipoDoc;
@@ -33,29 +23,23 @@ interface Props {
   existente?: Documento;
 }
 
-function redactarDescripcion(d: DatosReporte): string {
-  const tipo = (d.tipoReporte || "técnico").toLowerCase();
-  const asunto = d.asunto || "la solicitud del cliente";
-  return `Se realiza visita de mantenimiento ${tipo} en las instalaciones de ${d.cliente || "el cliente"} para atender: ${asunto.toLowerCase()}.
-
-Durante el diagnóstico se inspeccionan equipos, conexiones, alimentación eléctrica y estado general de la infraestructura, identificando los puntos que afectan el funcionamiento del sistema.
-
-Como acción ${tipo === "preventivo" ? "preventiva" : "correctiva"}, se ejecutan los ajustes, reemplazos y configuraciones necesarias, dejando registro fotográfico del antes y el después.
-
-Finalmente se realizan pruebas de funcionamiento junto con ${d.personaContactada || "la persona contactada"}, confirmando que el sistema queda operando bajo condiciones normales.`;
-}
-
+/**
+ * Generador genérico: asistente conversacional + vista previa editable.
+ * Lo propio de cada formato (pasos, autollenado, reglas) lo aporta su módulo
+ * en src/modulos/<clave>/.
+ */
 export function Generador({ tipo, existente }: Props) {
   const demo = useDemo();
   const router = useRouter();
   const usuario = demo.usuario!;
+  const modulo = moduloDe(tipo);
   const [doc, setDoc] = useState<Documento>(() => {
     if (existente) return existente;
     const n = demo.nuevoId(tipo);
     const base = { ...n, estado: "borrador" as const, autorId: usuario.id, clienteId: "", creado: hoy(), actualizado: hoy(), historial: [] };
     return tipo === "reporte"
-      ? ({ ...base, tipo: "reporte", datos: { ...reporteVacio(hoy()), nombreTecnico: usuario.nombre } } as DocReporte)
-      : ({ ...base, tipo: "permiso", datos: { ...permisoVacio(hoy()), responsable: usuario.nombre, encargado: usuario.nombre } } as DocPermiso);
+      ? ({ ...base, tipo, datos: moduloDe("reporte").vacio(hoy(), usuario.nombre) } as DocReporte)
+      : ({ ...base, tipo, datos: moduloDe("permiso").vacio(hoy(), usuario.nombre) } as DocPermiso);
   });
   const [resaltar, setResaltar] = useState<string | undefined>();
   const [firmando, setFirmando] = useState<string | null>(null);
@@ -65,135 +49,42 @@ export function Generador({ tipo, existente }: Props) {
   const pendientes = useMemo(() => faltantes(doc), [doc]);
   const pct = avance(doc);
 
-  const editarReporte = (p: Partial<DatosReporte>) => setDoc((d) => ({ ...d, datos: { ...d.datos, ...p } }) as Documento);
-  const editarPermiso = (p: Partial<DatosPermiso>) => setDoc((d) => ({ ...d, datos: { ...d.datos, ...p } }) as Documento);
+  /** Mezcla un cambio parcial en el contenido del formato. */
+  const editar = (cambio: Partial<DatosReporte> | Partial<DatosPermiso>) => setDoc((d) => ({ ...d, datos: { ...d.datos, ...cambio } }) as Documento);
 
-  function elegirCliente(nombre: string): string | void {
-    const c = demo.clientes.find((x) => x.nombre === nombre);
-    if (!c) {
-      setDoc((d) => ({ ...d, clienteId: "", datos: { ...d.datos, cliente: nombre } }) as Documento);
-      return;
-    }
-    if (tipo === "reporte") {
-      setDoc((d) => ({
-        ...d,
-        clienteId: c.id,
-        datos: { ...d.datos, cliente: c.nombre, direccion: c.direccion, personaContactada: c.contacto, correo: c.correo, telefono: c.telefono, cargo: c.cargo },
-      }) as Documento);
-      return `Encontré a ${c.nombre} en tu directorio. Completé dirección, contacto (${c.contacto}), correo, teléfono y cargo. Puedes ajustarlos con un clic en el formato.`;
-    }
-    setDoc((d) => ({ ...d, clienteId: c.id, datos: { ...d.datos, cliente: c.nombre, sitioTrabajo: c.sitio } }) as Documento);
-    return `Cliente ${c.nombre} seleccionado. Sitio de trabajo sugerido: ${c.sitio}.`;
-  }
-
-  const pasosReporte: Paso[] = [
-    { id: "cliente", tipo: "texto", resaltar: "cliente", pregunta: "¿Para qué cliente es el reporte?", sugerencias: demo.clientes.map((c) => c.nombre), ayuda: "Elige uno del directorio para autocompletar sus datos, o escribe uno nuevo." },
-    { id: "tipoReporte", tipo: "select", resaltar: "tipoReporte", pregunta: "¿Qué tipo de reporte es?", opciones: [...TIPOS_REPORTE] },
-    { id: "fecha", tipo: "fecha", resaltar: "fecha", pregunta: "¿En qué fecha se hizo la visita?", sugerencias: [hoy()] },
-    { id: "personaContactada", tipo: "texto", resaltar: "personaContactada", pregunta: "¿Con quién se atendió la visita?", sugerencias: doc.datos && (doc as DocReporte).datos.personaContactada ? [(doc as DocReporte).datos.personaContactada] : [], validar: (v) => (v.trim().length < 3 ? "Escribe el nombre de la persona contactada." : null) },
-    {
-      id: "asunto",
-      tipo: "texto",
-      resaltar: "asunto",
-      pregunta: "¿Cuál es el asunto?",
-      sugerencias: ["Mantenimiento preventivo CCTV", "Reparación fibra óptica", "Instalación control de acceso", "Revisión cerca eléctrica"],
-      validar: (v) => (v.trim().length < 5 ? "El asunto debe tener al menos 5 caracteres." : null),
-    },
-    {
-      id: "descripcion",
-      tipo: "textarea",
-      resaltar: "descripcion",
-      pregunta: "Describe el trabajo realizado: diagnóstico, acción y resultado.",
-      ayuda: "¿Sin tiempo? Usa «Redactar borrador» y ajústalo: el texto queda en el estilo del formato.",
-      generar: () => redactarDescripcion((doc as DocReporte).datos),
-      validar: (v) => (v.trim().length < 40 ? "La descripción debe tener al menos 40 caracteres para que sea útil al cliente." : null),
-    },
-    {
-      id: "recomendaciones",
-      tipo: "textarea",
-      resaltar: "recomendaciones",
-      opcional: true,
-      pregunta: "¿Alguna recomendación para el cliente?",
-      sugerencias: ["Programar mantenimiento preventivo trimestral.", "Proteger con tubería los tramos de cable expuestos.", "Instalar UPS para respaldo eléctrico de los equipos."],
-    },
-    { id: "nombreTecnico", tipo: "texto", resaltar: "nombreTecnico", pregunta: "Nombre del técnico que firma", sugerencias: [usuario.nombre] },
-    { id: "firmaTecnico", tipo: "firma", resaltar: "firmaTecnico", pregunta: "Firma del técnico. Puedes firmar con el dedo desde el celular." },
-  ];
-
-  const d = doc.datos as DatosPermiso;
-  const pasosPermiso: Paso[] = [
-    { id: "cliente", tipo: "texto", resaltar: "cliente", pregunta: "¿Para qué cliente es el permiso de trabajo?", sugerencias: demo.clientes.map((c) => c.nombre) },
-    { id: "sitioTrabajo", tipo: "texto", resaltar: "sitioTrabajo", pregunta: "¿Cuál es el sitio de trabajo?", sugerencias: d.sitioTrabajo ? [d.sitioTrabajo] : [] },
-    { id: "hora", tipo: "hora", resaltar: "hora", pregunta: "¿A qué hora se emite el permiso?", sugerencias: ["07:00", "07:30", "08:00", "13:00"], ayuda: `Fecha de emisión: ${d.fechaEmision}. Puedes cambiarla en el formato.` },
-    {
-      id: "puestoProyecto",
-      tipo: "select",
-      resaltar: "puestoProyecto",
-      pregunta: "¿Qué tipo de trabajo se va a realizar?",
-      ayuda: "Al elegir la actividad, precargo los peligros, medidas y EPP típicos. Luego los ajustas.",
-      opciones: [...Object.keys(PLANTILLAS_ACTIVIDAD), "Otro"],
-    },
-    { id: "actividades", tipo: "texto", resaltar: "actividades", pregunta: "Describe brevemente las actividades a realizar", sugerencias: d.puestoProyecto ? [`${d.puestoProyecto} en ${d.sitioTrabajo || "sitio"}`] : [] },
-    { id: "equipo", tipo: "multi", resaltar: "equipo", pregunta: "Equipo requerido", opciones: [...EQUIPO_REQUERIDO], inicial: () => (doc.datos as DatosPermiso).equipo },
-    { id: "peligros", tipo: "multi", resaltar: "peligros", pregunta: "Peligros identificados", opciones: [...PELIGROS], inicial: () => (doc.datos as DatosPermiso).peligros },
-    { id: "medidas", tipo: "multi", resaltar: "medidas", pregunta: "Medidas de seguridad requeridas", opciones: [...MEDIDAS], inicial: () => (doc.datos as DatosPermiso).medidas },
-    { id: "epp", tipo: "multi", resaltar: "epp", pregunta: "Verificación de elementos de protección personal", opciones: [...EPP], inicial: () => (doc.datos as DatosPermiso).epp },
-    {
-      id: "verificacion",
-      tipo: "verificacion",
-      resaltar: "verificacion",
-      pregunta: "Verificación de condiciones de trabajo. Responde cada punto.",
-      ayuda: "Si algún punto queda en NO, el sistema no deja enviar el permiso: así lo exige el SG-SST.",
-      opciones: [...PREGUNTAS_VERIFICACION],
-      inicial: () => (doc.datos as DatosPermiso).verificacion,
-    },
-    { id: "ejecutores", tipo: "ejecutores", resaltar: "ejecutores", pregunta: "¿Quiénes conforman el grupo ejecutor?" },
-    { id: "firmaEncargado", tipo: "firma", resaltar: "autorizacion", pregunta: "Firma de la persona encargada de ejecutar el trabajo." },
-  ];
+  // Los módulos están tipados por formato; el generador los trata de forma uniforme.
+  const mod = modulo as unknown as {
+    pasos: (c: { datos: unknown; clientes: typeof demo.clientes; usuarioNombre: string; hoy: string }) => ReturnType<typeof modulo.pasos>;
+    aplicar: (id: string, v: ValorPaso, d: unknown) => { cambio: Record<string, unknown>; mensaje?: string };
+    alElegirCliente: (c: (typeof demo.clientes)[number]) => { cambio: Record<string, unknown>; mensaje: string };
+  };
 
   function aplicar(id: string, v: ValorPaso): string | void {
-    if (id === "cliente") return elegirCliente(v as string);
     if (id.startsWith("firma")) return;
-    if (tipo === "reporte") {
-      editarReporte({ [id]: v } as Partial<DatosReporte>);
-      return;
-    }
-    if (id === "puestoProyecto") {
-      const t = PLANTILLAS_ACTIVIDAD[v as string];
-      if (t) {
-        editarPermiso({ puestoProyecto: v as string, equipo: t.equipo, peligros: t.peligros, medidas: t.medidas, epp: t.epp });
-        return `Precargué ${t.peligros.length} peligros, ${t.medidas.length} medidas y ${t.epp.length} EPP para «${v}». Revísalos en los siguientes pasos.`;
+    if (id === "cliente") {
+      const c = demo.clientes.find((x) => x.nombre === v);
+      if (!c) {
+        setDoc((d) => ({ ...d, clienteId: "", datos: { ...d.datos, cliente: v as string } }) as Documento);
+        return;
       }
-      editarPermiso({ puestoProyecto: "" });
-      return "Escribe el puesto o proyecto directamente en el formato (clic sobre el campo).";
+      const r = mod.alElegirCliente(c);
+      setDoc((d) => ({ ...d, clienteId: c.id, datos: { ...d.datos, ...r.cambio } }) as Documento);
+      return r.mensaje;
     }
-    if (id === "hora") {
-      const [h, mm] = (v as string).split(":").map(Number);
-      if (!Number.isNaN(h)) editarPermiso({ hora: `${String(h % 12 || 12).padStart(2, "0")}:${String(mm || 0).padStart(2, "0")}`, ampm: h >= 12 ? "PM" : "AM" });
-      return;
-    }
-    if (id === "verificacion") {
-      editarPermiso({ verificacion: v as SiNoNa[] });
-      if ((v as string[]).includes("NO")) return "⚠️ Hay puntos en NO. Corrige la condición antes de iniciar: el permiso no podrá enviarse así.";
-      return;
-    }
-    if (id === "ejecutores") {
-      editarPermiso({ ejecutores: v as Ejecutor[] });
-      return "Agregué el grupo ejecutor al formato. Cada persona puede firmar en su fila.";
-    }
-    editarPermiso({ [id]: v } as Partial<DatosPermiso>);
+    const r = mod.aplicar(id, v, doc.datos);
+    editar(r.cambio);
+    return r.mensaje;
   }
 
   function guardarFirma(url: string) {
     const campo = firmando!;
     setFirmando(null);
-    if (campo.startsWith("ejecutor:")) {
+    if (campo.startsWith("ejecutor:") && doc.tipo === "permiso") {
       const k = Number(campo.split(":")[1]);
-      editarPermiso({ ejecutores: d.ejecutores.map((e, j) => (j === k ? { ...e, firma: url } : e)) });
+      editar({ ejecutores: doc.datos.ejecutores.map((e, j) => (j === k ? { ...e, firma: url } : e)) });
       return;
     }
-    if (tipo === "reporte") editarReporte({ [campo]: url } as Partial<DatosReporte>);
-    else editarPermiso({ [campo]: url } as Partial<DatosPermiso>);
+    editar({ [campo]: url });
   }
 
   function guardar(enviar: boolean) {
@@ -261,12 +152,12 @@ export function Generador({ tipo, existente }: Props) {
           <ChatAsistente
             titulo="Asistente SOTEC"
             subtitulo={`${f.corto} · ${f.codigo}`}
-            pasos={tipo === "reporte" ? pasosReporte : pasosPermiso}
+            pasos={mod.pasos({ datos: doc.datos, clientes: demo.clientes, usuarioNombre: usuario.nombre, hoy: hoy() })}
             aplicar={aplicar}
             onPaso={(p) => setResaltar(p?.resaltar)}
             onFirmar={(id) => setFirmando(id)}
             firmado={(id) => Boolean((doc.datos as unknown as Record<string, string>)[id])}
-            ejecutoresIniciales={tipo === "permiso" ? d.ejecutores : []}
+            ejecutoresIniciales={doc.tipo === "permiso" ? doc.datos.ejecutores : []}
             retomando={Boolean(existente)}
             bienvenida={
               existente
@@ -298,9 +189,9 @@ export function Generador({ tipo, existente }: Props) {
           <p className="text-xs text-slate-500 print:hidden">Clic sobre cualquier campo del formato para editarlo. Los campos resaltados en verde son los que el asistente está preguntando.</p>
           <div className="overflow-x-auto rounded-lg bg-slate-100 p-2 sm:p-4">
             {doc.tipo === "reporte" ? (
-              <PlantillaReporte datos={doc.datos} codigoDoc={doc.codigo} editar={editarReporte} firmar={(c) => setFirmando(c)} resaltar={resaltar} />
+              <PlantillaReporte datos={doc.datos} codigoDoc={doc.codigo} editar={editar} firmar={(c) => setFirmando(c)} resaltar={resaltar} />
             ) : (
-              <PlantillaPermiso datos={doc.datos} codigoDoc={doc.codigo} editar={editarPermiso} firmar={(c: CampoFirmaPermiso) => setFirmando(c)} resaltar={resaltar} />
+              <PlantillaPermiso datos={doc.datos} codigoDoc={doc.codigo} editar={editar} firmar={(c: CampoFirmaPermiso) => setFirmando(c)} resaltar={resaltar} />
             )}
           </div>
           <div className="lg:hidden print:hidden">{acciones}</div>

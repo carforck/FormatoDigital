@@ -1,7 +1,7 @@
 "use client";
 
 import { Avatar, PageHeader } from "@/components/ui/corporativo";
-import { useDemo } from "@/lib/store";
+import { useDemo } from "@/nucleo/datos/DemoProvider";
 
 export default function Auditoria() {
   const demo = useDemo();

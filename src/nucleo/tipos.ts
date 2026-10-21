@@ -1,3 +1,10 @@
+import type { DatosPermiso } from "@/modulos/permisos/tipos";
+import type { DatosReporte } from "@/modulos/reportes/tipos";
+
+// Los tipos propios de cada formato viven en su módulo; se reexportan aquí por comodidad.
+export type { DatosReporte } from "@/modulos/reportes/tipos";
+export type { DatosPermiso, Ejecutor, SiNoNa } from "@/modulos/permisos/tipos";
+
 export type Rol = "tecnico" | "supervisor" | "admin" | "cliente";
 
 export type Estado = "borrador" | "en_revision" | "aprobado" | "rechazado" | "cerrado";
@@ -26,66 +33,6 @@ export interface Cliente {
   sitio: string;
 }
 
-/** FO-GSST-22 · Formato de reporte técnico */
-export interface DatosReporte {
-  fecha: string;
-  tipoReporte: string;
-  cliente: string;
-  direccion: string;
-  personaContactada: string;
-  correo: string;
-  telefono: string;
-  cargo: string;
-  asunto: string;
-  descripcion: string;
-  recomendaciones: string;
-  nombreTecnico: string;
-  firmaTecnico: string; // data URL
-  firmaCliente: string; // data URL
-}
-
-export type SiNoNa = "SI" | "NO" | "NA" | "";
-
-export interface Ejecutor {
-  nombre: string;
-  cedula: string;
-  arlEps: string;
-  horaInicio: string;
-  horaFin: string;
-  firma: string;
-}
-
-/** F-GSST-13 · Permiso de trabajo */
-export interface DatosPermiso {
-  fechaEmision: string;
-  hora: string;
-  ampm: "AM" | "PM";
-  cliente: string;
-  sitioTrabajo: string;
-  puestoProyecto: string;
-  responsable: string;
-  actividades: string;
-  equipo: string[];
-  maquinariaCual: string;
-  equipoMenorCual: string;
-  equipoOtros: string;
-  peligros: string[];
-  peligrosOtros: string;
-  medidas: string[];
-  medidasOtras: string;
-  epp: string[];
-  eppOtro: string;
-  verificacion: SiNoNa[];
-  ejecutores: Ejecutor[];
-  autoriza: string;
-  firmaAutoriza: string;
-  encargado: string;
-  firmaEncargado: string;
-  cierreAreaLimpia: "SI" | "NO" | "";
-  cierraNombre: string;
-  firmaCierre: string;
-}
-
 export interface Evento {
   fecha: string;
   usuarioId: string;
@@ -110,10 +57,12 @@ export interface DocReporte extends DocBase {
   tipo: "reporte";
   datos: DatosReporte;
 }
+
 export interface DocPermiso extends DocBase {
   tipo: "permiso";
   datos: DatosPermiso;
 }
+
 export type Documento = DocReporte | DocPermiso;
 
 export interface Notificacion {

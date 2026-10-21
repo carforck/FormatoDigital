@@ -11,7 +11,7 @@ import {
   Timer,
 } from "lucide-react";
 
-import { asset } from "@/lib/base";
+import { asset } from "@/nucleo/rutas";
 import { FondoInteractivo } from "@/components/fx/FondoInteractivo";
 import { Contador, Icono, ProgresoScroll, Reveal, TextoRotativo } from "@/components/fx/Reveal";
 import { GraficasImpacto } from "@/components/landing/GraficasImpacto";

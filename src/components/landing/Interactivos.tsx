@@ -6,10 +6,10 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Check, ChevronDown, FileText, HardHat } from "lucide-react";
 
 import { Contador, Icono, Tilt } from "@/components/fx/Reveal";
-import { PlantillaPermiso } from "@/components/docs/PlantillaPermiso";
-import { PlantillaReporte } from "@/components/docs/PlantillaReporte";
-import { PERFILES } from "@/lib/perfiles";
-import { useDemo } from "@/lib/store";
+import { PlantillaPermiso } from "@/modulos/permisos/PlantillaPermiso";
+import { PlantillaReporte } from "@/modulos/reportes/PlantillaReporte";
+import { PERFILES } from "@/nucleo/perfiles";
+import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { cn } from "@/lib/utils";
 
 /** Muestra los dos formatos reales de SOTEC ya digitalizados. */

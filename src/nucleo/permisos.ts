@@ -1,4 +1,4 @@
-import type { Documento, Rol, Usuario } from "./types";
+import type { Documento, Rol, Usuario } from "@/nucleo/tipos";
 
 export type Accion =
   | "crear"

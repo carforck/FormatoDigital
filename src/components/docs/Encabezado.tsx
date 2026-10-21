@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
-import { asset } from "@/lib/base";
-import { FORMATOS } from "@/lib/formatos";
-import type { TipoDoc } from "@/lib/types";
+import { asset } from "@/nucleo/rutas";
+import { FORMATOS } from "@/nucleo/catalogos";
+import type { TipoDoc } from "@/nucleo/tipos";
 
 /** Encabezado del formato: logo, título y control documental (código, versión, fecha). */
 export function Encabezado({ tipo, codigoDoc }: { tipo: TipoDoc; codigoDoc?: string }) {

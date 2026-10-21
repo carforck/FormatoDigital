@@ -7,8 +7,8 @@ import { Avatar, PageHeader } from "@/components/ui/corporativo";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useDemo } from "@/lib/store";
-import type { Cliente } from "@/lib/types";
+import { useDemo } from "@/nucleo/datos/DemoProvider";
+import type { Cliente } from "@/nucleo/tipos";
 
 const VACIO: Cliente = { id: "", nombre: "", direccion: "", contacto: "", cargo: "", correo: "", telefono: "", sitio: "" };
 const CAMPOS: [keyof Cliente, string][] = [

@@ -22,9 +22,9 @@ import {
 import type { LucideIcon } from "lucide-react";
 
 import { Icono, useVisible } from "@/components/fx/Reveal";
-import { rutaDoc } from "@/lib/base";
-import { useDemo } from "@/lib/store";
-import type { Rol } from "@/lib/types";
+import { rutaDoc } from "@/nucleo/rutas";
+import { useDemo } from "@/nucleo/datos/DemoProvider";
+import type { Rol } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 
 interface Destino {

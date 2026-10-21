@@ -1,10 +1,10 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import type { DatosReporte } from "@/lib/types";
+import type { DatosReporte } from "@/nucleo/tipos";
 
-import { EditableText } from "./EditableText";
-import { Encabezado, Firma } from "./Encabezado";
+import { EditableText } from "@/components/docs/EditableText";
+import { Encabezado, Firma } from "@/components/docs/Encabezado";
 
 interface Props {
   datos: DatosReporte;

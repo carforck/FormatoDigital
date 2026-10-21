@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start -p 3100",
     "lint": "next lint",
-    "deploy": "bash scripts/deploy-pages.sh"
+    "deploy": "bash scripts/deploy-pages.sh",
+    "test:e2e": "node tests/e2e/demo.cjs",
+    "test:db": "bash scripts/probar-db.sh"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.0",
@@ -32,6 +34,7 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.35",
     "postcss": "^8.4.49",
+    "puppeteer-core": "^25.15.0",
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.3"
   }

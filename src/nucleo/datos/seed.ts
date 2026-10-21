@@ -1,5 +1,6 @@
-import { PLANTILLAS_ACTIVIDAD, permisoVacio, reporteVacio } from "./formatos";
-import type { Auditoria, Cliente, Config, Documento, Estado, Notificacion, Usuario } from "./types";
+import { PLANTILLAS_ACTIVIDAD, permisoVacio } from "@/modulos/permisos/catalogo";
+import { reporteVacio } from "@/modulos/reportes/catalogo";
+import type { Auditoria, Cliente, Config, Documento, Estado, Notificacion, Usuario } from "@/nucleo/tipos";
 
 /** Firma ficticia dibujada como SVG para los documentos de ejemplo. */
 export function firmaDemo(seed: number): string {

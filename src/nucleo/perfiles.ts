@@ -1,6 +1,6 @@
 import { ClipboardCheck, HardHat, ShieldCheck, Building2 } from "lucide-react";
 
-import type { Rol } from "./types";
+import type { Rol } from "@/nucleo/tipos";
 
 /** Tarjetas de acceso rápido de la demo (sin credenciales). */
 export const PERFILES: { rol: Rol; titulo: string; persona: string; icon: typeof HardHat; puede: string[] }[] = [

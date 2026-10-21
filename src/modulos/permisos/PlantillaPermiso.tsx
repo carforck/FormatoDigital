@@ -1,11 +1,11 @@
 "use client";
 
-import { EPP, EQUIPO_REQUERIDO, MEDIDAS, PELIGROS, PREGUNTAS_VERIFICACION } from "@/lib/formatos";
+import { EPP, EQUIPO_REQUERIDO, MEDIDAS, PELIGROS, PREGUNTAS_VERIFICACION } from "@/modulos/permisos/catalogo";
 import { cn } from "@/lib/utils";
-import type { DatosPermiso, Ejecutor, SiNoNa } from "@/lib/types";
+import type { DatosPermiso, Ejecutor, SiNoNa } from "@/nucleo/tipos";
 
-import { EditableText } from "./EditableText";
-import { Encabezado, Firma } from "./Encabezado";
+import { EditableText } from "@/components/docs/EditableText";
+import { Encabezado, Firma } from "@/components/docs/Encabezado";
 
 export type CampoFirmaPermiso = "firmaAutoriza" | "firmaEncargado" | "firmaCierre" | `ejecutor:${number}`;
 

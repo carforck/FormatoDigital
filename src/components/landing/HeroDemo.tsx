@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Bot, Check, PenLine } from "lucide-react";
 
-import { asset } from "@/lib/base";
+import { asset } from "@/nucleo/rutas";
 import { cn } from "@/lib/utils";
 
 /** Mini demo que se reproduce sola: el asistente pregunta y el formato se llena. */

@@ -5,10 +5,10 @@ import { AlertTriangle, CheckCircle2, FileText, HardHat } from "lucide-react";
 
 import { EstadoBadge, fechaCorta } from "@/components/ui/badges";
 import { PageHeader } from "@/components/ui/corporativo";
-import { FORMATOS } from "@/lib/formatos";
-import { rutaDoc } from "@/lib/base";
-import { useDemo } from "@/lib/store";
-import { faltantes } from "@/lib/validar";
+import { FORMATOS } from "@/nucleo/catalogos";
+import { rutaDoc } from "@/nucleo/rutas";
+import { useDemo } from "@/nucleo/datos/DemoProvider";
+import { faltantes } from "@/nucleo/validar";
 
 export default function Revision() {
   const demo = useDemo();

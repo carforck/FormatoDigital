@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import { puede, puedeVerDoc } from "./permisos";
+import { puede, puedeVerDoc } from "@/nucleo/permisos";
 import {
   CLIENTES_SEED,
   CONFIG_SEED,
@@ -10,8 +10,8 @@ import {
   auditoriaSeed,
   documentosSeed,
   notificacionesSeed,
-} from "./seed";
-import type { Auditoria, Cliente, Config, Documento, Notificacion, Rol, TipoDoc, Usuario } from "./types";
+} from "@/nucleo/datos/seed";
+import type { Auditoria, Cliente, Config, Documento, Notificacion, Rol, TipoDoc, Usuario } from "@/nucleo/tipos";
 
 const KEY = "sotec-demo-v1";
 

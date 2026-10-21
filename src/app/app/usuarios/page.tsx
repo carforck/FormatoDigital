@@ -6,10 +6,10 @@ import { Check, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, PageHeader } from "@/components/ui/corporativo";
 import { Input } from "@/components/ui/input";
-import { ETIQUETA_ROL } from "@/lib/formatos";
-import { ACCIONES, DESCRIPCION_ACCION, puede } from "@/lib/permisos";
-import { useDemo } from "@/lib/store";
-import type { Rol } from "@/lib/types";
+import { ETIQUETA_ROL } from "@/nucleo/catalogos";
+import { ACCIONES, DESCRIPCION_ACCION, puede } from "@/nucleo/permisos";
+import { useDemo } from "@/nucleo/datos/DemoProvider";
+import type { Rol } from "@/nucleo/tipos";
 
 const ROLES = Object.keys(ETIQUETA_ROL) as Rol[];
 

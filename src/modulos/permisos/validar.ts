@@ -1,23 +1,5 @@
-import { PREGUNTAS_VERIFICACION } from "./formatos";
-import type { DatosPermiso, DatosReporte, Documento } from "./types";
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
-/** Lista de pendientes antes de enviar a revisión. Vacía = listo. */
-export function faltantesReporte(d: DatosReporte): string[] {
-  const f: string[] = [];
-  if (!d.fecha) f.push("Fecha");
-  if (!d.tipoReporte) f.push("Tipo de reporte");
-  if (!d.cliente.trim()) f.push("Cliente");
-  if (!d.personaContactada.trim()) f.push("Persona contactada");
-  if (d.correo && !EMAIL.test(d.correo)) f.push("Correo con formato válido");
-  if (d.telefono && d.telefono.replace(/\D/g, "").length < 7) f.push("Teléfono válido (mín. 7 dígitos)");
-  if (!d.asunto.trim()) f.push("Asunto");
-  if (d.descripcion.trim().length < 40) f.push("Descripción (mín. 40 caracteres)");
-  if (!d.nombreTecnico.trim()) f.push("Nombre del técnico");
-  if (!d.firmaTecnico) f.push("Firma del técnico");
-  return f;
-}
+import { PREGUNTAS_VERIFICACION } from "./catalogo";
+import type { DatosPermiso } from "./tipos";
 
 export function faltantesPermiso(d: DatosPermiso): string[] {
   const f: string[] = [];
@@ -49,14 +31,4 @@ export function faltantesPermiso(d: DatosPermiso): string[] {
   });
   if (!d.encargado.trim() || !d.firmaEncargado) f.push("Nombre y firma del encargado de ejecutar");
   return f;
-}
-
-export function faltantes(doc: Documento): string[] {
-  return doc.tipo === "reporte" ? faltantesReporte(doc.datos) : faltantesPermiso(doc.datos);
-}
-
-/** Porcentaje de diligenciamiento para la barra de progreso. */
-export function avance(doc: Documento): number {
-  const total = doc.tipo === "reporte" ? 10 : 16;
-  return Math.max(0, Math.min(100, Math.round(((total - Math.min(total, faltantes(doc).length)) / total) * 100)));
 }

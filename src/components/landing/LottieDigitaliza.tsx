@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { asset } from "@/lib/base";
+import { asset } from "@/nucleo/rutas";
 import { CheckCircle2, CloudUpload, PenLine, ScanLine } from "lucide-react";
 
 // lottie-web toca `document`: solo en el cliente

@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 import { Generador } from "@/components/generador/Generador";
-import { useDemo } from "@/lib/store";
+import { useDemo } from "@/nucleo/datos/DemoProvider";
 
 function Contenido() {
   const id = useSearchParams().get("id");

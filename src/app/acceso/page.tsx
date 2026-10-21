@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 
-import { asset } from "@/lib/base";
-import { PERFILES } from "@/lib/perfiles";
-import { useDemo } from "@/lib/store";
+import { asset } from "@/nucleo/rutas";
+import { PERFILES } from "@/nucleo/perfiles";
+import { useDemo } from "@/nucleo/datos/DemoProvider";
 
 export default function Acceso() {
   const demo = useDemo();

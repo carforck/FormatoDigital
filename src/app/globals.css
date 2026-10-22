@@ -144,6 +144,8 @@
 .dark .border-slate-100, .dark .border-slate-200, .dark .border-slate-200\/80, .dark .border-slate-300 { border-color: #2B342D !important; }
 .dark .divide-slate-100 > * + * { border-color: #252D27 !important; }
 .dark .ring-slate-200 { --tw-ring-color: #2B342D !important; }
+/* Anillos que separan un punto o botón del fondo (línea de tiempo, botón «Nuevo»): del color de la superficie */
+.dark .ring-white { --tw-ring-color: #171C19 !important; }
 
 /* Estados (badges y avisos): fondos translúcidos, texto luminoso */
 .dark .bg-emerald-50 { background-color: rgb(16 185 129 / 0.14) !important; }

@@ -293,7 +293,7 @@ export default function Tablero() {
                 .sort((a, b) => b.actualizado.localeCompare(a.actualizado))
                 .map((d) => (
                   <li key={d.id}>
-                    <Link href={rutaDoc(d.id)} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
+                    <Link href={rutaDoc(d.id, "&desde=tablero")} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
                         <IconoDoc tipo={d.tipo} />
                       </span>
@@ -329,7 +329,7 @@ export default function Tablero() {
             <ul className="divide-y divide-slate-100">
               {pendientes.slice(0, 6).map(({ d, accion }) => (
                 <li key={d.id + accion}>
-                  <Link href={rutaDoc(d.id)} className="group flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
+                  <Link href={rutaDoc(d.id, "&desde=tablero")} className="group flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
                       <IconoDoc tipo={d.tipo} />
                     </span>

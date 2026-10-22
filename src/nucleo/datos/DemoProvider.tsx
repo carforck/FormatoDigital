@@ -231,10 +231,10 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     };
     const vigente = (token: string) => enlaceValido(s, token);
     /** Notificaciones para los usuarios del portal de un cliente (no para todos los clientes). */
-    const aClientes = (prev: Estado, clienteId: string, texto: string, docId?: string): Notificacion[] =>
+    const aClientes = (prev: Estado, clienteId: string, texto: string, docId?: string, cuentaId?: string): Notificacion[] =>
       prev.usuarios
         .filter((x) => x.rol === "cliente" && x.activo && x.clienteId === clienteId)
-        .map((x) => ({ id: uid("n"), para: x.id, texto, docId, fecha: ahora(), leida: false }));
+        .map((x) => ({ id: uid("n"), para: x.id, texto, docId, cuentaId, fecha: ahora(), leida: false }));
     const prefijo = (prev: Estado, tipo: TipoDoc) => prefijoDe(prev.config, tipo);
     const gestionaProyectos = (prev: Estado) => {
       const r = rolDe(prev);
@@ -593,7 +593,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
             ...prev,
             cuentas: prev.cuentas.map((x) => (x.id === id ? { ...x, estado, actualizado: ahora(), historial: [...x.historial, evento(prev, etiqueta)] } : x)),
             notificaciones:
-              estado === "emitida" ? [...aClientes(prev, c.clienteId, `${prev.config.empresa} emitió la cuenta de cobro ${c.codigo}`), ...prev.notificaciones] : prev.notificaciones,
+              estado === "emitida" ? [...aClientes(prev, c.clienteId, `${prev.config.empresa} emitió la cuenta de cobro ${c.codigo}`, undefined, c.id), ...prev.notificaciones] : prev.notificaciones,
             auditoria: registrar(prev, `Cuenta de cobro: ${etiqueta.toLowerCase()}`, c.codigo),
           };
         });

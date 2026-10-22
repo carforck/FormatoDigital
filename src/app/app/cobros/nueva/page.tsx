@@ -1,11 +1,12 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FileText, Plus, Save, Stamp, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { FileText, Lock, Plus, Save, Stamp, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Volver, useOrigen } from "@/components/ui/volver";
+import { Volver, salirAlDetalle, useOrigen } from "@/components/ui/volver";
 import { PageHeader } from "@/components/ui/corporativo";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,8 +21,13 @@ function Nueva() {
   const router = useRouter();
   const params = useSearchParams();
   const u = demo.usuario!;
-  const existente = demo.cuentas.find((c) => c.id === params.get("id") && c.estado === "borrador");
-  const origen = useOrigen(existente ? { href: rutaCuenta(existente.id), label: existente.codigo } : { href: "/app/cobros", label: "Cuentas de cobro" });
+  const idEditar = params.get("id");
+  const existente = demo.cuentas.find((c) => c.id === idEditar && c.estado === "borrador");
+  const origenLista = useOrigen({ href: "/app/cobros", label: "Cuentas de cobro" });
+  // Editar una cuenta existente: «Volver» regresa a su detalle (que conserva su propio origen)
+  const origen = existente
+    ? { href: `${rutaCuenta(existente.id)}${origenLista.query ? `&${origenLista.query}` : ""}`, label: `Volver a la cuenta ${existente.codigo}`, query: origenLista.query }
+    : origenLista;
 
   const [cuenta, setCuenta] = useState<CuentaCobro>(() => {
     if (existente) return existente;
@@ -51,6 +57,8 @@ function Nueva() {
     };
   });
   const [aviso, setAviso] = useState<string | null>(null);
+  // Al emitir desde el formulario la cuenta deja de ser borrador antes de salir: no se muestra el bloqueo
+  const saliendo = useRef(false);
   const set = (p: Partial<CuentaCobro>) => setCuenta((c) => ({ ...c, ...p }));
   const setItem = (id: string, p: Partial<ItemCuentaCobro>) => set({ items: cuenta.items.map((i) => (i.id === id ? { ...i, ...p } : i)) });
 
@@ -78,8 +86,29 @@ function Nueva() {
     const error = demo.guardarCuenta(cuenta);
     if (error) return setAviso(error);
     if (emitir) demo.cambiarEstadoCuenta(cuenta.id, "emitida");
-    // replace: «atrás» desde la cuenta guardada no reabre el formulario
-    router.replace(`${rutaCuenta(cuenta.id)}${origen.query ? `&${origen.query}` : ""}`);
+    // replace: «atrás» desde la cuenta guardada no reabre el formulario; abierta con «Editar» desde
+    // la cuenta, se regresa a esa entrada (sin duplicarla en el historial)
+    saliendo.current = true;
+    const destino = `${rutaCuenta(cuenta.id)}${origen.query ? `&${origen.query}` : ""}`;
+    if (existente) salirAlDetalle(router, destino);
+    else router.replace(destino);
+  }
+
+  // ?id= de una cuenta ya emitida (o inexistente): no se abre un formulario nuevo en su lugar
+  if (idEditar && !existente && !saliendo.current) {
+    const c = demo.cuentasVisibles.find((x) => x.id === idEditar);
+    return (
+      <div className="mx-auto mt-16 max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+          <Lock className="h-5 w-5" />
+        </span>
+        <p className="mt-4 text-lg font-semibold">Esta cuenta de cobro no se puede editar</p>
+        <p className="mt-1 text-sm text-slate-600">Solo se edita en borrador. Al emitirla queda bloqueada para la trazabilidad; si tiene un error, anúlala y crea otra.</p>
+        <Link href={c ? rutaCuenta(c.id) : "/app/cobros"} className="mt-5 inline-flex rounded-lg bg-sotec px-4 py-2 text-sm font-medium text-white hover:bg-black">
+          {c ? `Ver la cuenta ${c.codigo}` : "Ir a cuentas de cobro"}
+        </Link>
+      </div>
+    );
   }
 
   return (

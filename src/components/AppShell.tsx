@@ -36,7 +36,8 @@ import {
 } from "lucide-react";
 
 import { Avatar } from "@/components/ui/corporativo";
-import { asset, rutaDoc } from "@/nucleo/rutas";
+import { useSeguirEdicion } from "@/components/ui/volver";
+import { asset, rutaCuenta, rutaDoc } from "@/nucleo/rutas";
 import { ETIQUETA_ROL } from "@/nucleo/catalogos";
 import { puede, type Accion } from "@/nucleo/permisos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
@@ -199,6 +200,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
   const compacta = escritorio && !fijada && !hover;
   const [q, setQ] = useState("");
+  useSeguirEdicion(path);
+  // Query de la URL para el título (?id=, ?nuevo=1). Se lee al confirmar cada navegación o cambio de datos
+  // (guardar cambia ?nuevo=1 por ?id=): el shell no usa useSearchParams, que obligaría a envolver todo el layout en Suspense
+  const [busqueda, setBusqueda] = useState("");
+  useEffect(() => {
+    setBusqueda(window.location.search);
+  }, [path, demo]);
   const refBell = useFueraDe<HTMLDivElement>(bell, () => setBell(false));
   const refPerfil = useFueraDe<HTMLDivElement>(perfil, () => setPerfil(false));
 
@@ -211,6 +219,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setNuevo(false);
     setPerfil(false);
   }, [path]);
+
+  // Esc cierra el menú lateral, la hoja «Nuevo», las notificaciones y el perfil (como los modales)
+  useEffect(() => {
+    if (!menu && !nuevo && !bell && !perfil) return;
+    const f = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setMenu(false);
+      setNuevo(false);
+      setBell(false);
+      setPerfil(false);
+    };
+    document.addEventListener("keydown", f);
+    return () => document.removeEventListener("keydown", f);
+  }, [menu, nuevo, bell, perfil]);
 
   if (!listo || !usuario) {
     return (
@@ -230,9 +252,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const sinLeer = demo.misNotificaciones.filter((n) => !n.leida).length;
   const tituloBase = TITULOS.find(([r]) => path.startsWith(r))?.[1] ?? "Tablero";
   // En el generador con ?id= se continúa un documento existente
-  const continuando = path.startsWith("/app/nuevo") && typeof window !== "undefined" && new URLSearchParams(window.location.search).has("id");
-  const titulo = continuando ? tituloBase.replace(/^Nuev[oa] /, "Continuar ") : tituloBase;
-  const activo = (href: string) => (href === "/app" ? path === "/app" : path.startsWith(href));
+  const qs = new URLSearchParams(busqueda);
+  const continuando = path.startsWith("/app/nuevo") && qs.has("id");
+  // Formularios de crear/editar: el título dice cuál de los dos es
+  const titulo = continuando
+    ? tituloBase.replace(/^Nuev[oa] /, "Continuar ")
+    : path === "/app/proyectos/editar"
+      ? qs.has("id") ? "Editar proyecto" : "Nuevo proyecto"
+      : path === "/app/cobros/nueva" && qs.has("id")
+        ? "Editar cuenta de cobro"
+        : path === "/app/equipos/ver" && qs.get("nuevo") === "1"
+          ? "Nuevo equipo"
+          : tituloBase;
+  // Continuar un documento existente no es «Nuevo …»: se marca Documentos
+  const activo = (href: string) => (continuando ? href === "/app/documentos" : href === "/app" ? path === "/app" : path.startsWith(href));
 
   const cambiarPerfil = (id: string) => {
     const u = demo.usuarios.find((x) => x.id === id)!;
@@ -435,7 +468,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {demo.misNotificaciones.slice(0, 12).map((n) => (
                     <Link
                       key={n.id}
-                      href={n.docId ? rutaDoc(n.docId) : "/app"}
+                      href={n.docId ? rutaDoc(n.docId) : n.cuentaId ? rutaCuenta(n.cuentaId) : "/app"}
                       onClick={() => setBell(false)}
                       className={cn("flex gap-2 rounded-lg px-2 py-2 text-sm hover:bg-slate-50", !n.leida && "bg-sotec-soft")}
                     >
@@ -577,7 +610,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Hoja "Nuevo" en celular */}
       {nuevo && (
         <div className="fixed inset-0 z-50 flex items-end bg-black/50 lg:hidden" onClick={() => setNuevo(false)}>
-          <div className="w-full rounded-t-2xl bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] animate-in slide-in-from-bottom duration-200" onClick={(e) => e.stopPropagation()}>
+          <div role="dialog" aria-modal="true" aria-label="Nuevo documento" className="w-full rounded-t-2xl bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] animate-in slide-in-from-bottom duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-200" />
             <p className="mb-3 text-sm font-semibold text-slate-900">¿Qué formato vas a diligenciar?</p>
             {[
@@ -596,6 +629,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </span>
               </Link>
             ))}
+            {/* Lo demás que el perfil puede crear */}
+            <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+              {[
+                { href: "/app/proyectos/editar", t: "Proyecto", icon: FolderKanban, req: "proyectos" as Accion },
+                { href: "/app/cobros/nueva", t: "Cuenta de cobro", icon: Receipt, req: "cobros" as Accion },
+                { href: "/app/equipos/ver?nuevo=1", t: "Equipo", icon: Cctv, req: "equipos" as Accion },
+              ]
+                .filter((o) => puede(usuario.rol, o.req))
+                .map((o) => (
+                  <Link key={o.href} href={o.href} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:border-sotec-green">
+                    <Plus className="h-4 w-4" aria-hidden /> <o.icon className="h-4 w-4 text-slate-500" aria-hidden /> {o.t}
+                  </Link>
+                ))}
+            </div>
           </div>
         </div>
       )}

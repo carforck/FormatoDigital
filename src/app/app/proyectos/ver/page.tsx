@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { CalendarDays, CircleDollarSign, FileText, Lock, MapPin, Pause, PenLine, Play, Plus, Receipt, Trash2, UserRound, Wallet } from "lucide-react";
 
 import { BarraPresupuesto } from "@/components/proyectos/piezas";
-import { Volver } from "@/components/ui/volver";
+import { Volver, marcarEdicion } from "@/components/ui/volver";
 import { EstadoBadge, EstadoProyectoBadge, fechaCorta } from "@/components/ui/badges";
 import { EstadoCuentaBadge } from "@/components/ui/estado-cuenta";
 import { IconoDoc } from "@/components/ui/icono-doc";
@@ -86,7 +86,7 @@ function Detalle() {
           </div>
           {gestiona && (
             <div className="flex flex-wrap gap-2">
-              <Link href={`/app/proyectos/editar?id=${p.id}`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+              <Link href={`/app/proyectos/editar?id=${p.id}`} onClick={marcarEdicion} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
                 <PenLine className="h-4 w-4" /> Editar
               </Link>
               {p.estado === "activo" && (
@@ -208,13 +208,13 @@ function Detalle() {
           <p className="text-xs text-slate-500">El formato se abre con el cliente y el proyecto ya diligenciados.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {TIPOS_DOC.map((t) => (
-              <Link key={t} href={nuevoEn(t)} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:border-sotec-green hover:bg-slate-50">
+              <Link key={t} href={nuevoEn(t)} onClick={marcarEdicion} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:border-sotec-green hover:bg-slate-50">
                 <Plus className="h-4 w-4" aria-hidden />
                 <IconoDoc tipo={t} className="h-4 w-4 text-slate-500" /> {formatoDe(t).corto}
               </Link>
             ))}
             {puede(u.rol, "cobros") && (
-              <Link href={`/app/cobros/nueva?proyecto=${p.id}&cliente=${p.clienteId}`} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:border-sotec-green hover:bg-slate-50">
+              <Link href={`/app/cobros/nueva?proyecto=${p.id}&cliente=${p.clienteId}`} onClick={marcarEdicion} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:border-sotec-green hover:bg-slate-50">
                 <Plus className="h-4 w-4" aria-hidden />
                 <Receipt className="h-4 w-4 text-slate-500" aria-hidden /> Cuenta de cobro
               </Link>
@@ -248,7 +248,7 @@ function Detalle() {
               <div className="px-4 py-6 text-sm text-slate-500">
                 <p>Este proyecto aún no tiene cuentas de cobro.</p>
                 {puede(u.rol, "cobros") && (
-                  <Link href={`/app/cobros/nueva?proyecto=${p.id}&cliente=${p.clienteId}`} className="mt-2 inline-flex items-center gap-1 font-medium text-sotec-greenDeep hover:underline">
+                  <Link href={`/app/cobros/nueva?proyecto=${p.id}&cliente=${p.clienteId}`} onClick={marcarEdicion} className="mt-2 inline-flex items-center gap-1 font-medium text-sotec-greenDeep hover:underline">
                     <Plus className="h-4 w-4" aria-hidden /> Crear la primera cuenta de cobro
                   </Link>
                 )}
@@ -279,7 +279,7 @@ function Detalle() {
             <div className="px-4 py-6 text-sm text-slate-500">
               <p>No hay {pestana === "todos" ? "documentos" : formatoDe(pestana).plural} visibles en este proyecto.</p>
               {crea && pestana !== "todos" && (
-                <Link href={nuevoEn(pestana)} className="mt-2 inline-flex items-center gap-1 font-medium text-sotec-greenDeep hover:underline">
+                <Link href={nuevoEn(pestana)} onClick={marcarEdicion} className="mt-2 inline-flex items-center gap-1 font-medium text-sotec-greenDeep hover:underline">
                   <Plus className="h-4 w-4" aria-hidden /> {formatoDe(pestana).nuevo} {formatoDe(pestana).corto.toLowerCase()} en este proyecto
                 </Link>
               )}

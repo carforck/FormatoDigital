@@ -123,6 +123,8 @@ export interface Notificacion {
   para: Rol | string; // rol o id de usuario
   texto: string;
   docId?: string;
+  /** Cuenta de cobro a la que lleva el aviso (p. ej. «emitió la cuenta de cobro…»). */
+  cuentaId?: string;
   fecha: string;
   leida: boolean;
 }

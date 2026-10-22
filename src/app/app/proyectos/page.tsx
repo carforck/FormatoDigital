@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { marcarEdicion } from "@/components/ui/volver";
 import { useState } from "react";
 import { CalendarDays, FolderKanban, MapPin, Plus, Search, UserRound } from "lucide-react";
 
@@ -44,7 +45,7 @@ export default function Proyectos() {
         descripcion={interno ? "Cada obra de un cliente con sus reportes, permisos, gastos, cotizaciones y cuentas de cobro." : "Las obras que adelantamos en tu empresa, con sus reportes y cotizaciones."}
         acciones={
           puede(u.rol, "proyectos") && (
-            <Link href="/app/proyectos/editar" className="inline-flex items-center gap-2 rounded-lg bg-sotec px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-black">
+            <Link href="/app/proyectos/editar" onClick={marcarEdicion} className="inline-flex items-center gap-2 rounded-lg bg-sotec px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-black">
               <Plus className="h-4 w-4" /> Nuevo proyecto
             </Link>
           )
@@ -87,7 +88,7 @@ export default function Proyectos() {
               </button>
             )}
             {puede(u.rol, "proyectos") && (
-              <Link href="/app/proyectos/editar" className="inline-flex items-center gap-1 rounded-lg bg-sotec px-3 py-1.5 font-medium text-white hover:bg-black">
+              <Link href="/app/proyectos/editar" onClick={marcarEdicion} className="inline-flex items-center gap-1 rounded-lg bg-sotec px-3 py-1.5 font-medium text-white hover:bg-black">
                 <Plus className="h-4 w-4" aria-hidden /> {demo.proyectosVisibles.length ? "Nuevo proyecto" : "Crear el primer proyecto"}
               </Link>
             )}

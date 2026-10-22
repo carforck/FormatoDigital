@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Ban, CheckCircle2, PenLine, Printer, Send, Stamp } from "lucide-react";
+import { Ban, CheckCircle2, FolderKanban, PenLine, Printer, Send, Stamp } from "lucide-react";
 
 import { EnviarDocumento } from "@/components/EnviarDocumento";
-import { Volver, useOrigen } from "@/components/ui/volver";
+import { Volver, marcarEdicion, useOrigen } from "@/components/ui/volver";
 import { Button } from "@/components/ui/button";
 import { EstadoCuentaBadge } from "@/components/ui/estado-cuenta";
 import { PlantillaCuentaCobro } from "@/modulos/cobros/PlantillaCuentaCobro";
@@ -57,15 +57,22 @@ function Ver() {
             {cliente?.nombre} · <strong className="text-slate-700">{cop(total)}</strong>
           </p>
           {proyecto && (
-            <Link href={rutaProyecto(proyecto.id)} className="mt-1 inline-block text-sm font-medium text-sotec-greenDeep hover:underline">
-              Proyecto <span className="font-mono">{proyecto.codigo}</span> · {proyecto.nombre}
+            <Link href={rutaProyecto(proyecto.id)} className="mt-1 block text-sm font-medium text-sotec-greenDeep hover:underline">
+              <FolderKanban className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-hidden />
+              Proyecto <span className="whitespace-nowrap font-mono">{proyecto.codigo}</span> · {proyecto.nombre}
             </Link>
           )}
         </div>
         <div className="flex flex-wrap gap-2">
           {gestiona && c.estado === "borrador" && (
             <>
-              <Button variant="outline" onClick={() => router.push(`/app/cobros/nueva?id=${c.id}${origen.query ? `&${origen.query}` : ""}`)}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  marcarEdicion();
+                  router.push(`/app/cobros/nueva?id=${c.id}${origen.query ? `&${origen.query}` : ""}`);
+                }}
+              >
                 <PenLine className="h-4 w-4" /> Editar
               </Button>
               <Button onClick={() => demo.cambiarEstadoCuenta(c.id, "emitida")} disabled={c.items.length === 0 || c.items.some((i) => i.valorUnitario <= 0)}>
@@ -111,7 +118,7 @@ function Ver() {
                   .filter((i) => i.documentoId)
                   .map((i) => (
                     <li key={i.id}>
-                      <Link href={rutaDoc(i.documentoId!)} className="font-mono text-sotec-greenDeep hover:underline">
+                      <Link href={rutaDoc(i.documentoId!, `&desde=cuenta:${c.id}`)} className="font-mono text-sotec-greenDeep hover:underline">
                         {demo.documentos.find((d) => d.id === i.documentoId)?.codigo}
                       </Link>{" "}
                       <span className="text-slate-600">{i.descripcion}</span>

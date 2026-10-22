@@ -8,6 +8,7 @@ import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { asset } from "@/nucleo/rutas";
 import { PERFILES } from "@/nucleo/perfiles";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
+import { ETIQUETA_ROL } from "@/nucleo/catalogos";
 
 export default function Acceso() {
   const demo = useDemo();
@@ -27,6 +28,19 @@ export default function Acceso() {
         <p className="mt-3 max-w-2xl text-white/70">
           Sin usuario ni contraseña. Cada perfil ve un menú y unos permisos distintos; puedes cambiar de perfil en cualquier momento desde la barra superior.
         </p>
+
+        {/* De regreso desde la presentación: se retoma la sesión de la demo sin volver a elegir perfil */}
+        {demo.usuario && (
+          <Link
+            href="/app"
+            className="mt-6 inline-flex max-w-full items-center gap-2 rounded-xl border border-sotec-green/40 bg-sotec-green/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-sotec-green/20"
+          >
+            <span className="min-w-0 truncate">
+              Continuar como {demo.usuario.nombre} · {ETIQUETA_ROL[demo.usuario.rol]}
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-sotec-green" />
+          </Link>
+        )}
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {PERFILES.map((p) => (

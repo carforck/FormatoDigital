@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Volver } from "@/components/ui/volver";
+import { Volver, regresarSiViene, salirAlDetalle } from "@/components/ui/volver";
 import { PageHeader } from "@/components/ui/corporativo";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,8 +41,10 @@ function Editar() {
     e.preventDefault();
     const error = demo.guardarProyecto(p);
     if (error) return setAviso(error);
-    // replace: «atrás» desde el proyecto guardado no reabre el formulario
-    router.replace(rutaProyecto(p.id));
+    // replace: «atrás» desde el proyecto guardado no reabre el formulario; abierto con «Editar» desde
+    // el proyecto, se regresa a esa entrada (sin duplicarla en el historial)
+    if (existente) salirAlDetalle(router, rutaProyecto(p.id));
+    else router.replace(rutaProyecto(p.id));
   }
 
   return (
@@ -128,7 +130,7 @@ function Editar() {
         {aviso && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 sm:col-span-2">{aviso}</p>}
         <div className="flex flex-wrap items-center justify-end gap-2 sm:col-span-2">
           <p className="mr-auto text-xs text-slate-500">{existente ? "El código no cambia." : "El código se asigna al guardar."}</p>
-          <Link href={regreso} className="inline-flex h-10 items-center rounded-md px-4 text-sm font-medium text-slate-700 hover:bg-slate-100">
+          <Link href={regreso} onClick={(e) => regresarSiViene(router, regreso) && e.preventDefault()} className="inline-flex h-10 items-center rounded-md px-4 text-sm font-medium text-slate-700 hover:bg-slate-100">
             Cancelar
           </Link>
           <Button type="submit">

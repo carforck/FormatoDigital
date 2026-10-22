@@ -67,11 +67,25 @@ El listado vive en `src/modulos/registro.ts` (`MODULOS`) y se muestra en
 
 ### Navegación y ciclo de vida
 
-- Cada detalle, formulario y generador tiene «← Volver a …» (`Volver` y
-  `useOrigen` en `src/components/ui/volver.tsx`). Con `?desde=proyecto:<id>`
-  (o `?proyecto=<id>` en el generador) vuelve al proyecto; si no, a la lista.
-- Guardar navega al detalle con `router.replace`: «atrás» regresa a donde se
-  abrió el formulario, no a un formulario vacío. Borrar también usa `replace`.
+- Cada detalle, formulario y generador tiene «← Volver a …» arriba a la
+  izquierda (`Volver` y `useOrigen` en `src/components/ui/volver.tsx`).
+  `?desde=` dice de dónde se abrió: `proyecto:<id>` (o `?proyecto=<id>` en el
+  generador), `equipo:<id>`, `doc:<id>`, `cuenta:<id>`, `revision` o
+  `tablero`; sin origen, vuelve a la lista. Etiquetas: «Volver a <Lista>»
+  (como en la barra lateral) y «Volver al proyecto PRY-…», «Volver al
+  documento RT-…», «Volver a la cuenta CC-…», «Volver al equipo …».
+- Editar un documento, un proyecto o una cuenta vuelve a su detalle. Guardar
+  navega al detalle con `router.replace`: «atrás» regresa a donde se abrió el
+  formulario, no a un formulario vacío. Si el formulario se abrió desde ese
+  mismo detalle o lista (`marcarEdicion`), guardar, cancelar y «Volver»
+  regresan con «atrás» (`salirAlDetalle`, `regresarSiViene`) para no apilar
+  otra copia del detalle. Borrar también usa `replace`.
+- El título de la barra superior distingue crear de editar («Nuevo
+  proyecto», «Editar proyecto», «Continuar reporte técnico», «Nuevo equipo»).
+- Modales y hojas (rechazo, envío, firma, «Nuevo» en celular, menú,
+  notificaciones) se cierran con Esc y con un toque fuera (`fondoQueCierra`:
+  solo si el toque empieza y termina en el fondo, así un trazo de firma no la
+  cierra).
 - Proyectos: crear, editar, pausar, reactivar, cerrar y eliminar solo si no
   tiene documentos ni cuentas (si tiene, se ofrece cerrarlo; la base de datos
   aplica la misma regla con `proyectos_borrar`).
@@ -368,7 +382,7 @@ bash scripts/armar-instalador.sh                                # 3. regenera su
 |---|---|
 | `npm run test:db` | Migraciones, RLS y flujo en PostgreSQL desechable |
 | `npm run test:unit` | Valor en letras, 22 casos (`tests/unit/letras.test.ts`) |
-| `npm run test:e2e` | Demo en el navegador (`tests/e2e/demo.cjs`): secciones `flujo`, `responsive`, `controles`, `magno`, `proyectos`, `crud`, `equipos` |
+| `npm run test:e2e` | Demo en el navegador (`tests/e2e/demo.cjs`): secciones `flujo`, `responsive`, `controles`, `magno`, `proyectos`, `crud`, `equipos`, `navegacion` |
 
 - `SOLO=<sección> npm run test:e2e` corre una sola sección.
 - `BASE=https://formato-digital-nine.vercel.app npm run test:e2e` prueba el

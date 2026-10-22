@@ -21,7 +21,7 @@ export default function Revision() {
   const tarjeta = (d: (typeof cola)[number], cta: string) => {
     const p = faltantes(d);
     return (
-      <Link key={d.id} href={rutaDoc(d.id)} className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-sotec-greenDeep hover:shadow-md">
+      <Link key={d.id} href={rutaDoc(d.id, "&desde=revision")} className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-sotec-greenDeep hover:shadow-md">
         <div className="flex items-center gap-2">
           <IconoDoc tipo={d.tipo} className="h-4 w-4 text-slate-500" />
           <span className="font-mono text-sm font-semibold">{d.codigo}</span>
@@ -53,14 +53,23 @@ export default function Revision() {
       <section>
         <h2 className="mb-2 font-semibold">Por revisar ({cola.length})</h2>
         {cola.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">Bandeja al día.</p>
+          <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+            <p>Bandeja al día: no hay documentos esperando tu revisión.</p>
+            <Link href="/app/documentos" className="mt-2 inline-block font-medium text-sotec-greenDeep hover:underline">
+              Ver todos los documentos →
+            </Link>
+          </div>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{cola.map((d) => tarjeta(d, "Revisar"))}</div>
         )}
       </section>
       <section>
         <h2 className="mb-2 font-semibold">Aprobados pendientes de cierre ({porCerrar.length})</h2>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{porCerrar.map((d) => tarjeta(d, infoDoc(d.tipo).flujo.cerrar))}</div>
+        {porCerrar.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">Nada pendiente de cierre. Los reportes y cotizaciones aprobados los cierra el cliente con su firma.</p>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{porCerrar.map((d) => tarjeta(d, infoDoc(d.tipo).flujo.cerrar))}</div>
+        )}
       </section>
     </div>
   );

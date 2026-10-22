@@ -16,7 +16,7 @@ const path = require("path");
 const puppeteer = require("puppeteer-core");
 
 const BASE = (process.env.BASE || "http://localhost:3100").replace(/\/$/, "");
-const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud"
+const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion"
 const CLAVE = "sotec-demo-v7";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -944,6 +944,200 @@ async function equipos(b, errores) {
   await p.close();
 }
 
+async function navegacion(b, errores) {
+  console.log("\n— Navegación: «Volver» según el origen, atrás/adelante sin duplicados y la ida y vuelta landing ↔ app");
+  const p = await nuevaPagina(b, errores);
+  await p.setViewport({ width: 1440, height: 900 });
+  const ruta = () => p.url().replace(BASE, "");
+  const texto = () => p.evaluate(() => document.body.innerText.replace(/\s+/g, " "));
+  const volver = () => p.evaluate(() => [...document.querySelectorAll("main a")].find((a) => a.textContent.includes("Volver"))?.textContent.trim() ?? "");
+  const titulo = () => p.evaluate(() => document.querySelector("header p.truncate")?.textContent ?? "");
+  const atras = async () => {
+    await p.goBack({ waitUntil: "networkidle0" });
+    await sleep(500);
+    return ruta();
+  };
+  const esperar = (fn, arg) => p.waitForFunction(fn, { timeout: 15000 }, arg);
+
+  // 1. Landing → acceso → app → «Volver al sitio» → atrás regresa a la app; /acceso ofrece continuar la sesión
+  await p.goto(`${BASE}/`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "networkidle0" });
+  await p.evaluate(() => [...document.querySelectorAll("a")].find((a) => a.getAttribute("href") === "/acceso").click());
+  await esperar(() => location.pathname.startsWith("/acceso"));
+  await sleep(500);
+  ok(!(await texto()).includes("Continuar como"), "sin sesión, /acceso solo ofrece elegir perfil");
+  await clic(p, "Administrador");
+  await esperar(() => location.pathname.startsWith("/app"));
+  await sleep(800);
+  await p.evaluate(() => [...document.querySelectorAll("aside a")].find((a) => a.textContent.includes("Volver al sitio")).click());
+  await esperar(() => location.pathname === "/");
+  await sleep(500);
+  ok(ruta() === "/", "«Volver al sitio» lleva a la landing");
+  ok((await atras()) === "/app", "desde la landing, «atrás» regresa a la app con la sesión");
+  await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  await sleep(400);
+  await clic(p, "Continuar como Gerencia SOTEC", "a");
+  await esperar(() => location.pathname === "/app");
+  ok(ruta() === "/app", "con sesión, /acceso ofrece «Continuar como …» y vuelve al tablero");
+
+  // 2. Editar un documento desde su detalle: «Volver al documento», guardar regresa al detalle y «atrás» a la lista (sin duplicados)
+  await comoUsuario(p, "u-tec1");
+  await p.goto(`${BASE}/app/documentos`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  await clic(p, "RT-007-26", "a");
+  await esperar(() => location.search.includes("id=d-rt-5"));
+  await sleep(500);
+  await clic(p, "Editar");
+  await esperar(() => location.pathname.includes("/app/nuevo/reporte"));
+  await sleep(700);
+  const activo = await p.evaluate(() => [...document.querySelectorAll("aside nav a")].filter((a) => a.querySelector("span.absolute")).map((a) => a.textContent.trim()));
+  ok((await volver()) === "Volver al documento RT-007-26" && (await titulo()) === "Continuar reporte técnico" && activo.join() === "Documentos", "el editor ofrece «Volver al documento», título «Continuar …» y Documentos activo");
+  await clic(p, "Guardar borrador");
+  await esperar(() => location.pathname.includes("/app/documentos/ver"));
+  await sleep(600);
+  ok((await texto()).includes("Borrador guardado"), "guardar regresa al detalle con el aviso");
+  ok((await atras()) === "/app/documentos", "«atrás» tras guardar va a la lista, no a otra copia del detalle");
+  await clic(p, "RT-007-26", "a");
+  await esperar(() => location.search.includes("id=d-rt-5"));
+  await sleep(400);
+  await clic(p, "Editar");
+  await esperar(() => location.pathname.includes("/app/nuevo/reporte"));
+  await sleep(600);
+  await clic(p, "Volver al documento", "a");
+  await esperar(() => location.pathname.includes("/app/documentos/ver"));
+  await sleep(400);
+  ok((await atras()) === "/app/documentos", "cancelar con «Volver» tampoco deja el editor en el historial");
+
+  // 3. Proyectos: editar y guardar, crear y cancelar
+  await comoUsuario(p, "u-adm");
+  await p.goto(`${BASE}/app/proyectos`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  await clic(p, "PRY-002-26", "a");
+  await esperar(() => location.search.includes("id=p-2"));
+  await sleep(500);
+  await clic(p, "Editar", "a");
+  await esperar(() => location.pathname.includes("/editar"));
+  await sleep(500);
+  ok((await titulo()) === "Editar proyecto" && (await volver()) === "Volver al proyecto PRY-002-26", "editar proyecto: título y «Volver al proyecto»");
+  await clic(p, "Guardar proyecto");
+  await esperar(() => location.pathname.includes("/proyectos/ver"));
+  ok((await atras()) === "/app/proyectos", "guardar el proyecto no duplica el detalle en el historial");
+  await clic(p, "Nuevo proyecto", "a");
+  await esperar(() => location.pathname.includes("/editar"));
+  await sleep(500);
+  ok((await titulo()) === "Nuevo proyecto", "el título dice «Nuevo proyecto»");
+  await clic(p, "Cancelar", "a");
+  await esperar(() => location.pathname === "/app/proyectos");
+  await sleep(300);
+  ok((await atras()) !== "/app/proyectos/editar", "cancelar un proyecto nuevo no deja el formulario en el historial");
+
+  // 4. «Volver» respeta el origen: revisión, cuenta de cobro, documento → equipo, documento → cuenta, tablero
+  await p.goto(`${BASE}/app/revision`, { waitUntil: "networkidle0" });
+  await sleep(400);
+  await clic(p, "RT-008-26", "a");
+  await esperar(() => location.pathname.includes("/documentos/ver"));
+  await sleep(400);
+  ok((await volver()) === "Volver a Revisión", "un documento abierto desde Revisión vuelve a Revisión");
+  await clic(p, "Aprobar");
+  await sleep(400);
+  await atras();
+  ok(ruta() === "/app/revision" && !(await texto()).split("Aprobados pendientes")[0].includes("RT-008-26"), "«atrás» tras aprobar regresa a la bandeja, ya sin el documento");
+  await p.goForward({ waitUntil: "networkidle0" });
+  await sleep(400);
+  ok((await p.evaluate(() => document.querySelector("h1").innerText)).includes("Aprobado"), "«adelante» muestra el documento aprobado, sin acciones de revisión");
+  await p.goto(`${BASE}/app/cobros/ver?id=cc-1`, { waitUntil: "networkidle0" });
+  await sleep(400);
+  await clic(p, "RT-002-26", "a");
+  await esperar(() => location.pathname.includes("/documentos/ver"));
+  await sleep(400);
+  ok((await volver()) === "Volver a la cuenta CC-001-26", "un soporte abierto desde la cuenta vuelve a la cuenta");
+  await p.goto(`${BASE}/app/documentos/ver?id=d-rt-clay`, { waitUntil: "networkidle0" });
+  await sleep(400);
+  await clic(p, "Cámara 4", "a");
+  await esperar(() => location.pathname.includes("/equipos/ver"));
+  await sleep(400);
+  ok((await volver()) === "Volver al documento RT-001-26", "un equipo abierto desde el documento vuelve al documento");
+  await p.goto(`${BASE}/app/documentos/ver?id=d-rt-2`, { waitUntil: "networkidle0" });
+  await sleep(400);
+  await clic(p, "Crear cuenta de cobro");
+  await esperar(() => location.pathname.includes("/cobros/nueva"));
+  await sleep(500);
+  await clic(p, "Volver al documento RT-004-26", "a");
+  await esperar(() => location.pathname.includes("/documentos/ver"));
+  await sleep(300);
+  ok((await atras()) !== "/app/cobros/nueva", "la cuenta abierta desde el reporte vuelve al reporte sin dejar el formulario atrás");
+  await p.goto(`${BASE}/app`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  await clic(p, "RT-", "main a");
+  await esperar(() => location.pathname.includes("/documentos/ver"));
+  await sleep(300);
+  ok((await volver()) === "Volver al Tablero", "un documento abierto desde el tablero vuelve al tablero");
+
+  // 5. Equipo nuevo: título y cancelar sin dejar el formulario; URL de una cuenta emitida en el editor
+  await p.goto(`${BASE}/app/equipos?cliente=c-clay`, { waitUntil: "networkidle0" });
+  await sleep(400);
+  await clic(p, "Nuevo equipo", "a");
+  await esperar(() => location.search.includes("nuevo=1"));
+  await sleep(500);
+  ok((await titulo()) === "Nuevo equipo", "el título dice «Nuevo equipo»");
+  await clic(p, "Cancelar");
+  await esperar(() => location.pathname === "/app/equipos");
+  await sleep(300);
+  ok(!(await atras()).includes("nuevo=1"), "cancelar un equipo nuevo no deja el formulario en el historial");
+  await p.goto(`${BASE}/app/cobros/nueva?id=cc-1`, { waitUntil: "networkidle0" });
+  await sleep(400);
+  ok((await texto()).includes("Esta cuenta de cobro no se puede editar") && (await texto()).includes("Ver la cuenta CC-001-26"), "una cuenta ya emitida no abre un formulario en blanco por URL");
+
+  // 6. Modales y doble clic: rechazo con Esc y toque fuera; duplicar una sola vez
+  await comoUsuario(p, "u-sup");
+  await p.goto(`${BASE}/app/documentos/ver?id=d-rt-7`, { waitUntil: "networkidle0" });
+  await sleep(400);
+  await clic(p, "Rechazar");
+  await p.keyboard.press("Escape");
+  await sleep(200);
+  const trasEsc = !(await p.$('[role="dialog"]'));
+  await clic(p, "Rechazar");
+  await p.mouse.click(8, 450);
+  await sleep(200);
+  ok(trasEsc && !(await p.$('[role="dialog"]')), "el motivo de rechazo se cierra con Esc y con un toque fuera");
+  const antes = await p.evaluate((k) => JSON.parse(localStorage.getItem(k)).documentos.length, CLAVE);
+  await p.evaluate(() => {
+    const el = [...document.querySelectorAll("main button")].find((x) => x.textContent.trim() === "Duplicar");
+    el.click();
+    el.click();
+  });
+  await esperar(() => location.pathname.includes("/app/nuevo/reporte"));
+  await sleep(600);
+  ok((await p.evaluate((k) => JSON.parse(localStorage.getItem(k)).documentos.length, CLAVE)) === antes + 1, "doble clic en «Duplicar» crea una sola copia");
+
+  // 7. Celular: la hoja «Nuevo» trae todo lo que el perfil crea y se cierra con Esc y tocando fuera
+  await p.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+  await comoUsuario(p, "u-adm");
+  await p.goto(`${BASE}/app/documentos`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  const abrirNuevo = () => p.evaluate(() => [...document.querySelectorAll("nav button")].find((x) => x.textContent.includes("Nuevo")).click());
+  const hoja = () => p.evaluate(() => [...document.querySelectorAll('[aria-label="Nuevo documento"] a')].map((a) => a.textContent.trim()));
+  await abrirNuevo();
+  await sleep(300);
+  const adm = await hoja();
+  ok(["Reporte técnico", "Permiso de trabajo", "Legalización de gastos", "Cotización", "Proyecto", "Cuenta de cobro", "Equipo"].every((t) => adm.some((x) => x.startsWith(t))), "la hoja «Nuevo» del administrador incluye formatos, proyecto, cuenta de cobro y equipo");
+  await p.keyboard.press("Escape");
+  await sleep(200);
+  const cerrada = !(await p.$('[aria-label="Nuevo documento"]'));
+  await comoUsuario(p, "u-tec1");
+  await p.reload({ waitUntil: "networkidle0" });
+  await sleep(500);
+  await abrirNuevo();
+  await sleep(300);
+  const tec = await hoja();
+  await p.touchscreen.tap(195, 60);
+  await sleep(300);
+  ok(cerrada && !(await p.$('[aria-label="Nuevo documento"]')), "la hoja «Nuevo» se cierra con Esc y tocando fuera");
+  ok(tec.some((x) => x.startsWith("Equipo")) && !tec.some((x) => x.startsWith("Proyecto") || x.startsWith("Cuenta de cobro")), "la hoja del técnico no ofrece proyecto ni cuenta de cobro");
+  await p.close();
+}
+
 (async () => {
   const b = await puppeteer.launch({ executablePath: chrome(), headless: true, args: ["--no-sandbox"] });
   const errores = [];
@@ -955,6 +1149,7 @@ async function equipos(b, errores) {
     if (!SOLO || SOLO === "proyectos") await proyectos(b, errores);
     if (!SOLO || SOLO === "crud") await crud(b, errores);
     if (!SOLO || SOLO === "equipos") await equipos(b, errores);
+    if (!SOLO || SOLO === "navegacion") await navegacion(b, errores);
   } catch (e) {
     ok(false, `error: ${e.message}`);
   } finally {

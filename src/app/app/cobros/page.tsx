@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { marcarEdicion } from "@/components/ui/volver";
 import { CircleDollarSign, Clock, Plus, Receipt } from "lucide-react";
 
 import { Contador } from "@/components/fx/Reveal";
@@ -22,7 +23,8 @@ export default function Cobros() {
   const kpis = [
     { label: "Por cobrar", valor: suma(["emitida", "enviada"]), icon: Clock, tono: "bg-amber-50 text-amber-700" },
     { label: "Pagado", valor: suma(["pagada"]), icon: CircleDollarSign, tono: "bg-emerald-50 text-emerald-700" },
-    { label: "Borradores", valor: cuentas.filter((c) => c.estado === "borrador").length, icon: Receipt, tono: "bg-slate-100 text-slate-700", cantidad: true },
+    // El cliente nunca ve borradores: el indicador solo es para quien gestiona
+    ...(puede(u.rol, "cobros") ? [{ label: "Borradores", valor: cuentas.filter((c) => c.estado === "borrador").length, icon: Receipt, tono: "bg-slate-100 text-slate-700", cantidad: true }] : []),
   ];
 
   return (
@@ -33,14 +35,14 @@ export default function Cobros() {
         descripcion={u.rol === "cliente" ? "Cuentas de cobro emitidas a tu empresa." : `${demo.config.empresa} le cobra a sus clientes por los servicios, con soporte en los reportes técnicos.`}
         acciones={
           puede(u.rol, "cobros") && (
-            <Link href="/app/cobros/nueva" className="inline-flex items-center gap-2 rounded-lg bg-sotec px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-black">
+            <Link href="/app/cobros/nueva" onClick={marcarEdicion} className="inline-flex items-center gap-2 rounded-lg bg-sotec px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-black">
               <Plus className="h-4 w-4" /> Nueva cuenta de cobro
             </Link>
           )
         }
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className={`grid grid-cols-1 gap-3 ${kpis.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
         {kpis.map((k) => (
           <div key={k.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between">
@@ -89,7 +91,16 @@ export default function Cobros() {
             ))}
           </tbody>
         </table>
-        {cuentas.length === 0 && <p className="p-6 text-center text-sm text-slate-500">No hay cuentas de cobro todavía.</p>}
+        {cuentas.length === 0 && (
+          <div className="p-6 text-center text-sm text-slate-500">
+            <p>{u.rol === "cliente" ? "Aún no hay cuentas de cobro emitidas a tu empresa." : "No hay cuentas de cobro todavía."}</p>
+            {puede(u.rol, "cobros") && (
+              <Link href="/app/cobros/nueva" onClick={marcarEdicion} className="mt-2 inline-flex items-center gap-1 font-medium text-sotec-greenDeep hover:underline">
+                <Plus className="h-4 w-4" aria-hidden /> Crear la primera cuenta de cobro
+              </Link>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

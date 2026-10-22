@@ -7,7 +7,7 @@ import { AlertTriangle, Cctv, CheckCircle2, Eye, FolderKanban, MessageSquare, Pr
 import { ChatAsistente, type ValorPaso } from "@/components/chat/ChatAsistente";
 import { FirmaPad } from "@/components/docs/FirmaPad";
 import { Button } from "@/components/ui/button";
-import { Volver, useOrigen } from "@/components/ui/volver";
+import { Volver, salirAlDetalle, useOrigen } from "@/components/ui/volver";
 import type { Paso } from "@/components/chat/ChatAsistente";
 import { equiposAtendidos, puedeEditarEquipos } from "@/modulos/equipos/logica";
 import { SelectorEquipos } from "@/modulos/equipos/SelectorEquipos";
@@ -47,7 +47,11 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   const modulo = moduloDe(tipo);
   const info = infoDoc(tipo);
   // Desde un proyecto (?proyecto= o ?desde=proyecto:) se vuelve al proyecto; si no, a Documentos
-  const origen = useOrigen({ href: "/app/documentos", label: "Documentos" });
+  const origenLista = useOrigen({ href: "/app/documentos", label: "Documentos" });
+  // Continuar un documento existente: «Volver» regresa a su detalle (que conserva su propio origen)
+  const origen = existente
+    ? { href: rutaDoc(existente.id, origenLista.query ? `&${origenLista.query}` : ""), label: `Volver al documento ${existente.codigo}`, query: origenLista.query }
+    : origenLista;
   // Lo que se va diligenciando en un documento nuevo se guarda en el navegador:
   // si se recarga o se cambia de perfil a mitad, se recupera al volver.
   const claveCache = `fd-generador-${tipo}-${usuario.id}`;
@@ -251,8 +255,11 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     } catch {
       /* sin almacenamiento */
     }
-    // replace: «atrás» desde el detalle vuelve a donde se abrió el generador, no a un formulario vacío
-    router.replace(rutaDoc(g.id, `&ok=${enviar ? "enviado" : "guardado"}${origen.query ? `&${origen.query}` : ""}`));
+    // replace: «atrás» desde el detalle vuelve a donde se abrió el generador, no a un formulario vacío.
+    // Abierto con «Editar» desde el detalle: se regresa a esa entrada (sin duplicarla en el historial)
+    const destino = rutaDoc(g.id, `${origen.query ? `&${origen.query}` : ""}`);
+    if (existente) salirAlDetalle(router, destino, enviar ? "enviado" : "guardado");
+    else router.replace(rutaDoc(g.id, `&ok=${enviar ? "enviado" : "guardado"}${origen.query ? `&${origen.query}` : ""}`));
   }
 
   const f = info.formato;

@@ -78,3 +78,23 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(onCerrar: () =>
 
   return ref;
 }
+
+/**
+ * Props del fondo de un modal para cerrarlo con un toque fuera del diálogo. Solo
+ * cuenta si el toque empezó y terminó en el fondo: un trazo de firma o una
+ * selección de texto que termina fuera no cierra el modal.
+ *
+ *   <div className="fixed inset-0 …" {...fondoQueCierra(onCerrar)}>
+ */
+export function fondoQueCierra(onCerrar: () => void) {
+  let enFondo = false;
+  return {
+    onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
+      enFondo = e.target === e.currentTarget;
+    },
+    onClick: (e: React.MouseEvent<HTMLElement>) => {
+      if (enFondo && e.target === e.currentTarget) onCerrar();
+      enFondo = false;
+    },
+  };
+}

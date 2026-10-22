@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { Cctv, Check, CheckCircle2, Copy, FolderKanban, Link2, Lock, PenLine, Printer, Receipt, Send, SendHorizonal, Trash2, X } from "lucide-react";
 
 import { EnviarDocumento } from "@/components/EnviarDocumento";
-import { Volver, useOrigen } from "@/components/ui/volver";
+import { Volver, marcarEdicion, useAvisoDeRegreso, useOrigen } from "@/components/ui/volver";
+import { fondoQueCierra, useModal } from "@/components/ui/useModal";
 
 import { FirmaPad } from "@/components/docs/FirmaPad";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,9 @@ import { clienteDoc, empresaDe, infoDoc, rutaNuevo } from "@/modulos/registro";
 function Detalle() {
   const params = useSearchParams();
   const id = params.get("id") ?? "";
-  const ok = params.get("ok");
+  // Aviso de guardado: en la URL (documento nuevo) o al regresar del formulario de edición
+  const avisoRegreso = useAvisoDeRegreso();
+  const ok = params.get("ok") ?? avisoRegreso;
   const router = useRouter();
   const demo = useDemo();
   const u = demo.usuario!;
@@ -35,6 +38,8 @@ function Detalle() {
   const [rechazo, setRechazo] = useState<string | null>(null);
   const [cierre, setCierre] = useState<Partial<DatosPermiso>>({ cierreAreaLimpia: "", cierraNombre: u.nombre, firmaCierre: "" });
   const [envio, setEnvio] = useState<null | { enlace?: string }>(null);
+  // Un solo duplicado aunque se haga doble clic (el botón sigue en pantalla hasta que cambia la ruta)
+  const duplicando = useRef(false);
 
   if (!doc || !puedeVerDoc(u, doc)) {
     return (
@@ -97,14 +102,22 @@ function Detalle() {
             {clienteDoc(doc)} · por {nombre(doc.autorId)}
           </p>
           {proyecto && (
-            <Link href={rutaProyecto(proyecto.id)} className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-sotec-greenDeep hover:underline">
-              <FolderKanban className="h-3.5 w-3.5" aria-hidden /> Proyecto <span className="font-mono">{proyecto.codigo}</span> · {proyecto.nombre}
+            <Link href={rutaProyecto(proyecto.id)} className="mt-1 block text-sm font-medium text-sotec-greenDeep hover:underline">
+              {/* En línea (no flex): en celular el nombre largo se parte como texto y el código no se corta */}
+              <FolderKanban className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-hidden />
+              Proyecto <span className="whitespace-nowrap font-mono">{proyecto.codigo}</span> · {proyecto.nombre}
             </Link>
           )}
         </div>
         <div className="flex flex-wrap gap-2">
           {editable && (
-            <Button variant="outline" onClick={() => router.push(rutaNuevo(doc.tipo, conOrigen(`id=${doc.id}`)))}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                marcarEdicion();
+                router.push(rutaNuevo(doc.tipo, conOrigen(`id=${doc.id}`)));
+              }}
+            >
               <PenLine className="h-4 w-4" /> Editar
             </Button>
           )}
@@ -132,6 +145,8 @@ function Detalle() {
             <Button
               variant="outline"
               onClick={() => {
+                if (duplicando.current) return;
+                duplicando.current = true;
                 const nid = demo.duplicar(doc.id);
                 if (nid) router.push(rutaNuevo(doc.tipo, conOrigen(`id=${nid}`)));
               }}
@@ -161,7 +176,13 @@ function Detalle() {
             </Button>
           )}
           {puedeCobrar && (
-            <Button variant="outline" onClick={() => router.push(`/app/cobros/nueva?cliente=${doc.clienteId}&reporte=${doc.id}`)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                marcarEdicion();
+                router.push(`/app/cobros/nueva?cliente=${doc.clienteId}&reporte=${doc.id}&desde=doc:${doc.id}`);
+              }}
+            >
               <Receipt className="h-4 w-4" /> Crear cuenta de cobro
             </Button>
           )}
@@ -187,7 +208,7 @@ function Detalle() {
       </div>
 
       {cuenta && puede(u.rol, "ver_cobros") && (
-        <Link href={rutaCuenta(cuenta.id)} className="print:hidden flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 hover:bg-sky-100">
+        <Link href={`${rutaCuenta(cuenta.id)}&desde=doc:${doc.id}`} className="print:hidden flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 hover:bg-sky-100">
           <Receipt className="h-4 w-4" /> Este reporte ya se cobró en la cuenta de cobro <strong className="font-mono">{cuenta.codigo}</strong> →
         </Link>
       )}
@@ -231,7 +252,7 @@ function Detalle() {
           <ul className="mt-2 flex flex-wrap gap-1.5">
             {atendidos.map((e) => (
               <li key={e.id} className="min-w-0 max-w-full">
-                <Link href={rutaEquipo(e.id)} className="flex min-w-0 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:border-sotec-greenDeep">
+                <Link href={`${rutaEquipo(e.id)}&desde=doc:${doc.id}`} className="flex min-w-0 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:border-sotec-greenDeep">
                   <IconoEquipo tipo={e.tipo} sistema={e.sistema} className="h-3.5 w-3.5 shrink-0" />
                   <span className="truncate">{e.nombre}</span>
                 </Link>
@@ -301,43 +322,44 @@ function Detalle() {
         />
       )}
 
-      {rechazo !== null && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Rechazar ${doc.codigo}`}
-          onKeyDown={(e) => e.key === "Escape" && setRechazo(null)}
-        >
-          <div className="w-full max-w-md rounded-xl bg-white p-4">
-            <p className="font-semibold">Rechazar {doc.codigo}</p>
-            <p className="text-sm text-slate-500">El autor recibe el motivo y puede corregirlo.</p>
-            <textarea autoFocus rows={3} value={rechazo} onChange={(e) => setRechazo(e.target.value)} className="mt-3 w-full rounded-md border border-slate-300 p-2 text-sm" placeholder="Ej: falta la lista de verificación de alturas" />
-            <div className="mt-2 flex flex-wrap gap-1">
-              {["Falta detallar las recomendaciones", "Firma del ejecutor incompleta", "EPP insuficiente para el riesgo"].map((s) => (
-                <button key={s} onClick={() => setRechazo(s)} className="rounded-full border border-slate-200 px-2 py-0.5 text-xs hover:bg-slate-50">
-                  {s}
-                </button>
-              ))}
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setRechazo(null)}>
-                Cancelar
-              </Button>
-              <Button
-                variant="destructive"
-                disabled={rechazo.trim().length < 5}
-                onClick={() => {
-                  demo.rechazar(doc.id, rechazo.trim());
-                  setRechazo(null);
-                }}
-              >
-                Rechazar
-              </Button>
-            </div>
-          </div>
+      {rechazo !== null && <DialogoRechazo codigo={doc.codigo} motivo={rechazo} setMotivo={setRechazo} onRechazar={() => demo.rechazar(doc.id, rechazo.trim())} />}
+    </div>
+  );
+}
+
+/** Motivo del rechazo: Esc o un toque fuera cierran, el foco queda dentro (useModal). */
+function DialogoRechazo({ codigo, motivo, setMotivo, onRechazar }: { codigo: string; motivo: string; setMotivo: (m: string | null) => void; onRechazar: () => void }) {
+  const cerrar = () => setMotivo(null);
+  const ref: React.MutableRefObject<HTMLDivElement | null> = useModal<HTMLDivElement>(cerrar, { focoInicial: (): HTMLElement | null => ref.current?.querySelector("textarea") ?? null });
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" {...fondoQueCierra(cerrar)}>
+      <div ref={ref} role="dialog" aria-modal="true" aria-label={`Rechazar ${codigo}`} className="w-full max-w-md rounded-xl bg-white p-4">
+        <p className="font-semibold">Rechazar {codigo}</p>
+        <p className="text-sm text-slate-500">El autor recibe el motivo y puede corregirlo.</p>
+        <textarea rows={3} value={motivo} onChange={(e) => setMotivo(e.target.value)} className="mt-3 w-full rounded-md border border-slate-300 p-2 text-sm" placeholder="Ej: falta la lista de verificación de alturas" />
+        <div className="mt-2 flex flex-wrap gap-1">
+          {["Falta detallar las recomendaciones", "Firma del ejecutor incompleta", "EPP insuficiente para el riesgo"].map((s) => (
+            <button key={s} onClick={() => setMotivo(s)} className="rounded-full border border-slate-200 px-2 py-0.5 text-xs hover:bg-slate-50">
+              {s}
+            </button>
+          ))}
         </div>
-      )}
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="ghost" onClick={cerrar}>
+            Cancelar
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={motivo.trim().length < 5}
+            onClick={() => {
+              onRechazar();
+              cerrar();
+            }}
+          >
+            Rechazar
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

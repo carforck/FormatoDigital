@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Archive, ArchiveRestore, ArrowLeft, Building2, CircleAlert, CircleCheck, CircleX, FileText, FolderKanban, MapPin, PenLine, Plus, Save, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, Building2, CircleAlert, CircleCheck, CircleX, FileText, FolderKanban, MapPin, PenLine, Plus, Save, Trash2, X } from "lucide-react";
 
 import { EstadoBadge, fechaCorta } from "@/components/ui/badges";
+import { Volver, marcarEdicion, regresarSiViene, useOrigen } from "@/components/ui/volver";
 import { cn } from "@/lib/utils";
 import { ESTADOS_EQUIPO, ETIQUETA_ESTADO_EQUIPO, SISTEMAS, esSistema, sistemaDe } from "@/modulos/equipos/catalogo";
 import { equiposIdsDe, fechaDoc, historialEquipo, puedeEditarEquipos, puedeEliminarEquipos, puedeVerEquipo } from "@/modulos/equipos/logica";
@@ -60,11 +61,9 @@ function Ficha() {
   if (cliVolver && u.rol !== "cliente") qVolver.set("cliente", cliVolver);
   if (params.get("sistema")) qVolver.set("sistema", params.get("sistema")!);
   const rutaVolver = `/app/equipos${qVolver.toString() ? `?${qVolver}` : ""}`;
-  const volver = (
-    <Link href={rutaVolver} className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
-      <ArrowLeft className="h-4 w-4" aria-hidden /> Volver a Equipos
-    </Link>
-  );
+  // Abierta desde un documento (equipos atendidos, ?desde=doc:<id>): «Volver» regresa al documento
+  const origen = useOrigen({ href: rutaVolver, label: "Equipos" });
+  const volver = <Volver href={origen.href} label={origen.label} />;
 
   const bloqueo = (texto: string) => (
     <div className="mx-auto mt-16 max-w-md rounded-xl border border-slate-200 bg-white p-6 text-center">
@@ -228,8 +227,10 @@ function Ficha() {
               type="button"
               onClick={() => {
                 setError(null);
-                if (nuevo) router.push(rutaVolver);
-                else setBorrador(null);
+                // Nuevo: se regresa a la entrada anterior (el listado) en vez de apilar otra
+                if (nuevo) {
+                  if (!regresarSiViene(router, rutaVolver)) router.replace(rutaVolver);
+                } else setBorrador(null);
               }}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"
             >
@@ -293,7 +294,7 @@ function Ficha() {
             </p>
           </div>
           {nuevoReporte && (
-            <Link href={nuevoReporte} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-sotec px-4 py-2.5 sm:w-auto text-sm font-medium text-white shadow-sm hover:bg-black">
+            <Link href={nuevoReporte} onClick={marcarEdicion} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-sotec px-4 py-2.5 sm:w-auto text-sm font-medium text-white shadow-sm hover:bg-black">
               <Plus className="h-4 w-4" aria-hidden /> Nuevo reporte de este equipo
             </Link>
           )}

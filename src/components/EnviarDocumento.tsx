@@ -6,7 +6,7 @@ import { Check, Copy, ExternalLink, Mail, MessageCircle, X } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useModal } from "@/components/ui/useModal";
+import { fondoQueCierra, useModal } from "@/components/ui/useModal";
 
 interface Props {
   titulo: string;
@@ -38,6 +38,7 @@ export function EnviarDocumento({ titulo, correo: c0, telefono: t0, asunto: a0, 
   const [mensaje, setMensaje] = useState(m0);
   const [copiado, setCopiado] = useState(false);
   const dialogo = useModal<HTMLDivElement>(onCerrar);
+  const fondo = fondoQueCierra(onCerrar);
   const idTitulo = useId();
   const idDescripcion = useId();
 
@@ -46,7 +47,7 @@ export function EnviarDocumento({ titulo, correo: c0, telefono: t0, asunto: a0, 
   const telValido = telefono.replace(/\D/g, "").length >= 10;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" >
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" {...fondo}>
       <div ref={dialogo} role="dialog" aria-modal="true" aria-labelledby={idTitulo} aria-describedby={idDescripcion} className="max-h-[92vh] outline-none w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
         <div className="flex items-start justify-between gap-3">
           <div>

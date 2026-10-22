@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Eraser, PenLine, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { useModal } from "@/components/ui/useModal";
+import { fondoQueCierra, useModal } from "@/components/ui/useModal";
 
 interface Props {
   titulo: string;
@@ -18,6 +18,7 @@ export function FirmaPad({ titulo, onGuardar, onCerrar }: Props) {
   const dibujando = useRef(false);
   const [vacio, setVacio] = useState(true);
   const dialogo = useModal<HTMLDivElement>(onCerrar);
+  const fondo = fondoQueCierra(onCerrar);
   const idTitulo = useId();
 
   useEffect(() => {
@@ -46,7 +47,7 @@ export function FirmaPad({ titulo, onGuardar, onCerrar }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" >
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" {...fondo}>
       <div ref={dialogo} role="dialog" aria-modal="true" aria-labelledby={idTitulo} className="w-full max-w-lg rounded-xl bg-white p-4 shadow-xl outline-none">
         <div className="mb-3 flex items-center justify-between">
           <p id={idTitulo} className="flex items-center gap-2 font-semibold">

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { marcarEdicion } from "@/components/ui/volver";
 import { Suspense, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Building2, ChevronRight, FileText, MapPin, Plus, Search } from "lucide-react";
@@ -56,7 +57,7 @@ function Equipos() {
         descripcion={interno ? "Inventario de cada cliente por sistema, con el historial de reportes de cada equipo." : "Los equipos instalados en tu empresa y el historial de servicios de cada uno."}
         acciones={
           crea && (
-            <Link href={nuevoHref} className="inline-flex items-center gap-2 rounded-lg bg-sotec px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-black">
+            <Link href={nuevoHref} onClick={marcarEdicion} className="inline-flex items-center gap-2 rounded-lg bg-sotec px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-black">
               <Plus className="h-4 w-4" aria-hidden /> Nuevo equipo
             </Link>
           )
@@ -162,7 +163,7 @@ function Equipos() {
                   : "Cuando nuestros técnicos registren los equipos atendidos en tus reportes, aparecerán aquí con su historial."}
               </p>
               {crea && !q.trim() && (
-                <Link href={nuevoHref} className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+                <Link href={nuevoHref} onClick={marcarEdicion} className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
                   <Plus className="h-4 w-4" aria-hidden /> Registrar un equipo
                 </Link>
               )}

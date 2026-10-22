@@ -294,4 +294,224 @@ select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
 do $$ begin assert (select firmante_nombre from public.firmas where documento_id = (select v::uuid from ctx where k = 'borr') and campo = 'firmaCliente') = 'Cliente Uno', 'la firma original se conserva'; end $$;
 reset role;
 
+-- ------------------------------------------------- 11. proyectos y cotizaciones (0009)
+insert into public.formatos (organizacion_id, clave, codigo, nombre, prefijo, visible_cliente) values
+  ('10000000-0000-0000-0000-000000000001', 'cotizacion', 'FO-COM-01', 'Cotización', 'COT', true);
+-- El técnico no crea proyectos
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+do $$ begin
+  perform public.crear_proyecto('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'Proyecto del técnico');
+  raise exception 'FALLO: el técnico creó un proyecto';
+exception when insufficient_privilege then null; end $$;
+reset role;
+-- La coordinadora crea dos proyectos con su consecutivo
+select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
+insert into ctx select 'p1', (public.crear_proyecto('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'CCTV hornos', 'Área de hornos', '00000000-0000-0000-0000-0000000000a3', current_date, 18000000)).id;
+insert into ctx select 'p2', (public.crear_proyecto('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002', 'Control de acceso torre B')).id;
+do $$ begin
+  assert (select codigo from public.proyectos where id = (select v::uuid from ctx where k = 'p1')) = 'PRY-001-' || to_char(now(), 'YY'), 'código PRY-001';
+  assert (select codigo from public.proyectos where id = (select v::uuid from ctx where k = 'p2')) = 'PRY-002-' || to_char(now(), 'YY'), 'consecutivo PRY-002';
+end $$;
+-- Un documento no puede ir a un proyecto de otro cliente
+do $$ begin
+  perform public.crear_documento('10000000-0000-0000-0000-000000000001', 'reporte', '{}', null, 'c0000000-0000-0000-0000-000000000002', (select v::uuid from ctx where k = 'p1'));
+  raise exception 'FALLO: documento en un proyecto de otro cliente';
+exception when insufficient_privilege then null; end $$;
+-- Con el proyecto basta: el cliente sale de él
+insert into ctx select 'cot1', (public.crear_documento('10000000-0000-0000-0000-000000000001', 'cotizacion', '{"asunto":"Ampliación CCTV"}', null, null, (select v::uuid from ctx where k = 'p1'))).id;
+do $$ begin
+  assert (select cliente_id from public.documentos where id = (select v::uuid from ctx where k = 'cot1')) = 'c0000000-0000-0000-0000-000000000001', 'el documento toma el cliente del proyecto';
+  assert (select codigo from public.documentos where id = (select v::uuid from ctx where k = 'cot1')) like 'COT-001-%', 'código COT-001';
+end $$;
+update public.documentos set estado = 'en_revision' where id = (select v::uuid from ctx where k = 'cot1');
+-- Enviado, ya no cambia de proyecto
+do $$ begin
+  update public.documentos set proyecto_id = (select v::uuid from ctx where k = 'p2'), cliente_id = 'c0000000-0000-0000-0000-000000000002' where id = (select v::uuid from ctx where k = 'cot1');
+  raise exception 'FALLO: cambió el proyecto de un documento enviado';
+exception when insufficient_privilege then null; end $$;
+reset role;
+-- La gerencia aprueba (la cotización queda en el portal) y crea la cuenta de cobro del proyecto
+select pg_temp.como('00000000-0000-0000-0000-0000000000a1');
+update public.documentos set estado = 'aprobado' where id = (select v::uuid from ctx where k = 'cot1');
+insert into ctx select 'cc2', (public.crear_cuenta_cobro('10000000-0000-0000-0000-000000000001', null, 'Anticipo CCTV hornos', null, (select v::uuid from ctx where k = 'p1'))).id;
+do $$ begin
+  assert (select cliente_id from public.cuentas_cobro where id = (select v::uuid from ctx where k = 'cc2')) = 'c0000000-0000-0000-0000-000000000001', 'la cuenta toma el cliente del proyecto';
+  assert (select proyecto_id from public.cuentas_cobro where id = (select v::uuid from ctx where k = 'cc2')) = (select v::uuid from ctx where k = 'p1'), 'la cuenta queda en el proyecto';
+end $$;
+-- Proyecto cerrado: no recibe documentos nuevos
+update public.proyectos set estado = 'cerrado' where id = (select v::uuid from ctx where k = 'p2');
+do $$ begin
+  assert (select fecha_fin from public.proyectos where id = (select v::uuid from ctx where k = 'p2')) = current_date, 'al cerrar se fija la fecha de fin';
+  perform public.crear_documento('10000000-0000-0000-0000-000000000001', 'reporte', '{}', null, null, (select v::uuid from ctx where k = 'p2'));
+  raise exception 'FALLO: documento nuevo en un proyecto cerrado';
+exception when insufficient_privilege then null; end $$;
+reset role;
+-- Un proyecto con documentos no se elimina; uno vacío sí (solo admin y SST)
+select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
+insert into ctx select 'p3', (public.crear_proyecto('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002', 'Proyecto sin documentos')).id;
+delete from public.proyectos where id = (select v::uuid from ctx where k = 'p1');
+do $$ begin assert (select count(*) from public.proyectos where id = (select v::uuid from ctx where k = 'p1')) = 1, 'un proyecto con documentos no se elimina'; end $$;
+reset role;
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+delete from public.proyectos where id = (select v::uuid from ctx where k = 'p3');
+reset role;
+do $$ begin assert (select count(*) from public.proyectos where id = (select v::uuid from ctx where k = 'p3')) = 1, 'el técnico no elimina proyectos'; end $$;
+select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
+delete from public.proyectos where id = (select v::uuid from ctx where k = 'p3');
+reset role;
+do $$ begin assert (select count(*) from public.proyectos where id = (select v::uuid from ctx where k = 'p3')) = 0, 'SST elimina un proyecto vacío'; end $$;
+-- Un cliente con historial no se puede borrar (se desactiva)
+select pg_temp.como('00000000-0000-0000-0000-0000000000a1');
+do $$ begin
+  delete from public.clientes where id = 'c0000000-0000-0000-0000-000000000001';
+  raise exception 'FALLO: borró un cliente con documentos';
+exception when foreign_key_violation then null; end $$;
+update public.clientes set activo = false where id = 'c0000000-0000-0000-0000-000000000002';
+do $$ begin assert (select count(*) from public.documentos where cliente_id = 'c0000000-0000-0000-0000-000000000001') > 0, 'el historial del cliente se conserva'; end $$;
+update public.clientes set activo = true where id = 'c0000000-0000-0000-0000-000000000002';
+reset role;
+
+-- El técnico ve los proyectos de su empresa; la otra empresa, ninguno
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+do $$ begin assert (select count(*) from public.proyectos) = 2, 'el técnico ve los proyectos de su empresa'; end $$;
+reset role;
+select pg_temp.como('00000000-0000-0000-0000-0000000000b1');
+do $$ begin
+  assert (select count(*) from public.proyectos) = 0, 'la otra empresa no ve proyectos ajenos';
+  perform public.crear_documento('20000000-0000-0000-0000-000000000002', 'reporte', '{}', null, null, (select v::uuid from ctx where k = 'p1'));
+  raise exception 'FALLO: usó un proyecto de otra empresa';
+exception when insufficient_privilege then null; end $$;
+reset role;
+-- El cliente ve solo los proyectos de su empresa, no los edita y acepta la cotización firmando en su portal
+select pg_temp.como('00000000-0000-0000-0000-0000000000a5');
+do $$ begin
+  assert (select count(*) from public.proyectos) = 1, 'el cliente solo ve los proyectos de su empresa';
+  assert (select count(*) from public.documentos where id = (select v::uuid from ctx where k = 'cot1')) = 1, 'el cliente ve la cotización aprobada';
+end $$;
+update public.proyectos set nombre = 'Cambiado por el cliente' where id = (select v::uuid from ctx where k = 'p1');
+do $$ begin
+  assert (select public.firmar_como_cliente((select v::uuid from ctx where k = 'cot1'), 'Ing. Daniel', 'data:image/png;base64,AAAA')) = 'cerrado', 'el cliente acepta la cotización firmando';
+  assert (select estado from public.documentos where id = (select v::uuid from ctx where k = 'cot1')) = 'cerrado', 'la cotización aceptada queda cerrada';
+end $$;
+do $$ begin
+  perform public.firmar_como_cliente((select v::uuid from ctx where k = 'cot1'), 'Ing. Daniel', 'data:image/png;base64,AAAA');
+  raise exception 'FALLO: firmó dos veces';
+exception when check_violation then null; end $$;
+reset role;
+do $$ begin assert (select nombre from public.proyectos where id = (select v::uuid from ctx where k = 'p1')) = 'CCTV hornos', 'el cliente no edita proyectos'; end $$;
+-- Otro cliente no firma la cotización ajena
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+do $$ begin
+  perform public.firmar_como_cliente((select v::uuid from ctx where k = 'cot1'), 'Técnico', 'data:image/png;base64,AAAA');
+  raise exception 'FALLO: alguien que no es el cliente firmó como cliente';
+exception when insufficient_privilege then null; end $$;
+reset role;
+
+-- ------------------------------------------------- 10. equipos (0010): inventario por cliente e historial
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+with x as (insert into public.equipos (organizacion_id, cliente_id, proyecto_id, sistema, tipo, nombre)
+  values ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', (select v::uuid from ctx where k = 'p1'), 'cctv', 'NVR', 'NVR principal 16 canales') returning id) insert into ctx select 'e1', id from x;
+with x as (insert into public.equipos (organizacion_id, cliente_id, sistema, tipo, nombre)
+  values ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'cctv', 'Cámara domo', 'Cámara 1 – Portería') returning id) insert into ctx select 'e2', id from x;
+with x as (insert into public.equipos (organizacion_id, cliente_id, sistema, tipo, nombre)
+  values ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002', 'acceso', 'Controladora', 'Controladora torre B') returning id) insert into ctx select 'e3', id from x;
+-- El mismo nombre (otras mayúsculas y espacios) en el mismo cliente y sistema no se duplica
+do $$ begin
+  insert into public.equipos (organizacion_id, cliente_id, sistema, tipo, nombre)
+  values ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'cctv', 'NVR', '  nvr principal   16 CANALES ');
+  raise exception 'FALLO: equipo duplicado';
+exception when unique_violation then null; end $$;
+-- El proyecto debe ser del mismo cliente
+do $$ begin
+  insert into public.equipos (organizacion_id, cliente_id, proyecto_id, sistema, tipo, nombre)
+  values ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002', (select v::uuid from ctx where k = 'p1'), 'cctv', 'NVR', 'NVR torre B');
+  raise exception 'FALLO: equipo en un proyecto de otro cliente';
+exception when insufficient_privilege then null; end $$;
+-- El técnico marca los equipos atendidos en su reporte (del mismo cliente)
+insert into ctx select 'rtE', (public.crear_documento('10000000-0000-0000-0000-000000000001', 'reporte', '{"asunto":"Preventivo CCTV"}', null, 'c0000000-0000-0000-0000-000000000001')).id;
+insert into public.documento_equipos (organizacion_id, documento_id, equipo_id)
+select '10000000-0000-0000-0000-000000000001', (select v::uuid from ctx where k = 'rtE'), v::uuid from ctx where k in ('e1', 'e2');
+do $$ begin
+  insert into public.documento_equipos (organizacion_id, documento_id, equipo_id)
+  values ('10000000-0000-0000-0000-000000000001', (select v::uuid from ctx where k = 'rtE'), (select v::uuid from ctx where k = 'e3'));
+  raise exception 'FALLO: marcó un equipo de otro cliente';
+exception when insufficient_privilege then null; end $$;
+update public.documentos set estado = 'en_revision' where id = (select v::uuid from ctx where k = 'rtE');
+-- Enviado: los equipos atendidos quedan fijos
+do $$ begin
+  delete from public.documento_equipos where documento_id = (select v::uuid from ctx where k = 'rtE');
+  raise exception 'FALLO: cambió los equipos de un reporte enviado';
+exception when insufficient_privilege then null; end $$;
+-- El técnico edita y retira, pero no borra ni cambia el cliente
+update public.equipos set marca = 'Dahua', estado = 'con_falla' where id = (select v::uuid from ctx where k = 'e2');
+delete from public.equipos where id = (select v::uuid from ctx where k = 'e3');
+do $$ begin
+  update public.equipos set cliente_id = 'c0000000-0000-0000-0000-000000000002' where id = (select v::uuid from ctx where k = 'e2');
+  raise exception 'FALLO: cambió el cliente de un equipo';
+exception when insufficient_privilege then null; end $$;
+do $$ begin
+  assert (select marca from public.equipos where id = (select v::uuid from ctx where k = 'e2')) = 'Dahua', 'el técnico edita la ficha';
+  assert (select count(*) from public.equipos where id = (select v::uuid from ctx where k = 'e3')) = 1, 'el técnico no borra equipos';
+end $$;
+reset role;
+-- Otro técnico no marca equipos en un reporte ajeno
+select pg_temp.como('00000000-0000-0000-0000-0000000000a4');
+insert into ctx select 'rtE2', (public.crear_documento('10000000-0000-0000-0000-000000000001', 'reporte', '{}', null, 'c0000000-0000-0000-0000-000000000001')).id;
+do $$ begin
+  insert into public.documento_equipos (organizacion_id, documento_id, equipo_id)
+  values ('10000000-0000-0000-0000-000000000001', (select v::uuid from ctx where k = 'rtE2'), (select v::uuid from ctx where k = 'e1'));
+  insert into public.documento_equipos (organizacion_id, documento_id, equipo_id)
+  values ('10000000-0000-0000-0000-000000000001', (select v::uuid from ctx where k = 'rtE'), (select v::uuid from ctx where k = 'e2'));
+  raise exception 'FALLO: marcó equipos en el reporte de otro técnico';
+exception when insufficient_privilege or unique_violation then null; end $$;
+reset role;
+-- El cliente: solo los equipos de su empresa; el historial, solo de reportes aprobados o cerrados
+select pg_temp.como('00000000-0000-0000-0000-0000000000a5');
+do $$ begin
+  assert (select count(*) from public.equipos) = 2, 'el cliente solo ve los equipos de su empresa';
+  assert (select count(*) from public.documento_equipos where documento_id = (select v::uuid from ctx where k = 'rtE')) = 0, 'el cliente no ve el historial de un reporte en revisión';
+end $$;
+update public.equipos set nombre = 'Cambiado por el cliente' where id = (select v::uuid from ctx where k = 'e1');
+do $$ begin
+  insert into public.equipos (organizacion_id, cliente_id, sistema, tipo, nombre)
+  values ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'cctv', 'Cámara domo', 'Cámara del cliente');
+  raise exception 'FALLO: el cliente registró un equipo';
+exception when insufficient_privilege then null; end $$;
+reset role;
+select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
+update public.documentos set estado = 'aprobado' where id = (select v::uuid from ctx where k = 'rtE');
+reset role;
+select pg_temp.como('00000000-0000-0000-0000-0000000000a5');
+do $$ begin
+  assert (select count(*) from public.documento_equipos where documento_id = (select v::uuid from ctx where k = 'rtE')) = 2, 'aprobado, el cliente ve los equipos atendidos';
+  assert (select nombre from public.equipos where id = (select v::uuid from ctx where k = 'e1')) = 'NVR principal 16 canales', 'el cliente no edita equipos';
+end $$;
+reset role;
+-- La administración borra solo equipos sin historial; con reportes se retiran
+select pg_temp.como('00000000-0000-0000-0000-0000000000a1');
+do $$ begin
+  delete from public.equipos where id = (select v::uuid from ctx where k = 'e1');
+  raise exception 'FALLO: borró un equipo con reportes';
+exception when foreign_key_violation then null; end $$;
+update public.equipos set estado = 'retirado' where id = (select v::uuid from ctx where k = 'e1');
+delete from public.equipos where id = (select v::uuid from ctx where k = 'e3');
+do $$ begin
+  assert (select estado from public.equipos where id = (select v::uuid from ctx where k = 'e1')) = 'retirado', 'el equipo con historial se retira';
+  assert (select count(*) from public.equipos where id = (select v::uuid from ctx where k = 'e3')) = 0, 'la administración borra un equipo sin reportes';
+  assert (select count(*) from public.auditoria where entidad = 'equipo') >= 3, 'registro y cambios de estado en la auditoría';
+end $$;
+reset role;
+-- Otra empresa: no ve ni crea equipos ajenos
+select pg_temp.como('00000000-0000-0000-0000-0000000000b1');
+do $$ begin
+  assert (select count(*) from public.equipos) = 0, 'la otra empresa no ve equipos ajenos';
+  assert (select count(*) from public.documento_equipos) = 0, 'la otra empresa no ve historiales ajenos';
+end $$;
+do $$ begin
+  insert into public.equipos (organizacion_id, cliente_id, sistema, tipo, nombre)
+  values ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'cctv', 'NVR', 'Intruso');
+  raise exception 'FALLO: creó un equipo en otra empresa';
+exception when insufficient_privilege then null; end $$;
+reset role;
+
 select 'OK: todas las pruebas pasaron' as resultado;

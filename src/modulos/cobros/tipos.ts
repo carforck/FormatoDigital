@@ -20,6 +20,8 @@ export interface CuentaCobro {
   consecutivo: number;
   clienteId: string;
   ordenId?: string;
+  /** Proyecto u obra al que se carga la cuenta (opcional). */
+  proyectoId?: string;
   fecha: string;
   concepto: string;
   items: ItemCuentaCobro[];

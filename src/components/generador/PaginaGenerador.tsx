@@ -17,10 +17,16 @@ import type { TipoDoc } from "@/nucleo/tipos";
  * caso (ajeno, enviado, cerrado o inexistente) se bloquea aunque se escriba la URL.
  */
 function Contenido({ tipo }: { tipo: TipoDoc }) {
-  const id = useSearchParams().get("id");
+  const params = useSearchParams();
+  const id = params.get("id");
   const demo = useDemo();
   const u = demo.usuario!;
-  if (!id) return <Generador key="nuevo" tipo={tipo} />;
+  // Desde un proyecto: ?proyecto=<id> (fija cliente y proyecto) o ?cliente=<id>
+  const proyecto = params.get("proyecto") ?? undefined;
+  const cliente = params.get("cliente") ?? undefined;
+  // Desde la ficha de un equipo: ?equipo=<id> lo deja marcado como atendido
+  const equipo = params.get("equipo") ?? undefined;
+  if (!id) return <Generador key={`nuevo-${proyecto ?? ""}-${cliente ?? ""}-${equipo ?? ""}`} tipo={tipo} proyectoInicial={proyecto} clienteInicial={cliente} equipoInicial={equipo} />;
 
   const doc = demo.documentos.find((d) => d.id === id && d.tipo === tipo);
   if (!doc || !puedeEditarDoc(u, doc)) {

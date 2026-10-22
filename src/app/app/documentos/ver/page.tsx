@@ -3,23 +3,22 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { ArrowLeft, Check, CheckCircle2, Copy, Link2, Lock, PenLine, Printer, Receipt, Send, SendHorizonal, Trash2, X } from "lucide-react";
+import { Cctv, Check, CheckCircle2, Copy, FolderKanban, Link2, Lock, PenLine, Printer, Receipt, Send, SendHorizonal, Trash2, X } from "lucide-react";
 
 import { EnviarDocumento } from "@/components/EnviarDocumento";
+import { Volver, useOrigen } from "@/components/ui/volver";
 
 import { FirmaPad } from "@/components/docs/FirmaPad";
-import { PlantillaPermiso } from "@/modulos/permisos/PlantillaPermiso";
-import { PlantillaGasto } from "@/modulos/gastos/PlantillaGasto";
-import { PlantillaReporte } from "@/modulos/reportes/PlantillaReporte";
 import { Button } from "@/components/ui/button";
 import { EstadoBadge } from "@/components/ui/badges";
-import { FORMATOS } from "@/nucleo/catalogos";
 import { puede, puedeEditarDoc, puedeRevisarDoc, puedeVerDoc } from "@/nucleo/permisos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
-import { rutaCuenta, urlPublica } from "@/nucleo/rutas";
+import { rutaCuenta, rutaEquipo, rutaProyecto, urlPublica } from "@/nucleo/rutas";
+import { equiposAtendidos, equiposIdsDe } from "@/modulos/equipos/logica";
+import { IconoEquipo } from "@/modulos/equipos/piezas";
 import type { DatosPermiso } from "@/nucleo/tipos";
 import { faltantes } from "@/nucleo/validar";
-import { clienteDoc } from "@/modulos/registro";
+import { clienteDoc, empresaDe, infoDoc, rutaNuevo } from "@/modulos/registro";
 
 function Detalle() {
   const params = useSearchParams();
@@ -29,6 +28,9 @@ function Detalle() {
   const demo = useDemo();
   const u = demo.usuario!;
   const doc = demo.documentos.find((d) => d.id === id);
+  // Abierto desde un proyecto (?desde=proyecto:<id>), «Volver» regresa al proyecto
+  const origen = useOrigen({ href: "/app/documentos", label: "Documentos" });
+  const conOrigen = (q: string) => (origen.query ? `${q}&${origen.query}` : q);
   const [firma, setFirma] = useState<null | "aprobar" | "cliente" | "cierre">(null);
   const [rechazo, setRechazo] = useState<string | null>(null);
   const [cierre, setCierre] = useState<Partial<DatosPermiso>>({ cierreAreaLimpia: "", cierraNombre: u.nombre, firmaCierre: "" });
@@ -45,30 +47,36 @@ function Detalle() {
     );
   }
 
-  const f = FORMATOS[doc.tipo];
+  const info = infoDoc(doc.tipo);
+  // Equipos atendidos (módulo Equipos): salen en el formato y enlazan a su ficha
+  const atendidos = equiposAtendidos(equiposIdsDe(doc), demo.equiposVisibles);
+  const { flujo, Plantilla } = info;
+  const f = info.formato;
   const editable = puedeEditarDoc(u, doc);
   const pend = faltantes(doc);
   // Nadie aprueba ni rechaza su propio documento (separación de funciones)
   const revisa = puedeRevisarDoc(u, doc);
-  const cierraPermiso = doc.tipo === "permiso" && doc.estado === "aprobado" && puede(u.rol, "cerrar_permiso");
-  const firmaCliente = doc.tipo === "reporte" && doc.estado === "aprobado" && (u.rol === "cliente" || puede(u.rol, "revisar"));
+  // El cierre depende del formato: formulario (permiso), firma del cliente (reporte, cotización) o un revisor (gastos)
+  const cierraPermiso = flujo.cierre === "formulario" && doc.estado === "aprobado" && puede(u.rol, "cerrar_permiso");
+  const firmaCliente = flujo.cierre === "cliente" && Boolean(flujo.campoFirmaCliente) && doc.estado === "aprobado" && ((u.rol === "cliente" && doc.clienteId === u.clienteId) || puede(u.rol, "revisar"));
+  const cierraRevisor = flujo.cierre === "revisor" && doc.estado === "aprobado" && puede(u.rol, "revisar");
+  const proyecto = demo.proyectos.find((p) => p.id === doc.proyectoId);
+  const datosLibres = doc.datos as unknown as Record<string, string | undefined>;
   const nombre = (uid: string) => demo.usuarios.find((x) => x.id === uid)?.nombre ?? "Sistema";
   const datosVista = doc.tipo === "permiso" && cierraPermiso ? { ...doc.datos, ...cierre } : doc.datos;
   const cliente = demo.clientes.find((c) => c.id === doc.clienteId);
-  const correoCliente = doc.tipo === "reporte" ? doc.datos.correo || cliente?.correo || "" : cliente?.correo || "";
-  const telCliente = doc.tipo === "reporte" ? doc.datos.telefono || cliente?.telefono || "" : cliente?.telefono || "";
+  const correoCliente = datosLibres.correo || cliente?.correo || "";
+  const telCliente = datosLibres.telefono || cliente?.telefono || "";
   const interno = u.rol !== "cliente";
   const pedirFirma = interno && doc.tipo === "reporte" && doc.estado === "aprobado" && !doc.datos.firmaCliente;
   const cuenta = doc.tipo === "reporte" ? demo.cuentaDeReporte(doc.id) : undefined;
   const puedeCobrar = doc.tipo === "reporte" && (doc.estado === "aprobado" || doc.estado === "cerrado") && !cuenta && puede(u.rol, "cobros");
   const empresa = demo.config.empresa;
-  const contacto = doc.tipo === "reporte" ? doc.datos.personaContactada : cliente?.contacto;
+  const contacto = datosLibres.personaContactada || cliente?.contacto;
 
   return (
     <div className="space-y-4">
-      <Link href="/app/documentos" className="print:hidden inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
-        <ArrowLeft className="h-4 w-4" /> Documentos
-      </Link>
+      <Volver href={origen.href} label={origen.label} />
 
       {ok && (
         <p className="print:hidden flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
@@ -83,15 +91,20 @@ function Detalle() {
             {f.codigo} · {f.corto}
           </p>
           <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold">
-            <span className="font-mono">{doc.codigo}</span> <EstadoBadge estado={doc.estado} />
+            <span className="font-mono">{doc.codigo}</span> <EstadoBadge estado={doc.estado} tipo={doc.tipo} />
           </h1>
           <p className="text-sm text-slate-500">
             {clienteDoc(doc)} · por {nombre(doc.autorId)}
           </p>
+          {proyecto && (
+            <Link href={rutaProyecto(proyecto.id)} className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-sotec-greenDeep hover:underline">
+              <FolderKanban className="h-3.5 w-3.5" aria-hidden /> Proyecto <span className="font-mono">{proyecto.codigo}</span> · {proyecto.nombre}
+            </Link>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           {editable && (
-            <Button variant="outline" onClick={() => router.push(`/app/nuevo/${doc.tipo}?id=${doc.id}`)}>
+            <Button variant="outline" onClick={() => router.push(rutaNuevo(doc.tipo, conOrigen(`id=${doc.id}`)))}>
               <PenLine className="h-4 w-4" /> Editar
             </Button>
           )}
@@ -102,8 +115,8 @@ function Detalle() {
           )}
           {revisa && (
             <>
-              <Button onClick={() => (doc.tipo === "reporte" ? demo.aprobar(doc.id) : setFirma("aprobar"))}>
-                <Check className="h-4 w-4" /> {doc.tipo === "gasto" ? "Dar Vo.Bo. y firmar" : doc.tipo === "permiso" ? "Aprobar y firmar" : "Aprobar"}
+              <Button onClick={() => (flujo.firmaAlAprobar ? setFirma("aprobar") : demo.aprobar(doc.id))}>
+                <Check className="h-4 w-4" /> {flujo.aprobar}
               </Button>
               <Button variant="outline" className="border-rose-200 text-rose-700 hover:bg-rose-50" onClick={() => setRechazo("")}>
                 <X className="h-4 w-4" /> Rechazar
@@ -112,7 +125,7 @@ function Detalle() {
           )}
           {firmaCliente && (
             <Button onClick={() => setFirma("cliente")}>
-              <PenLine className="h-4 w-4" /> Firmar como cliente
+              <PenLine className="h-4 w-4" /> {flujo.cerrar}
             </Button>
           )}
           {puede(u.rol, "crear") && (
@@ -120,15 +133,15 @@ function Detalle() {
               variant="outline"
               onClick={() => {
                 const nid = demo.duplicar(doc.id);
-                if (nid) router.push(`/app/nuevo/${doc.tipo}?id=${nid}`);
+                if (nid) router.push(rutaNuevo(doc.tipo, conOrigen(`id=${nid}`)));
               }}
             >
               <Copy className="h-4 w-4" /> Duplicar
             </Button>
           )}
-          {doc.tipo === "gasto" && doc.estado === "aprobado" && puede(u.rol, "revisar") && (
+          {cierraRevisor && (
             <Button onClick={() => demo.cerrar(doc.id, {})}>
-              <CheckCircle2 className="h-4 w-4" /> Marcar como reembolsado
+              <CheckCircle2 className="h-4 w-4" /> {flujo.cerrar}
             </Button>
           )}
           {pedirFirma && (
@@ -142,7 +155,7 @@ function Detalle() {
               <Link2 className="h-4 w-4" /> Pedir firma al cliente
             </Button>
           )}
-          {interno && doc.tipo !== "gasto" && doc.estado !== "borrador" && (
+          {interno && info.visibleCliente && doc.estado !== "borrador" && (
             <Button variant="outline" onClick={() => setEnvio({})}>
               <Send className="h-4 w-4" /> Enviar
             </Button>
@@ -162,7 +175,8 @@ function Detalle() {
               onClick={() => {
                 if (confirm(`¿Eliminar el borrador ${doc.codigo}?`)) {
                   demo.eliminar(doc.id);
-                  router.push("/app/documentos");
+                  // El documento borrado no queda en el historial del navegador
+                  router.replace(origen.href);
                 }
               }}
             >
@@ -209,21 +223,35 @@ function Detalle() {
         </div>
       )}
 
+      {atendidos.length > 0 && (
+        <section aria-label="Equipos atendidos" className="print:hidden rounded-lg border border-slate-200 bg-white p-3">
+          <h2 className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+            <Cctv className="h-3.5 w-3.5" aria-hidden /> Equipos atendidos · {atendidos.length}
+          </h2>
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {atendidos.map((e) => (
+              <li key={e.id} className="min-w-0 max-w-full">
+                <Link href={rutaEquipo(e.id)} className="flex min-w-0 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:border-sotec-greenDeep">
+                  <IconoEquipo tipo={e.tipo} sistema={e.sistema} className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{e.nombre}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="grid gap-4 xl:grid-cols-[1fr_280px]">
         <div className="overflow-x-auto rounded-lg bg-slate-100 p-2 sm:p-4">
-          {doc.tipo === "reporte" ? (
-            <PlantillaReporte datos={doc.datos} codigoDoc={doc.codigo} />
-          ) : doc.tipo === "gasto" ? (
-            <PlantillaGasto datos={doc.datos} codigoDoc={doc.codigo} />
-          ) : (
-            <PlantillaPermiso
-              datos={datosVista as DatosPermiso}
-              codigoDoc={doc.codigo}
-              editarCierre={cierraPermiso ? (p) => setCierre((c) => ({ ...c, ...p })) : undefined}
-              firmar={cierraPermiso ? () => setFirma("cierre") : undefined}
-              resaltar={cierraPermiso ? "cierre" : undefined}
-            />
-          )}
+          <Plantilla
+            datos={datosVista}
+            codigoDoc={doc.codigo}
+            empresa={empresaDe(demo.config)}
+            equipos={atendidos}
+            editarCierre={cierraPermiso ? (p) => setCierre((c) => ({ ...c, ...(p as Partial<DatosPermiso>) })) : undefined}
+            firmar={cierraPermiso ? () => setFirma("cierre") : undefined}
+            resaltar={cierraPermiso ? "cierre" : undefined}
+          />
         </div>
         <aside className={u.rol === "cliente" ? "hidden" : "print:hidden h-fit rounded-xl border border-slate-200 bg-white p-4"}>
           <h2 className="text-sm font-semibold">Trazabilidad</h2>
@@ -248,7 +276,8 @@ function Detalle() {
           onCerrar={() => setFirma(null)}
           onGuardar={(url) => {
             if (firma === "aprobar") demo.aprobar(doc.id, url);
-            if (firma === "cliente") demo.cerrar(doc.id, { firmaCliente: url });
+            // El módulo decide qué más se llena con la firma (p. ej. la fecha de aceptación de la cotización)
+            if (firma === "cliente" && flujo.campoFirmaCliente) demo.cerrar(doc.id, info.aplicarFirma(flujo.campoFirmaCliente, url, doc.datos) as Partial<typeof doc.datos>);
             if (firma === "cierre") setCierre((c) => ({ ...c, firmaCierre: url }));
             setFirma(null);
           }}

@@ -3,7 +3,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 import { SIGUIENTES, type CuentaCobro, type EstadoCuentaCobro } from "@/modulos/cobros/tipos";
-import { puede, puedeVerCuenta, puedeVerDoc } from "@/nucleo/permisos";
+import { puedeVerEquipo } from "@/modulos/equipos/logica";
+import * as reglasEquipos from "@/modulos/equipos/reglas";
+import type { ApiEquipos, Equipo } from "@/modulos/equipos/tipos";
+import { infoDoc, prefijoDe } from "@/modulos/registro";
+import { puede, puedeVerCuenta, puedeVerDoc, puedeVerProyecto } from "@/nucleo/permisos";
 import {
   CLIENTES_SEED,
   CONFIG_SEED,
@@ -11,12 +15,14 @@ import {
   auditoriaSeed,
   cuentasSeed,
   documentosSeed,
+  equiposSeed,
   notificacionesSeed,
+  proyectosSeed,
 } from "@/nucleo/datos/seed";
-import type { Auditoria, Cliente, Config, Documento, EnlaceFirma, Notificacion, Rol, TipoDoc, Usuario } from "@/nucleo/tipos";
+import type { Auditoria, Cliente, Config, Documento, EnlaceFirma, EstadoProyecto, Notificacion, Proyecto, Rol, TipoDoc, Usuario } from "@/nucleo/tipos";
 
 // Subir la versión al cambiar la semilla: los navegadores cargan los datos nuevos
-const KEY = "sotec-demo-v5";
+const KEY = "sotec-demo-v7";
 
 interface Estado {
   usuarioId: string | null;
@@ -27,6 +33,9 @@ interface Estado {
   auditoria: Auditoria[];
   config: Config;
   cuentas: CuentaCobro[];
+  proyectos: Proyecto[];
+  /** Inventario de equipos por cliente (módulo Equipos). */
+  equipos: Equipo[];
   enlaces: EnlaceFirma[];
   /** Último consecutivo usado por formato y año («reporte-2026»). Solo avanza: no se reutilizan números. */
   consecutivos: Record<string, number>;
@@ -35,8 +44,9 @@ interface Estado {
 const anioDe = (iso: string) => iso.slice(0, 4);
 
 /** Reconstruye los contadores a partir de los documentos y cuentas existentes. */
-function contadoresDe(docs: Documento[], cuentas: CuentaCobro[]): Record<string, number> {
+function contadoresDe(docs: Documento[], cuentas: CuentaCobro[], proyectos: Proyecto[] = []): Record<string, number> {
   const c: Record<string, number> = {};
+  for (const p of proyectos) c[`proyecto-${anioDe(p.creado)}`] = Math.max(c[`proyecto-${anioDe(p.creado)}`] ?? 0, p.consecutivo);
   for (const d of docs) c[`${d.tipo}-${anioDe(d.creado)}`] = Math.max(c[`${d.tipo}-${anioDe(d.creado)}`] ?? 0, d.consecutivo);
   for (const x of cuentas) c[`cobro-${anioDe(x.creado)}`] = Math.max(c[`cobro-${anioDe(x.creado)}`] ?? 0, x.consecutivo);
   return c;
@@ -45,6 +55,7 @@ function contadoresDe(docs: Documento[], cuentas: CuentaCobro[]): Record<string,
 function inicial(): Estado {
   const documentos = documentosSeed();
   const cuentas = cuentasSeed();
+  const proyectos = proyectosSeed();
   return {
     usuarioId: null,
     usuarios: USUARIOS_SEED,
@@ -54,8 +65,10 @@ function inicial(): Estado {
     auditoria: auditoriaSeed(),
     config: CONFIG_SEED,
     cuentas,
+    proyectos,
+    equipos: equiposSeed(),
     enlaces: [],
-    consecutivos: contadoresDe(documentos, cuentas),
+    consecutivos: contadoresDe(documentos, cuentas, proyectos),
   };
 }
 
@@ -72,7 +85,7 @@ function uid(p: string) {
   return `${p}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-interface Api extends Estado {
+interface Api extends Estado, ApiEquipos {
   listo: boolean;
   usuario: Usuario | null;
   visibles: Documento[];
@@ -92,6 +105,12 @@ interface Api extends Estado {
   marcarLeidas: () => void;
   actualizarUsuario: (u: Usuario) => void;
   guardarCliente: (c: Cliente) => void;
+  /** Activa o desactiva un cliente (sale de los selectores; el historial se conserva). */
+  cambiarActivoCliente: (id: string, activo: boolean) => void;
+  /** Elimina un cliente sin documentos, proyectos ni cuentas. Devuelve el motivo si no se puede. */
+  eliminarCliente: (id: string) => string | null;
+  /** Clientes que se pueden elegir en los formularios (activos). */
+  clientesActivos: Cliente[];
   actualizarConfig: (c: Config) => void;
   reiniciar: () => void;
   // Firma remota y envíos
@@ -108,6 +127,14 @@ interface Api extends Estado {
   /** Cuenta de cobro (no anulada) que ya incluye un reporte, si existe. */
   cuentaDeReporte: (docId: string) => CuentaCobro | undefined;
   errorGuardado: string | null;
+  // Proyectos
+  proyectosVisibles: Proyecto[];
+  nuevoCodigoProyecto: () => { id: string; codigo: string; consecutivo: number };
+  /** Crea o actualiza un proyecto (admin y SST). Devuelve un mensaje de error o null. */
+  guardarProyecto: (p: Proyecto) => string | null;
+  cambiarEstadoProyecto: (id: string, estado: EstadoProyecto) => void;
+  /** Elimina un proyecto sin documentos ni cuentas. Devuelve el motivo si no se puede. */
+  eliminarProyecto: (id: string) => string | null;
 }
 
 const Ctx = createContext<Api | null>(null);
@@ -124,7 +151,8 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       const base = inicial();
       const docs = guardado.documentos ?? base.documentos;
       const cuentas = guardado.cuentas ?? base.cuentas;
-      setS({ ...base, ...guardado, config: { ...base.config, ...guardado.config }, consecutivos: guardado.consecutivos ?? contadoresDe(docs, cuentas) });
+      const proyectos = guardado.proyectos ?? base.proyectos;
+      setS({ ...base, ...guardado, proyectos, config: { ...base.config, ...guardado.config }, consecutivos: guardado.consecutivos ?? contadoresDe(docs, cuentas, proyectos) });
     };
     try {
       cargar(localStorage.getItem(KEY));
@@ -207,7 +235,29 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       prev.usuarios
         .filter((x) => x.rol === "cliente" && x.activo && x.clienteId === clienteId)
         .map((x) => ({ id: uid("n"), para: x.id, texto, docId, fecha: ahora(), leida: false }));
-    const prefijo = (prev: Estado, tipo: TipoDoc) => ({ reporte: prev.config.prefijoReporte, permiso: prev.config.prefijoPermiso, gasto: prev.config.prefijoGasto })[tipo];
+    const prefijo = (prev: Estado, tipo: TipoDoc) => prefijoDe(prev.config, tipo);
+    const gestionaProyectos = (prev: Estado) => {
+      const r = rolDe(prev);
+      return Boolean(r && puede(r, "proyectos"));
+    };
+    /** Solo equipos del cliente del documento (al cambiar de cliente se quitan los del anterior). */
+    const equiposDelCliente = (prev: Estado, doc: Documento): string[] | undefined => {
+      const ids = (doc.equiposIds ?? []).filter((id, k, a) => a.indexOf(id) === k && prev.equipos.some((e) => e.id === id && e.clienteId === doc.clienteId));
+      return ids.length ? ids : undefined;
+    };
+    const ctxEquipos = (prev: Estado) => ({ usuario: prev.usuarios.find((x) => x.id === prev.usuarioId), clientes: prev.clientes, ahora: ahora() });
+    /** Aplica una regla del inventario sobre el estado actual (respuesta inmediata) y la revalida con el más reciente. */
+    const conEquipos = (regla: (prev: Estado) => reglasEquipos.Cambio): reglasEquipos.Cambio => {
+      const r = regla(s);
+      if (r.auditoria) {
+        setS((prev) => {
+          const r2 = regla(prev);
+          if (!r2.auditoria) return prev; // doble clic u otra pestaña: ya estaba hecho
+          return { ...prev, equipos: r2.equipos, auditoria: registrar(prev, r2.auditoria[0], r2.auditoria[1]) };
+        });
+      }
+      return r;
+    };
     const codigo = (pref: string, n: number, anio: string) => `${pref}-${String(n).padStart(3, "0")}-${anio.slice(2)}`;
 
     return {
@@ -254,7 +304,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
             // Solo el autor edita, y solo en borrador o rechazado; se conserva lo que no es contenido
             const editable = existente.autorId === prev.usuarioId && (existente.estado === "borrador" || existente.estado === "rechazado");
             if (!editable) return prev;
-            const merged = { ...existente, datos: doc.datos, clienteId: doc.clienteId, actualizado: ahora() } as Documento;
+            const merged = { ...existente, datos: doc.datos, clienteId: doc.clienteId, proyectoId: doc.proyectoId || undefined, equiposIds: equiposDelCliente(prev, doc), actualizado: ahora() } as Documento;
             return { ...prev, documentos: prev.documentos.map((d) => (d.id === doc.id ? merged : d)) };
           }
           // Documento nuevo: toma el consecutivo definitivo del año (no se reutiliza aunque se elimine)
@@ -263,6 +313,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
           const n = (prev.consecutivos[clave] ?? 0) + 1;
           const nuevo = {
             ...actualizado,
+            equiposIds: equiposDelCliente(prev, doc),
             consecutivo: n,
             codigo: codigo(prefijo(prev, doc.tipo), n, anio),
             autorId: prev.usuarioId ?? doc.autorId,
@@ -300,14 +351,14 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
           // Solo un revisor, solo en revisión y nunca sobre un documento propio
           if (d.estado !== "en_revision" || !esRevisor(prev) || d.autorId === prev.usuarioId) return null;
           const u = prev.usuarios.find((x) => x.id === prev.usuarioId);
-          const datos =
-            d.tipo === "permiso"
-              ? { ...d.datos, autoriza: d.datos.autoriza || u?.nombre || "", firmaAutoriza: firmaAutoriza || d.datos.firmaAutoriza }
-              : d.tipo === "gasto"
-                ? { ...d.datos, voboNombre: u?.nombre || "", firmaVobo: firmaAutoriza || d.datos.firmaVobo }
-                : d.datos;
+          const info = infoDoc(d.tipo);
+          // Cada formato escribe en su casilla quién autoriza (permiso) o da el Vo.Bo. (gastos)
+          const datos = u && info.flujo.alAprobar ? { ...d.datos, ...info.flujo.alAprobar(d.datos as never, u, firmaAutoriza) } : d.datos;
           let notifs = notificar(prev, d.autorId, `${d.codigo} fue aprobado por ${nombre(prev.usuarioId)}`, d.id);
-          if (d.tipo === "reporte") notifs = [...aClientes(prev, d.clienteId, `${prev.config.empresa} compartió el reporte ${d.codigo} para tu firma`, d.id), ...notifs];
+          // Lo que cierra el cliente con su firma (reporte, cotización) le llega a su portal
+          if (info.visibleCliente && info.flujo.cierre === "cliente") {
+            notifs = [...aClientes(prev, d.clienteId, `${prev.config.empresa} compartió ${info.formato.el} ${info.formato.corto.toLowerCase()} ${d.codigo} para tu firma`, d.id), ...notifs];
+          }
           return {
             doc: { ...d, datos, estado: "aprobado", historial: [...d.historial, evento(prev, "Aprobó")] } as Documento,
             notificaciones: notifs,
@@ -331,13 +382,19 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         transicion(id, (d, prev) => {
           if (d.estado !== "aprobado") return null;
           const u = prev.usuarios.find((x) => x.id === prev.usuarioId);
-          // Reporte: lo cierra la firma del cliente (su portal) o un revisor; permiso y gastos: un revisor
-          const puedeCerrar = esRevisor(prev) || (d.tipo === "reporte" && u?.rol === "cliente" && u.clienteId === d.clienteId);
+          const { flujo } = infoDoc(d.tipo);
+          // Reporte y cotización: los cierra la firma del cliente (su portal, o en sitio ante un revisor);
+          // permiso, gastos: un revisor
+          const delCliente = flujo.cierre === "cliente";
+          const puedeCerrar = esRevisor(prev) || (delCliente && u?.rol === "cliente" && u.clienteId === d.clienteId);
           if (!puedeCerrar) return null;
+          const datos = { ...d.datos, ...cambios } as Record<string, unknown>;
+          // Nadie cierra sin la firma real del cliente (igual que el trigger documentos_flujo)
+          if (delCliente && flujo.campoFirmaCliente && !String(datos[flujo.campoFirmaCliente] ?? "").startsWith("data:image/")) return null;
           return {
-          doc: { ...d, datos: { ...d.datos, ...cambios }, estado: "cerrado", historial: [...d.historial, evento(prev, d.tipo === "permiso" ? "Cerró el permiso" : d.tipo === "gasto" ? "Marcó como reembolsado" : "Firmó como cliente")] } as Documento,
-          notificaciones: notificar(prev, d.autorId, `${d.codigo} quedó cerrado`, d.id),
-          auditoria: registrar(prev, d.tipo === "permiso" ? "Cerró permiso" : d.tipo === "gasto" ? "Reembolsó gastos" : "Firma cliente", d.codigo),
+            doc: { ...d, datos, estado: "cerrado", historial: [...d.historial, evento(prev, flujo.eventoCierre)] } as unknown as Documento,
+            notificaciones: notificar(prev, d.autorId, `${d.codigo} quedó cerrado`, d.id),
+            auditoria: registrar(prev, flujo.eventoCierre, d.codigo),
           };
         });
       },
@@ -346,11 +403,8 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         const d = s.documentos.find((x) => x.id === id);
         if (!d || !usuario) return null;
         const n = api.nuevoId(d.tipo);
-        const datos = d.tipo === "reporte"
-          ? { ...d.datos, fecha: hoy(), firmaTecnico: "", firmaCliente: "" }
-          : d.tipo === "permiso"
-            ? { ...d.datos, fechaEmision: hoy(), firmaAutoriza: "", firmaEncargado: "", firmaCierre: "", cierreAreaLimpia: "", cierraNombre: "", ejecutores: d.datos.ejecutores.map((e) => ({ ...e, firma: "" })) }
-            : { ...d.datos, fecha: hoy(), items: [], firmaColaborador: "", voboNombre: "", firmaVobo: "" };
+        // Cada módulo decide qué se limpia al duplicar (fechas y firmas)
+        const datos = infoDoc(d.tipo).duplicar(d.datos, hoy());
         const copia = { ...d, ...n, datos, estado: "borrador", autorId: usuario.id, creado: ahora(), actualizado: ahora(), motivoRechazo: undefined, historial: [] } as Documento;
         api.guardar(copia);
         return copia.id;
@@ -387,6 +441,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       },
 
       guardarCliente(c) {
+        if (!usuario || !puede(usuario.rol, "clientes")) return;
         setS((prev) => {
           const existe = prev.clientes.some((x) => x.id === c.id);
           return {
@@ -395,6 +450,31 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
             auditoria: registrar(prev, existe ? "Actualizó cliente" : "Creó cliente", c.nombre),
           };
         });
+      },
+
+      clientesActivos: s.clientes.filter((c) => c.activo !== false),
+
+      cambiarActivoCliente(id, activo) {
+        if (!usuario || !puede(usuario.rol, "clientes")) return;
+        setS((prev) => {
+          const c = prev.clientes.find((x) => x.id === id);
+          if (!c || (c.activo !== false) === activo) return prev;
+          return { ...prev, clientes: prev.clientes.map((x) => (x.id === id ? { ...x, activo } : x)), auditoria: registrar(prev, activo ? "Reactivó cliente" : "Desactivó cliente", c.nombre) };
+        });
+      },
+
+      eliminarCliente(id) {
+        if (!usuario || !puede(usuario.rol, "clientes")) return "Sin permiso para gestionar clientes.";
+        const usos = s.documentos.filter((d) => d.clienteId === id).length + s.proyectos.filter((p) => p.clienteId === id).length + s.cuentas.filter((c) => c.clienteId === id).length;
+        if (usos) return `Tiene ${usos} documento(s), proyecto(s) o cuenta(s) de cobro: desactívalo para conservar su historial.`;
+        if (s.usuarios.some((u) => u.clienteId === id)) return "Tiene usuarios del portal: desactívalo o reasigna esos usuarios.";
+        setS((prev) => {
+          const c = prev.clientes.find((x) => x.id === id);
+          // Se revalida con el estado más reciente (otra pestaña pudo agregarle documentos)
+          if (!c || prev.documentos.some((d) => d.clienteId === id) || prev.proyectos.some((p) => p.clienteId === id) || prev.cuentas.some((x) => x.clienteId === id)) return prev;
+          return { ...prev, clientes: prev.clientes.filter((x) => x.id !== id), auditoria: registrar(prev, "Eliminó cliente", c.nombre) };
+        });
+        return null;
       },
 
       actualizarConfig(c) {
@@ -524,6 +604,82 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       },
 
       errorGuardado,
+
+      proyectosVisibles: usuario ? s.proyectos.filter((p) => puedeVerProyecto(usuario, p, s.documentos)) : [],
+
+      // Vista previa; el código definitivo se asigna al guardar el proyecto por primera vez
+      nuevoCodigoProyecto() {
+        const anio = anioDe(hoy());
+        const consecutivo = (s.consecutivos[`proyecto-${anio}`] ?? 0) + 1;
+        return { id: uid("p"), consecutivo, codigo: codigo(s.config.prefijoProyecto || "PRY", consecutivo, anio) };
+      },
+
+      guardarProyecto(p) {
+        if (!usuario || !puede(usuario.rol, "proyectos")) return "Sin permiso para gestionar proyectos.";
+        if (!p.nombre.trim()) return "Escribe el nombre del proyecto.";
+        if (!s.clientes.some((c) => c.id === p.clienteId)) return "Elige el cliente del proyecto.";
+        if (p.fechaFin && p.fechaFin < p.fechaInicio) return "La fecha de fin no puede ser anterior a la de inicio.";
+        setS((prev) => {
+          if (!gestionaProyectos(prev)) return prev;
+          const existe = prev.proyectos.find((x) => x.id === p.id);
+          if (existe) {
+            // El código, el consecutivo y la trazabilidad no se editan
+            const act = { ...p, codigo: existe.codigo, consecutivo: existe.consecutivo, creado: existe.creado, historial: [...existe.historial, evento(prev, "Actualizó el proyecto")], actualizado: ahora() };
+            return { ...prev, proyectos: prev.proyectos.map((x) => (x.id === p.id ? act : x)), auditoria: registrar(prev, "Actualizó proyecto", `${existe.codigo} · ${p.nombre}`) };
+          }
+          const anio = anioDe(hoy());
+          const n = (prev.consecutivos[`proyecto-${anio}`] ?? 0) + 1;
+          const nuevo = { ...p, consecutivo: n, codigo: codigo(prev.config.prefijoProyecto || "PRY", n, anio), creado: ahora(), actualizado: ahora(), historial: [evento(prev, "Creó el proyecto")] };
+          return {
+            ...prev,
+            consecutivos: { ...prev.consecutivos, [`proyecto-${anio}`]: n },
+            proyectos: [nuevo, ...prev.proyectos],
+            auditoria: registrar(prev, "Creó proyecto", `${nuevo.codigo} · ${nuevo.nombre}`),
+          };
+        });
+        return null;
+      },
+
+      cambiarEstadoProyecto(id, estado) {
+        setS((prev) => {
+          const p = prev.proyectos.find((x) => x.id === id);
+          if (!p || p.estado === estado || !gestionaProyectos(prev)) return prev;
+          const accion = { activo: "Reactivó el proyecto", en_pausa: "Pausó el proyecto", cerrado: "Cerró el proyecto" }[estado];
+          const fechaFin = estado === "cerrado" ? p.fechaFin || hoy() : p.fechaFin;
+          return {
+            ...prev,
+            proyectos: prev.proyectos.map((x) => (x.id === id ? { ...x, estado, fechaFin, actualizado: ahora(), historial: [...x.historial, evento(prev, accion)] } : x)),
+            auditoria: registrar(prev, accion, p.codigo),
+          };
+        });
+      },
+
+      eliminarProyecto(id) {
+        if (!usuario || !puede(usuario.rol, "proyectos")) return "Sin permiso para gestionar proyectos.";
+        const usos = s.documentos.filter((d) => d.proyectoId === id).length + s.cuentas.filter((c) => c.proyectoId === id).length;
+        if (usos) return `El proyecto tiene ${usos} documento(s) o cuenta(s) de cobro y no se puede eliminar; ciérralo para conservar su historial.`;
+        setS((prev) => {
+          const p = prev.proyectos.find((x) => x.id === id);
+          if (!p || !gestionaProyectos(prev) || prev.documentos.some((d) => d.proyectoId === id) || prev.cuentas.some((c) => c.proyectoId === id)) return prev;
+          return { ...prev, proyectos: prev.proyectos.filter((x) => x.id !== id), auditoria: registrar(prev, "Eliminó proyecto", `${p.codigo} · ${p.nombre}`) };
+        });
+        return null;
+      },
+
+      // Equipos: crear (también desde el reporte), editar, cambiar estado o retirar, y borrar sin historial
+      equiposVisibles: usuario ? s.equipos.filter((e) => puedeVerEquipo(usuario, e)) : [],
+      crearEquipo(m) {
+        return conEquipos((prev) => reglasEquipos.crear(prev.equipos, m, ctxEquipos(prev)));
+      },
+      guardarEquipo(e) {
+        return conEquipos((prev) => reglasEquipos.guardar(prev.equipos, e, ctxEquipos(prev)));
+      },
+      cambiarEstadoEquipo(id, estado) {
+        return conEquipos((prev) => reglasEquipos.cambiarEstado(prev.equipos, id, estado, ctxEquipos(prev))).error;
+      },
+      eliminarEquipo(id) {
+        return conEquipos((prev) => reglasEquipos.eliminar(prev.equipos, id, prev.documentos, ctxEquipos(prev))).error;
+      },
 
       reiniciar() {
         setS((prev) => ({ ...inicial(), usuarioId: prev.usuarioId }));

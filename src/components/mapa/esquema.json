@@ -1,0 +1,2803 @@
+{
+  "$comentario": "Generado por scripts/generar-mapa-db.py a partir de supabase/migrations. No editar a mano.",
+  "migraciones": [
+    "0001_nucleo.sql",
+    "0002_operacion.sql",
+    "0003_finanzas.sql",
+    "0004_storage.sql",
+    "0005_auth_perfiles.sql",
+    "0006_endurecer_funciones.sql",
+    "0007_gastos_como_formato.sql",
+    "0008_separacion_funciones.sql",
+    "0009_proyectos.sql",
+    "0010_equipos.sql"
+  ],
+  "tablas": [
+    {
+      "nombre": "organizaciones",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "gen_random_uuid()"
+        },
+        {
+          "nombre": "slug",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": true,
+          "fk": null
+        },
+        {
+          "nombre": "nombre",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "nit",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "logo_url",
+          "tipo": "text",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "color_primario",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "'#1F1F1F'"
+        },
+        {
+          "nombre": "color_acento",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "'#92D050'"
+        },
+        {
+          "nombre": "config",
+          "tipo": "jsonb",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "'{}'::jsonb"
+        },
+        {
+          "nombre": "activa",
+          "tipo": "boolean",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "true"
+        },
+        {
+          "nombre": "created_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        },
+        {
+          "nombre": "updated_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        }
+      ],
+      "migracion": "0001_nucleo.sql",
+      "descripcion": "Organizaciones (empresas que usan la plataforma)",
+      "rls": true,
+      "externa": false
+    },
+    {
+      "nombre": "perfiles",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "auth.users",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "email",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": true,
+          "fk": null
+        },
+        {
+          "nombre": "nombre",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "cedula",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "telefono",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "firma",
+          "tipo": "text",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "created_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        },
+        {
+          "nombre": "updated_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        }
+      ],
+      "migracion": "0001_nucleo.sql",
+      "descripcion": "Perfiles (extiende auth.users; una persona puede estar en varias empresas)",
+      "rls": true,
+      "externa": false
+    },
+    {
+      "nombre": "clientes",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "gen_random_uuid()"
+        },
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "nombre",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "nit",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "direccion",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "contacto",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "cargo",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "correo",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "telefono",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "activo",
+          "tipo": "boolean",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "true"
+        },
+        {
+          "nombre": "created_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        },
+        {
+          "nombre": "updated_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        }
+      ],
+      "migracion": "0001_nucleo.sql",
+      "descripcion": "Clientes de cada organización (p. ej. Ladrillera Arcillas del Caribe para SOTEC)",
+      "rls": true,
+      "externa": false,
+      "unicos": [
+        [
+          "organizacion_id",
+          "nombre"
+        ]
+      ]
+    },
+    {
+      "nombre": "sitios",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "gen_random_uuid()"
+        },
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "cliente_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "clientes",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "nombre",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "direccion",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "created_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        }
+      ],
+      "migracion": "0001_nucleo.sql",
+      "descripcion": "",
+      "rls": true,
+      "externa": false
+    },
+    {
+      "nombre": "miembros",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "usuario_id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "auth.users",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "rol",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "cargo",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "cliente_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "clientes",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "activo",
+          "tipo": "boolean",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "true"
+        },
+        {
+          "nombre": "created_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        }
+      ],
+      "migracion": "0001_nucleo.sql",
+      "descripcion": "Miembros: quién pertenece a qué organización y con qué rol. Los usuarios con rol \"cliente\" quedan atados a un cliente concreto.",
+      "rls": true,
+      "externa": false
+    },
+    {
+      "nombre": "consecutivos",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "clave",
+          "tipo": "text",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "anio",
+          "tipo": "int",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "ultimo",
+          "tipo": "int",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "0"
+        }
+      ],
+      "migracion": "0001_nucleo.sql",
+      "descripcion": "Consecutivos por organización, formato y año: RT-001-26, PT-001-26…",
+      "rls": true,
+      "externa": false
+    },
+    {
+      "nombre": "auditoria",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "bigint",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "identity"
+        },
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "actor_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "auth.users",
+            "columna": "id",
+            "alBorrar": "set null"
+          }
+        },
+        {
+          "nombre": "accion",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "entidad",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "entidad_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "detalle",
+          "tipo": "jsonb",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "'{}'::jsonb"
+        },
+        {
+          "nombre": "created_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        }
+      ],
+      "migracion": "0001_nucleo.sql",
+      "descripcion": "Auditoría (solo inserción, vía función)",
+      "rls": true,
+      "externa": false
+    },
+    {
+      "nombre": "notificaciones",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "gen_random_uuid()"
+        },
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "usuario_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "auth.users",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "rol",
+          "tipo": "text",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "texto",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "documento_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "leida",
+          "tipo": "boolean",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "false"
+        },
+        {
+          "nombre": "created_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        }
+      ],
+      "migracion": "0001_nucleo.sql",
+      "descripcion": "Notificaciones in-app: a un usuario concreto o a todo un rol de la org",
+      "rls": true,
+      "externa": false
+    },
+    {
+      "nombre": "formatos",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "gen_random_uuid()"
+        },
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "clave",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "codigo",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "nombre",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "version",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "'01'"
+        },
+        {
+          "nombre": "fecha_version",
+          "tipo": "date",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "prefijo",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "activo",
+          "tipo": "boolean",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "true"
+        },
+        {
+          "nombre": "created_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        },
+        {
+          "nombre": "visible_cliente",
+          "tipo": "boolean",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "true"
+        }
+      ],
+      "migracion": "0002_operacion.sql",
+      "descripcion": "Formatos habilitados por organización (control documental)",
+      "rls": true,
+      "externa": false,
+      "unicos": [
+        [
+          "organizacion_id",
+          "clave"
+        ]
+      ]
+    },
+    {
+      "nombre": "ordenes_servicio",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "gen_random_uuid()"
+        },
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "codigo",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "cliente_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "clientes",
+            "columna": "id",
+            "alBorrar": null
+          }
+        },
+        {
+          "nombre": "sitio_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "sitios",
+            "columna": "id",
+            "alBorrar": null
+          }
+        },
+        {
+          "nombre": "titulo",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "descripcion",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "estado",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "'abierta'"
+        },
+        {
+          "nombre": "responsable_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "auth.users",
+            "columna": "id",
+            "alBorrar": null
+          }
+        },
+        {
+          "nombre": "fecha_programada",
+          "tipo": "date",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "creado_por",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "auth.users",
+            "columna": "id",
+            "alBorrar": null
+          },
+          "defecto": "auth.uid()"
+        },
+        {
+          "nombre": "created_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        },
+        {
+          "nombre": "updated_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        }
+      ],
+      "migracion": "0002_operacion.sql",
+      "descripcion": "Órdenes de servicio",
+      "rls": true,
+      "externa": false,
+      "unicos": [
+        [
+          "organizacion_id",
+          "codigo"
+        ]
+      ]
+    },
+    {
+      "nombre": "documentos",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "gen_random_uuid()"
+        },
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "formato_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "formatos",
+            "columna": "id",
+            "alBorrar": null
+          }
+        },
+        {
+          "nombre": "orden_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "ordenes_servicio",
+            "columna": "id",
+            "alBorrar": "set null"
+          }
+        },
+        {
+          "nombre": "cliente_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "clientes",
+            "columna": "id",
+            "alBorrar": null
+          }
+        },
+        {
+          "nombre": "codigo",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "consecutivo",
+          "tipo": "int",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "estado",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "'borrador'"
+        },
+        {
+          "nombre": "autor_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "auth.users",
+            "columna": "id",
+            "alBorrar": null
+          },
+          "defecto": "auth.uid()"
+        },
+        {
+          "nombre": "datos",
+          "tipo": "jsonb",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "'{}'::jsonb"
+        },
+        {
+          "nombre": "motivo_rechazo",
+          "tipo": "text",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "enviado_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "aprobado_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "aprobado_por",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "auth.users",
+            "columna": "id",
+            "alBorrar": null
+          }
+        },
+        {
+          "nombre": "cerrado_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "deleted_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "created_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        },
+        {
+          "nombre": "updated_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        },
+        {
+          "nombre": "proyecto_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "proyectos",
+            "columna": "id",
+            "alBorrar": "set null"
+          }
+        }
+      ],
+      "migracion": "0002_operacion.sql",
+      "descripcion": "Documentos (instancias de un formato: un reporte, un permiso…)",
+      "rls": true,
+      "externa": false,
+      "unicos": [
+        [
+          "organizacion_id",
+          "codigo"
+        ]
+      ]
+    },
+    {
+      "nombre": "documento_eventos",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "bigint",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "identity"
+        },
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "documento_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "documentos",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "actor_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "auth.users",
+            "columna": "id",
+            "alBorrar": "set null"
+          }
+        },
+        {
+          "nombre": "actor_nombre",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "accion",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "detalle",
+          "tipo": "text",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "created_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        }
+      ],
+      "migracion": "0002_operacion.sql",
+      "descripcion": "Historial visible en la pantalla del documento (trazabilidad)",
+      "rls": true,
+      "externa": false
+    },
+    {
+      "nombre": "firmas",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "gen_random_uuid()"
+        },
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "documento_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "documentos",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "campo",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "firmante_nombre",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "firmante_usuario_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "auth.users",
+            "columna": "id",
+            "alBorrar": "set null"
+          }
+        },
+        {
+          "nombre": "imagen",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "origen",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "firmado_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        }
+      ],
+      "migracion": "0002_operacion.sql",
+      "descripcion": "Firmas: en sitio (en el equipo del técnico), por portal o por enlace remoto",
+      "rls": true,
+      "externa": false,
+      "unicos": [
+        [
+          "documento_id",
+          "campo"
+        ]
+      ]
+    },
+    {
+      "nombre": "enlaces_firma",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "gen_random_uuid()"
+        },
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "documento_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "documentos",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "campo",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "'firmaCliente'"
+        },
+        {
+          "nombre": "token_hash",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": true,
+          "fk": null
+        },
+        {
+          "nombre": "correo_destino",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "expira_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now() + interval '7 days'"
+        },
+        {
+          "nombre": "usado_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "creado_por",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "auth.users",
+            "columna": "id",
+            "alBorrar": null
+          },
+          "defecto": "auth.uid()"
+        },
+        {
+          "nombre": "created_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        }
+      ],
+      "migracion": "0002_operacion.sql",
+      "descripcion": "Enlaces de firma remota: el cliente firma sin cuenta, desde el correo o WhatsApp. Se guarda solo el hash del token; caducan y se usan una vez.",
+      "rls": true,
+      "externa": false
+    },
+    {
+      "nombre": "archivos",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "gen_random_uuid()"
+        },
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "documento_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "documentos",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "orden_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "ordenes_servicio",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "tipo",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "ruta",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "descripcion",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "etiqueta",
+          "tipo": "text",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "posicion",
+          "tipo": "int",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "0"
+        },
+        {
+          "nombre": "creado_por",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "auth.users",
+            "columna": "id",
+            "alBorrar": null
+          },
+          "defecto": "auth.uid()"
+        },
+        {
+          "nombre": "created_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        }
+      ],
+      "migracion": "0002_operacion.sql",
+      "descripcion": "Archivos: fotos del registro fotográfico, soportes de gastos, PDFs. El binario vive en Storage; aquí la ruta y los metadatos.",
+      "rls": true,
+      "externa": false
+    },
+    {
+      "nombre": "cuentas_cobro",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "gen_random_uuid()"
+        },
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "orden_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "ordenes_servicio",
+            "columna": "id",
+            "alBorrar": "set null"
+          }
+        },
+        {
+          "nombre": "cliente_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "clientes",
+            "columna": "id",
+            "alBorrar": null
+          }
+        },
+        {
+          "nombre": "codigo",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "consecutivo",
+          "tipo": "int",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "fecha",
+          "tipo": "date",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "current_date"
+        },
+        {
+          "nombre": "concepto",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "subtotal",
+          "tipo": "numeric(14,2)",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "0"
+        },
+        {
+          "nombre": "iva",
+          "tipo": "numeric(14,2)",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "0"
+        },
+        {
+          "nombre": "total",
+          "tipo": "numeric(14,2)",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null,
+          "defecto": "generada"
+        },
+        {
+          "nombre": "valor_en_letras",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "datos",
+          "tipo": "jsonb",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "'{}'::jsonb"
+        },
+        {
+          "nombre": "estado",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "'borrador'"
+        },
+        {
+          "nombre": "creado_por",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "auth.users",
+            "columna": "id",
+            "alBorrar": null
+          },
+          "defecto": "auth.uid()"
+        },
+        {
+          "nombre": "emitida_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "pagada_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "created_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        },
+        {
+          "nombre": "updated_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        },
+        {
+          "nombre": "proyecto_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "proyectos",
+            "columna": "id",
+            "alBorrar": "set null"
+          }
+        }
+      ],
+      "migracion": "0003_finanzas.sql",
+      "descripcion": "Cuentas de cobro (la empresa le cobra a su cliente)",
+      "rls": true,
+      "externa": false,
+      "unicos": [
+        [
+          "organizacion_id",
+          "codigo"
+        ]
+      ]
+    },
+    {
+      "nombre": "cuenta_cobro_items",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "gen_random_uuid()"
+        },
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "cuenta_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "cuentas_cobro",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "documento_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "documentos",
+            "columna": "id",
+            "alBorrar": "set null"
+          }
+        },
+        {
+          "nombre": "descripcion",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "cantidad",
+          "tipo": "numeric(10,2)",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "1"
+        },
+        {
+          "nombre": "valor_unitario",
+          "tipo": "numeric(14,2)",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "total",
+          "tipo": "numeric(14,2)",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null,
+          "defecto": "generada"
+        },
+        {
+          "nombre": "posicion",
+          "tipo": "int",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "0"
+        }
+      ],
+      "migracion": "0003_finanzas.sql",
+      "descripcion": "Ítems: líneas de la cuenta; pueden referenciar el reporte técnico que respaldan",
+      "rls": true,
+      "externa": false
+    },
+    {
+      "nombre": "proyectos",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "gen_random_uuid()"
+        },
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "cliente_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "clientes",
+            "columna": "id",
+            "alBorrar": null
+          }
+        },
+        {
+          "nombre": "codigo",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "consecutivo",
+          "tipo": "int",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "nombre",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "sitio",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "descripcion",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "responsable_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "auth.users",
+            "columna": "id",
+            "alBorrar": "set null"
+          }
+        },
+        {
+          "nombre": "fecha_inicio",
+          "tipo": "date",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "current_date"
+        },
+        {
+          "nombre": "fecha_fin",
+          "tipo": "date",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "estado",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "'activo'"
+        },
+        {
+          "nombre": "presupuesto",
+          "tipo": "numeric(14,2)",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "creado_por",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "auth.users",
+            "columna": "id",
+            "alBorrar": null
+          },
+          "defecto": "auth.uid()"
+        },
+        {
+          "nombre": "created_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        },
+        {
+          "nombre": "updated_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        }
+      ],
+      "migracion": "0009_proyectos.sql",
+      "descripcion": "1. Proyectos",
+      "rls": true,
+      "externa": false,
+      "unicos": [
+        [
+          "organizacion_id",
+          "codigo"
+        ]
+      ]
+    },
+    {
+      "nombre": "equipos",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "gen_random_uuid()"
+        },
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "cliente_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "clientes",
+            "columna": "id",
+            "alBorrar": null
+          }
+        },
+        {
+          "nombre": "proyecto_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "proyectos",
+            "columna": "id",
+            "alBorrar": "set null"
+          }
+        },
+        {
+          "nombre": "sistema",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "tipo",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "nombre",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        },
+        {
+          "nombre": "marca",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "modelo",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "serial",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "ubicacion",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "estado",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "'operativo'"
+        },
+        {
+          "nombre": "notas",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "''"
+        },
+        {
+          "nombre": "creado_por",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "auth.users",
+            "columna": "id",
+            "alBorrar": null
+          },
+          "defecto": "auth.uid()"
+        },
+        {
+          "nombre": "created_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        },
+        {
+          "nombre": "updated_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        }
+      ],
+      "migracion": "0010_equipos.sql",
+      "descripcion": "1. Equipos",
+      "rls": true,
+      "externa": false
+    },
+    {
+      "nombre": "documento_equipos",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "documento_id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "documentos",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "equipo_id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "equipos",
+            "columna": "id",
+            "alBorrar": "restrict"
+          }
+        },
+        {
+          "nombre": "created_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        }
+      ],
+      "migracion": "0010_equipos.sql",
+      "descripcion": "2. Equipos atendidos en un documento",
+      "rls": true,
+      "externa": false
+    },
+    {
+      "nombre": "auth.users",
+      "esquema": "auth",
+      "columnas": [
+        {
+          "nombre": "id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": null
+        }
+      ],
+      "migracion": null,
+      "descripcion": "Tabla administrada por Supabase Auth",
+      "rls": false,
+      "externa": true
+    }
+  ],
+  "relaciones": [
+    {
+      "id": "perfiles.id->auth.users.id",
+      "desde": "perfiles",
+      "columna": "id",
+      "hacia": "auth.users",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "clientes.organizacion_id->organizaciones.id",
+      "desde": "clientes",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "sitios.organizacion_id->organizaciones.id",
+      "desde": "sitios",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "sitios.cliente_id->clientes.id",
+      "desde": "sitios",
+      "columna": "cliente_id",
+      "hacia": "clientes",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "miembros.organizacion_id->organizaciones.id",
+      "desde": "miembros",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "miembros.usuario_id->auth.users.id",
+      "desde": "miembros",
+      "columna": "usuario_id",
+      "hacia": "auth.users",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "miembros.cliente_id->clientes.id",
+      "desde": "miembros",
+      "columna": "cliente_id",
+      "hacia": "clientes",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": true
+    },
+    {
+      "id": "consecutivos.organizacion_id->organizaciones.id",
+      "desde": "consecutivos",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "auditoria.organizacion_id->organizaciones.id",
+      "desde": "auditoria",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "auditoria.actor_id->auth.users.id",
+      "desde": "auditoria",
+      "columna": "actor_id",
+      "hacia": "auth.users",
+      "columnaDestino": "id",
+      "alBorrar": "set null",
+      "nulo": true
+    },
+    {
+      "id": "notificaciones.organizacion_id->organizaciones.id",
+      "desde": "notificaciones",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "notificaciones.usuario_id->auth.users.id",
+      "desde": "notificaciones",
+      "columna": "usuario_id",
+      "hacia": "auth.users",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": true
+    },
+    {
+      "id": "formatos.organizacion_id->organizaciones.id",
+      "desde": "formatos",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "ordenes_servicio.organizacion_id->organizaciones.id",
+      "desde": "ordenes_servicio",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "ordenes_servicio.cliente_id->clientes.id",
+      "desde": "ordenes_servicio",
+      "columna": "cliente_id",
+      "hacia": "clientes",
+      "columnaDestino": "id",
+      "alBorrar": null,
+      "nulo": false
+    },
+    {
+      "id": "ordenes_servicio.sitio_id->sitios.id",
+      "desde": "ordenes_servicio",
+      "columna": "sitio_id",
+      "hacia": "sitios",
+      "columnaDestino": "id",
+      "alBorrar": null,
+      "nulo": true
+    },
+    {
+      "id": "ordenes_servicio.responsable_id->auth.users.id",
+      "desde": "ordenes_servicio",
+      "columna": "responsable_id",
+      "hacia": "auth.users",
+      "columnaDestino": "id",
+      "alBorrar": null,
+      "nulo": true
+    },
+    {
+      "id": "ordenes_servicio.creado_por->auth.users.id",
+      "desde": "ordenes_servicio",
+      "columna": "creado_por",
+      "hacia": "auth.users",
+      "columnaDestino": "id",
+      "alBorrar": null,
+      "nulo": false
+    },
+    {
+      "id": "documentos.organizacion_id->organizaciones.id",
+      "desde": "documentos",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "documentos.formato_id->formatos.id",
+      "desde": "documentos",
+      "columna": "formato_id",
+      "hacia": "formatos",
+      "columnaDestino": "id",
+      "alBorrar": null,
+      "nulo": false
+    },
+    {
+      "id": "documentos.orden_id->ordenes_servicio.id",
+      "desde": "documentos",
+      "columna": "orden_id",
+      "hacia": "ordenes_servicio",
+      "columnaDestino": "id",
+      "alBorrar": "set null",
+      "nulo": true
+    },
+    {
+      "id": "documentos.cliente_id->clientes.id",
+      "desde": "documentos",
+      "columna": "cliente_id",
+      "hacia": "clientes",
+      "columnaDestino": "id",
+      "alBorrar": null,
+      "nulo": true
+    },
+    {
+      "id": "documentos.autor_id->auth.users.id",
+      "desde": "documentos",
+      "columna": "autor_id",
+      "hacia": "auth.users",
+      "columnaDestino": "id",
+      "alBorrar": null,
+      "nulo": false
+    },
+    {
+      "id": "documentos.aprobado_por->auth.users.id",
+      "desde": "documentos",
+      "columna": "aprobado_por",
+      "hacia": "auth.users",
+      "columnaDestino": "id",
+      "alBorrar": null,
+      "nulo": true
+    },
+    {
+      "id": "documentos.proyecto_id->proyectos.id",
+      "desde": "documentos",
+      "columna": "proyecto_id",
+      "hacia": "proyectos",
+      "columnaDestino": "id",
+      "alBorrar": "set null",
+      "nulo": true
+    },
+    {
+      "id": "documento_eventos.organizacion_id->organizaciones.id",
+      "desde": "documento_eventos",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "documento_eventos.documento_id->documentos.id",
+      "desde": "documento_eventos",
+      "columna": "documento_id",
+      "hacia": "documentos",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "documento_eventos.actor_id->auth.users.id",
+      "desde": "documento_eventos",
+      "columna": "actor_id",
+      "hacia": "auth.users",
+      "columnaDestino": "id",
+      "alBorrar": "set null",
+      "nulo": true
+    },
+    {
+      "id": "firmas.organizacion_id->organizaciones.id",
+      "desde": "firmas",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "firmas.documento_id->documentos.id",
+      "desde": "firmas",
+      "columna": "documento_id",
+      "hacia": "documentos",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "firmas.firmante_usuario_id->auth.users.id",
+      "desde": "firmas",
+      "columna": "firmante_usuario_id",
+      "hacia": "auth.users",
+      "columnaDestino": "id",
+      "alBorrar": "set null",
+      "nulo": true
+    },
+    {
+      "id": "enlaces_firma.organizacion_id->organizaciones.id",
+      "desde": "enlaces_firma",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "enlaces_firma.documento_id->documentos.id",
+      "desde": "enlaces_firma",
+      "columna": "documento_id",
+      "hacia": "documentos",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "enlaces_firma.creado_por->auth.users.id",
+      "desde": "enlaces_firma",
+      "columna": "creado_por",
+      "hacia": "auth.users",
+      "columnaDestino": "id",
+      "alBorrar": null,
+      "nulo": false
+    },
+    {
+      "id": "archivos.organizacion_id->organizaciones.id",
+      "desde": "archivos",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "archivos.documento_id->documentos.id",
+      "desde": "archivos",
+      "columna": "documento_id",
+      "hacia": "documentos",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": true
+    },
+    {
+      "id": "archivos.orden_id->ordenes_servicio.id",
+      "desde": "archivos",
+      "columna": "orden_id",
+      "hacia": "ordenes_servicio",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": true
+    },
+    {
+      "id": "archivos.creado_por->auth.users.id",
+      "desde": "archivos",
+      "columna": "creado_por",
+      "hacia": "auth.users",
+      "columnaDestino": "id",
+      "alBorrar": null,
+      "nulo": false
+    },
+    {
+      "id": "cuentas_cobro.organizacion_id->organizaciones.id",
+      "desde": "cuentas_cobro",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "cuentas_cobro.orden_id->ordenes_servicio.id",
+      "desde": "cuentas_cobro",
+      "columna": "orden_id",
+      "hacia": "ordenes_servicio",
+      "columnaDestino": "id",
+      "alBorrar": "set null",
+      "nulo": true
+    },
+    {
+      "id": "cuentas_cobro.cliente_id->clientes.id",
+      "desde": "cuentas_cobro",
+      "columna": "cliente_id",
+      "hacia": "clientes",
+      "columnaDestino": "id",
+      "alBorrar": null,
+      "nulo": false
+    },
+    {
+      "id": "cuentas_cobro.creado_por->auth.users.id",
+      "desde": "cuentas_cobro",
+      "columna": "creado_por",
+      "hacia": "auth.users",
+      "columnaDestino": "id",
+      "alBorrar": null,
+      "nulo": false
+    },
+    {
+      "id": "cuentas_cobro.proyecto_id->proyectos.id",
+      "desde": "cuentas_cobro",
+      "columna": "proyecto_id",
+      "hacia": "proyectos",
+      "columnaDestino": "id",
+      "alBorrar": "set null",
+      "nulo": true
+    },
+    {
+      "id": "cuenta_cobro_items.organizacion_id->organizaciones.id",
+      "desde": "cuenta_cobro_items",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "cuenta_cobro_items.cuenta_id->cuentas_cobro.id",
+      "desde": "cuenta_cobro_items",
+      "columna": "cuenta_id",
+      "hacia": "cuentas_cobro",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "cuenta_cobro_items.documento_id->documentos.id",
+      "desde": "cuenta_cobro_items",
+      "columna": "documento_id",
+      "hacia": "documentos",
+      "columnaDestino": "id",
+      "alBorrar": "set null",
+      "nulo": true
+    },
+    {
+      "id": "proyectos.organizacion_id->organizaciones.id",
+      "desde": "proyectos",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "proyectos.cliente_id->clientes.id",
+      "desde": "proyectos",
+      "columna": "cliente_id",
+      "hacia": "clientes",
+      "columnaDestino": "id",
+      "alBorrar": null,
+      "nulo": false
+    },
+    {
+      "id": "proyectos.responsable_id->auth.users.id",
+      "desde": "proyectos",
+      "columna": "responsable_id",
+      "hacia": "auth.users",
+      "columnaDestino": "id",
+      "alBorrar": "set null",
+      "nulo": true
+    },
+    {
+      "id": "proyectos.creado_por->auth.users.id",
+      "desde": "proyectos",
+      "columna": "creado_por",
+      "hacia": "auth.users",
+      "columnaDestino": "id",
+      "alBorrar": null,
+      "nulo": false
+    },
+    {
+      "id": "equipos.organizacion_id->organizaciones.id",
+      "desde": "equipos",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "equipos.cliente_id->clientes.id",
+      "desde": "equipos",
+      "columna": "cliente_id",
+      "hacia": "clientes",
+      "columnaDestino": "id",
+      "alBorrar": null,
+      "nulo": false
+    },
+    {
+      "id": "equipos.proyecto_id->proyectos.id",
+      "desde": "equipos",
+      "columna": "proyecto_id",
+      "hacia": "proyectos",
+      "columnaDestino": "id",
+      "alBorrar": "set null",
+      "nulo": true
+    },
+    {
+      "id": "equipos.creado_por->auth.users.id",
+      "desde": "equipos",
+      "columna": "creado_por",
+      "hacia": "auth.users",
+      "columnaDestino": "id",
+      "alBorrar": null,
+      "nulo": false
+    },
+    {
+      "id": "documento_equipos.organizacion_id->organizaciones.id",
+      "desde": "documento_equipos",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "documento_equipos.documento_id->documentos.id",
+      "desde": "documento_equipos",
+      "columna": "documento_id",
+      "hacia": "documentos",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "documento_equipos.equipo_id->equipos.id",
+      "desde": "documento_equipos",
+      "columna": "equipo_id",
+      "hacia": "equipos",
+      "columnaDestino": "id",
+      "alBorrar": "restrict",
+      "nulo": false
+    }
+  ]
+}

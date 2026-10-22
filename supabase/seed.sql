@@ -15,11 +15,14 @@ from o, (values
   ('permiso',      'F-GSST-13',  'Permiso de trabajo',         '01', '2019-03-01', 'PT'),
   ('cuenta_cobro', 'CC-01',      'Cuenta de cobro',            '01', null,         'CC'),
   ('orden',        'OS-01',      'Orden de servicio',          '01', null,         'OS'),
-  ('gasto',        'FO-GSST-25', 'Formato de legalización y registro de gastos operativos', '01', '2020-03-01', 'LG')
+  ('gasto',        'FO-GSST-25', 'Formato de legalización y registro de gastos operativos', '01', '2020-03-01', 'LG'),
+  ('cotizacion',   'FO-COM-01',  'Cotización',                 '01', '2026-10-01', 'COT')
 ) as f(clave, codigo, nombre, version, fecha, prefijo)
 on conflict (organizacion_id, clave) do nothing;
 
+-- Internos: el cliente no los ve. La cotización sí (visible_cliente = true por defecto)
 update public.formatos set visible_cliente = false where clave = 'gasto';
+update public.formatos set visible_cliente = true where clave = 'cotizacion';
 
 with o as (select id from public.organizaciones where slug = 'sotec')
 insert into public.clientes (organizacion_id, nombre, direccion, contacto, cargo, correo, telefono)

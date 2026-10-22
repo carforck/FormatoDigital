@@ -74,7 +74,10 @@ export default function Cobros() {
                   <Link href={rutaCuenta(c.id)} className="font-mono font-semibold hover:underline">
                     {c.codigo}
                   </Link>
-                  <p className="truncate text-xs text-slate-500 md:max-w-xs">{c.concepto}</p>
+                  <p className="truncate text-xs text-slate-500 md:max-w-xs">
+                    {c.concepto}
+                    {c.proyectoId && <span className="ml-1 font-mono">· {demo.proyectos.find((p) => p.id === c.proyectoId)?.codigo}</span>}
+                  </p>
                 </td>
                 <td className="block px-4 md:table-cell">{cliente(c.clienteId)}</td>
                 <td className="inline-block px-4 text-slate-600 md:table-cell">{fechaCorta(c.fecha)}</td>

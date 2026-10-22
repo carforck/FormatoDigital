@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Ban, CheckCircle2, PenLine, Printer, Send, Stamp } from "lucide-react";
+import { Ban, CheckCircle2, PenLine, Printer, Send, Stamp } from "lucide-react";
 
 import { EnviarDocumento } from "@/components/EnviarDocumento";
+import { Volver, useOrigen } from "@/components/ui/volver";
 import { Button } from "@/components/ui/button";
 import { EstadoCuentaBadge } from "@/components/ui/estado-cuenta";
 import { PlantillaCuentaCobro } from "@/modulos/cobros/PlantillaCuentaCobro";
@@ -13,7 +14,7 @@ import { totales } from "@/modulos/cobros/tipos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { cop } from "@/nucleo/letras";
 import { puede, puedeVerCuenta } from "@/nucleo/permisos";
-import { rutaDoc } from "@/nucleo/rutas";
+import { rutaDoc, rutaProyecto } from "@/nucleo/rutas";
 
 function Ver() {
   const id = useSearchParams().get("id") ?? "";
@@ -21,6 +22,7 @@ function Ver() {
   const demo = useDemo();
   const u = demo.usuario!;
   const c = demo.cuentas.find((x) => x.id === id);
+  const origen = useOrigen({ href: "/app/cobros", label: "Cuentas de cobro" });
   const [enviar, setEnviar] = useState(false);
 
   if (!c || !puedeVerCuenta(u, c)) {
@@ -36,15 +38,14 @@ function Ver() {
 
   const gestiona = puede(u.rol, "cobros");
   const cliente = demo.clientes.find((x) => x.id === c.clienteId);
+  const proyecto = demo.proyectos.find((x) => x.id === c.proyectoId);
   const { total } = totales(c);
   const nombre = (uid: string) => demo.usuarios.find((x) => x.id === uid)?.nombre ?? "Sistema";
   const creador = demo.usuarios.find((x) => x.id === c.creadoPor)?.nombre;
 
   return (
     <div className="space-y-4">
-      <Link href="/app/cobros" className="print:hidden inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
-        <ArrowLeft className="h-4 w-4" /> Cuentas de cobro
-      </Link>
+      <Volver href={origen.href} label={origen.label} />
 
       <div className="print:hidden flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
@@ -55,11 +56,16 @@ function Ver() {
           <p className="text-sm text-slate-500">
             {cliente?.nombre} · <strong className="text-slate-700">{cop(total)}</strong>
           </p>
+          {proyecto && (
+            <Link href={rutaProyecto(proyecto.id)} className="mt-1 inline-block text-sm font-medium text-sotec-greenDeep hover:underline">
+              Proyecto <span className="font-mono">{proyecto.codigo}</span> · {proyecto.nombre}
+            </Link>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           {gestiona && c.estado === "borrador" && (
             <>
-              <Button variant="outline" onClick={() => router.push(`/app/cobros/nueva?id=${c.id}`)}>
+              <Button variant="outline" onClick={() => router.push(`/app/cobros/nueva?id=${c.id}${origen.query ? `&${origen.query}` : ""}`)}>
                 <PenLine className="h-4 w-4" /> Editar
               </Button>
               <Button onClick={() => demo.cambiarEstadoCuenta(c.id, "emitida")} disabled={c.items.length === 0 || c.items.some((i) => i.valorUnitario <= 0)}>
@@ -94,7 +100,7 @@ function Ver() {
 
       <div className="grid gap-4 xl:grid-cols-[1fr_280px]">
         <div className="min-w-0 overflow-x-auto rounded-lg bg-slate-100 p-2 sm:p-4">
-          <PlantillaCuentaCobro cuenta={c} cliente={cliente} config={demo.config} documentos={demo.documentos} firmante={creador} />
+          <PlantillaCuentaCobro cuenta={c} cliente={cliente} proyecto={proyecto} config={demo.config} documentos={demo.documentos} firmante={creador} />
         </div>
         <aside className="print:hidden h-fit space-y-4">
           {c.items.some((i) => i.documentoId) && u.rol !== "cliente" && (

@@ -1,6 +1,7 @@
 import type { ModuloDocumento } from "@/modulos/contrato";
 
 import { TIPOS_REPORTE, reporteVacio } from "./catalogo";
+import { PlantillaReporte } from "./PlantillaReporte";
 import type { DatosReporte } from "./tipos";
 import { faltantesReporte } from "./validar";
 
@@ -24,6 +25,21 @@ export const moduloReportes: ModuloDocumento<DatosReporte> = {
   totalComprobaciones: 10,
   titulo: (d) => d.asunto,
   faltantes: faltantesReporte,
+  formato: { codigo: "FO-GSST-22", nombre: "Formato de reporte técnico", version: "01", fecha: "01/03/2020", corto: "Reporte técnico", el: "el", nuevo: "Nuevo", plural: "reportes" },
+  prefijo: "RT",
+  // Equipos atendidos: se preguntan después del asunto y salen en «Datos generales»
+  equipos: { despuesDe: "asunto" },
+  Plantilla: PlantillaReporte,
+  clienteDe: (d) => d.cliente,
+  campoCliente: "cliente",
+  visibleCliente: true,
+  color: "var(--serie-a)",
+  flujo: { aprobar: "Aprobar", firmaAlAprobar: false, cierre: "cliente", campoFirmaCliente: "firmaCliente", cerrar: "Firmar como cliente", eventoCierre: "Firmó como cliente" },
+  duplicar: (d, hoy) => ({ ...d, fecha: hoy, firmaTecnico: "", firmaCliente: "" }),
+  alElegirProyecto: (p) => ({
+    cambio: { proyecto: `${p.codigo} · ${p.nombre}` },
+    mensaje: `El reporte queda en el proyecto ${p.codigo} · ${p.nombre}${p.sitio ? ` (${p.sitio})` : ""}.`,
+  }),
 
   alElegirCliente: (c) => ({
     cambio: { cliente: c.nombre, direccion: c.direccion, personaContactada: c.contacto, correo: c.correo, telefono: c.telefono, cargo: c.cargo },

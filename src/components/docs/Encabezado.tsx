@@ -1,11 +1,12 @@
 /* eslint-disable @next/next/no-img-element */
 import { asset } from "@/nucleo/rutas";
-import { FORMATOS } from "@/nucleo/catalogos";
+import { formatoDe } from "@/modulos/registro";
 import type { TipoDoc } from "@/nucleo/tipos";
 
 /** Encabezado del formato: logo, título y control documental (código, versión, fecha). */
 export function Encabezado({ tipo, codigoDoc }: { tipo: TipoDoc; codigoDoc?: string }) {
-  const f = FORMATOS[tipo];
+  // Se lee al dibujar (no al cargar el módulo): el registro importa las plantillas
+  const f = formatoDe(tipo);
   return (
     <table className="w-full border-collapse border border-black text-[11px]">
       <tbody>

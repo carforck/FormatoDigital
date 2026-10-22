@@ -1,7 +1,9 @@
+import { CATALOGO_SERVICIOS, cotizacionVacia } from "@/modulos/cotizaciones/catalogo";
 import { PLANTILLAS_ACTIVIDAD, permisoVacio } from "@/modulos/permisos/catalogo";
 import { reporteVacio } from "@/modulos/reportes/catalogo";
+import { EQUIPOS_DE_DOC } from "@/modulos/equipos/seed";
 import type { CuentaCobro } from "@/modulos/cobros/tipos";
-import type { Auditoria, Cliente, Config, Documento, Estado, Notificacion, Usuario } from "@/nucleo/tipos";
+import type { Auditoria, Cliente, Config, Documento, Estado, Notificacion, Proyecto, Usuario } from "@/nucleo/tipos";
 
 /** Firma ficticia dibujada como SVG para los documentos de ejemplo. */
 export function firmaDemo(seed: number): string {
@@ -20,10 +22,10 @@ export const USUARIOS_SEED: Usuario[] = [
 ];
 
 export const CLIENTES_SEED: Cliente[] = [
-  { id: "c-clay", nombre: "Ladrillera Arcillas del Caribe", direccion: "Zona Industrial, Cartagena", contacto: "Ing. Daniel Ortega", cargo: "Ing. sistemas", correo: "sistemas@arcillasdelcaribe.example", telefono: "3000000000", sitio: "Área de hornos" },
-  { id: "c-tango", nombre: "Constructora Horizonte Azul", direccion: "Bocagrande, Cartagena", contacto: "Arq. Laura Méndez", cargo: "Residente de obra", correo: "obra@horizonteazul.example", telefono: "3001112233", sitio: "Hotel Brisas del Mar" },
-  { id: "c-puerto", nombre: "Centro Logístico Bahía", direccion: "Mamonal Km 5, Cartagena", contacto: "Jorge Salcedo", cargo: "Jefe de seguridad", correo: "seguridad@logisticabahia.example", telefono: "3014445566", sitio: "Patio 2" },
-  { id: "c-conj", nombre: "Conjunto Residencial Los Robles", direccion: "Barrio Los Robles, Cartagena", contacto: "Patricia Ríos", cargo: "Administradora", correo: "admin@losrobles.example", telefono: "3157778899", sitio: "Portería principal" },
+  { id: "c-clay", nit: "900.100.200-1", nombre: "Ladrillera Arcillas del Caribe", direccion: "Zona Industrial, Cartagena", contacto: "Ing. Daniel Ortega", cargo: "Ing. sistemas", correo: "sistemas@arcillasdelcaribe.example", telefono: "3000000000", sitio: "Área de hornos" },
+  { id: "c-tango", nit: "900.300.400-2", nombre: "Constructora Horizonte Azul", direccion: "Bocagrande, Cartagena", contacto: "Arq. Laura Méndez", cargo: "Residente de obra", correo: "obra@horizonteazul.example", telefono: "3001112233", sitio: "Hotel Brisas del Mar" },
+  { id: "c-puerto", nit: "900.500.600-3", nombre: "Centro Logístico Bahía", direccion: "Mamonal Km 5, Cartagena", contacto: "Jorge Salcedo", cargo: "Jefe de seguridad", correo: "seguridad@logisticabahia.example", telefono: "3014445566", sitio: "Patio 2" },
+  { id: "c-conj", nit: "900.700.800-4", nombre: "Conjunto Residencial Los Robles", direccion: "Barrio Los Robles, Cartagena", contacto: "Patricia Ríos", cargo: "Administradora", correo: "admin@losrobles.example", telefono: "3157778899", sitio: "Portería principal" },
 ];
 
 export const CONFIG_SEED: Config = {
@@ -34,6 +36,8 @@ export const CONFIG_SEED: Config = {
   prefijoPermiso: "PT",
   prefijoCobro: "CC",
   prefijoGasto: "LG",
+  prefijos: { cotizacion: "COT" },
+  prefijoProyecto: "PRY",
   exigirFirmaCliente: true,
   vigenciaPermisoHoras: 12,
   ivaPorcentaje: 19,
@@ -41,6 +45,36 @@ export const CONFIG_SEED: Config = {
   tipoCuenta: "Ahorros",
   numeroCuenta: "000-000000-00",
   titularCuenta: "SOTEC",
+};
+
+/** Proyectos de ejemplo: SOTEC trabaja por proyecto y por cliente (todos ficticios). */
+export function proyectosSeed(): Proyecto[] {
+  const p = (n: number, x: Omit<Proyecto, "id" | "codigo" | "consecutivo" | "creado" | "actualizado" | "historial">): Proyecto => ({
+    id: `p-${n}`,
+    codigo: `PRY-${String(n).padStart(3, "0")}-26`,
+    consecutivo: n,
+    creado: `${x.fechaInicio}T08:00:00`,
+    actualizado: `${x.fechaFin ?? x.fechaInicio}T08:00:00`,
+    historial: [{ fecha: `${x.fechaInicio}T08:00:00`, usuarioId: "u-adm", accion: "Creó el proyecto" }, ...(x.estado !== "activo" ? [{ fecha: `${x.fechaFin ?? x.fechaInicio}T08:00:00`, usuarioId: "u-sup", accion: x.estado === "cerrado" ? "Cerró el proyecto" : "Pausó el proyecto" }] : [])],
+    ...x,
+  });
+  return [
+    p(1, { nombre: "CCTV hornos y patio de secado", clienteId: "c-clay", sitio: "Área de hornos", responsableId: "u-tec1", fechaInicio: "2026-05-20", estado: "activo", presupuesto: 18000000, descripcion: "Renovación del circuito cerrado de televisión en hornos, molienda y patio de secado: enlaces de fibra, NVR y monitoreo remoto." }),
+    p(2, { nombre: "Control de acceso torre B", clienteId: "c-tango", sitio: "Hotel Brisas del Mar · Torre B", responsableId: "u-tec2", fechaInicio: "2026-07-15", estado: "activo", presupuesto: 24500000, descripcion: "Control de acceso con lectoras y torniquetes para la torre B, cableado estructurado de la oficina de obra y trabajos en alturas." }),
+    p(3, { nombre: "Videovigilancia bodega y patio 2", clienteId: "c-puerto", sitio: "Patio 2", responsableId: "u-tec2", fechaInicio: "2026-06-01", fechaFin: "2026-07-15", estado: "cerrado", presupuesto: 9800000, descripcion: "Instalación de 8 cámaras IP con su cableado en la bodega y el patio de contenedores." }),
+    p(4, { nombre: "Seguridad perimetral portería", clienteId: "c-conj", sitio: "Portería principal", responsableId: "u-tec1", fechaInicio: "2026-07-01", estado: "en_pausa", presupuesto: 6200000, descripcion: "Cerca eléctrica, alarmas perimetrales y cámara PTZ de la portería. En pausa mientras la asamblea aprueba la segunda fase." }),
+    p(5, { nombre: "Detección de incendio bodegas", clienteId: "c-puerto", sitio: "Bodegas 1 y 2", responsableId: "u-sup", fechaInicio: "2026-09-01", estado: "activo", presupuesto: 15000000, descripcion: "Revisión y ampliación del sistema de detección de incendio de las bodegas, con trabajos eléctricos certificados." }),
+  ];
+}
+
+/** Proyecto de cada documento de ejemplo (coherente con el cliente y el asunto). */
+const PROYECTO_DE: Record<string, string> = {
+  "d-rt-clay": "p-1", "d-pt-clay": "p-1", "d-rt-3": "p-1", "d-rt-7": "p-1", "d-pt-3": "p-1", "d-lg-0": "p-1",
+  "d-rt-2": "p-2", "d-rt-6": "p-2", "d-pt-0": "p-2", "d-pt-2": "p-2", "d-lg-1": "p-2",
+  "d-rt-0": "p-3",
+  "d-rt-1": "p-4", "d-rt-5": "p-4", "d-rt-8": "p-4",
+  "d-rt-4": "p-5", "d-pt-1": "p-5",
+  "d-cot-0": "p-2", "d-cot-1": "p-1", "d-cot-2": "p-5",
 };
 
 /** Cuentas de cobro de ejemplo: SOTEC le cobra a sus clientes por servicios ya cerrados. */
@@ -51,6 +85,7 @@ export function cuentasSeed(): CuentaCobro[] {
       codigo: "CC-001-26",
       consecutivo: 1,
       clienteId: "c-puerto",
+      proyectoId: "p-3",
       fecha: "2026-06-20",
       concepto: "Instalación de cámaras IP en bodega",
       items: [
@@ -75,6 +110,7 @@ export function cuentasSeed(): CuentaCobro[] {
       codigo: "CC-002-26",
       consecutivo: 2,
       clienteId: "c-clay",
+      proyectoId: "p-1",
       fecha: "2026-08-12",
       concepto: "Configuración NVR y monitoreo remoto",
       items: [{ id: "i1", documentoId: "d-rt-3", descripcion: "Configuración NVR y monitoreo remoto", cantidad: 1, valorUnitario: 1200000 }],
@@ -345,7 +381,60 @@ export function documentosSeed(): Documento[] {
     });
   });
 
-  return docs;
+  // Cotizaciones: aceptada (firmada por el cliente), aprobada (en el portal para aceptar) y borrador
+  const servicio = (clave: string, cantidad: number, k: string) => {
+    const sv = CATALOGO_SERVICIOS.find((x) => x.clave === clave)!;
+    return { id: `cot-it-${k}`, descripcion: sv.descripcion, detalle: sv.detalle ?? "", cantidad, unidad: sv.unidad, precioUnitario: sv.precioReferencia, ivaPct: sv.ivaPct };
+  };
+  const cotizaciones: { id: string; cliente: Cliente; fecha: string; estado: Estado; asunto: string; items: ReturnType<typeof servicio>[] }[] = [
+    { id: "d-cot-0", cliente: tango, fecha: "2026-07-10", estado: "cerrado", asunto: "Control de acceso torre B · Hotel Brisas del Mar", items: [servicio("control-acceso", 6, "0a"), servicio("cableado", 240, "0b"), servicio("visita", 1, "0c")] },
+    { id: "d-cot-1", cliente: clay, fecha: "2026-10-15", estado: "aprobado", asunto: "Ampliación CCTV patio de secado", items: [servicio("inst-camara", 4, "1a"), servicio("cableado", 180, "1b"), servicio("config-nvr", 1, "1c")] },
+    { id: "d-cot-2", cliente: puerto, fecha: "2026-10-21", estado: "borrador", asunto: "Mantenimiento detección de incendio bodegas", items: [servicio("visita", 2, "2a")] },
+  ];
+  cotizaciones.forEach((c, i) => {
+    const n = i + 1;
+    const h = [{ fecha: `${c.fecha}T09:00:00`, usuarioId: sup.id, accion: "Creó el documento" }];
+    if (c.estado !== "borrador") h.push({ fecha: `${c.fecha}T10:00:00`, usuarioId: sup.id, accion: "Envió a revisión" }, { fecha: `${c.fecha}T15:00:00`, usuarioId: "u-adm", accion: "Aprobó" });
+    if (c.estado === "cerrado") h.push({ fecha: `${c.fecha}T18:00:00`, usuarioId: "", accion: "Cotización aceptada por el cliente" });
+    docs.push({
+      id: c.id,
+      tipo: "cotizacion",
+      codigo: codigo("COT", n, c.fecha),
+      consecutivo: n,
+      estado: c.estado,
+      autorId: sup.id,
+      clienteId: c.cliente.id,
+      creado: `${c.fecha}T09:00:00`,
+      actualizado: `${c.fecha}T15:00:00`,
+      historial: h,
+      datos: {
+        ...cotizacionVacia(c.fecha),
+        vendedor: sup.nombre,
+        cliente: c.cliente.nombre,
+        clienteNit: c.cliente.nit ?? "",
+        contacto: c.cliente.contacto,
+        correo: c.cliente.correo,
+        telefono: c.cliente.telefono,
+        direccion: c.cliente.direccion,
+        asunto: c.asunto,
+        items: c.items,
+        aceptaNombre: c.cliente.contacto,
+        aceptaCargo: c.cliente.cargo,
+        aceptaFecha: c.estado === "cerrado" ? c.fecha : "",
+        firmaCliente: c.estado === "cerrado" ? firmaDemo(120 + i) : "",
+      },
+    });
+  });
+
+  // Cada documento queda en su proyecto; el reporte lo muestra en «Proyecto»
+  const proyectos = proyectosSeed();
+  // y los reportes marcan sus equipos atendidos (módulo Equipos)
+  return docs.map((d0) => {
+    const d = (EQUIPOS_DE_DOC[d0.id] ? { ...d0, equiposIds: EQUIPOS_DE_DOC[d0.id] } : d0) as Documento;
+    const p = proyectos.find((x) => x.id === PROYECTO_DE[d.id]);
+    if (!p) return d;
+    return (d.tipo === "reporte" ? { ...d, proyectoId: p.id, datos: { ...d.datos, proyecto: `${p.codigo} · ${p.nombre}` } } : { ...d, proyectoId: p.id }) as Documento;
+  });
 }
 
 export function notificacionesSeed(): Notificacion[] {
@@ -353,6 +442,7 @@ export function notificacionesSeed(): Notificacion[] {
     { id: "n1", para: "supervisor", texto: "Andrés Camacho envió el permiso PT-005-26 a revisión", docId: "d-pt-3", fecha: "2026-10-20T07:45:00", leida: false },
     { id: "n2", para: "supervisor", texto: "Andrés Camacho envió el reporte RT-009-26 a revisión", docId: "d-rt-7", fecha: "2026-10-17T15:20:00", leida: false },
     { id: "n3", para: "u-tec1", texto: "Tu reporte RT-007-26 fue rechazado: falta detallar las recomendaciones", docId: "d-rt-5", fecha: "2026-09-25T11:00:00", leida: false },
+    { id: "n6", para: "u-cli", texto: "SOTEC compartió la cotización COT-002-26 para tu firma", docId: "d-cot-1", fecha: "2026-10-15T15:05:00", leida: false },
     { id: "n5", para: "u-cli", texto: "SOTEC aprobó el reporte RT-011-26 y está pendiente de tu firma", docId: "d-rt-9", fecha: "2026-10-20T11:05:00", leida: false },
     { id: "n4", para: "cliente", texto: "SOTEC compartió el reporte RT-001-26 para tu firma", docId: "d-rt-clay", fecha: "2026-05-26T12:00:00", leida: true },
   ];
@@ -366,3 +456,5 @@ export function auditoriaSeed(): Auditoria[] {
     { id: "a4", fecha: "2026-09-25T11:00:00", usuarioId: "u-sup", accion: "Rechazó", detalle: "RT-007-26" },
   ];
 }
+
+export { equiposSeed } from "@/modulos/equipos/seed";

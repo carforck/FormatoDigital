@@ -11,7 +11,7 @@ import { comprimirImagen } from "@/nucleo/imagenes";
 import type { Ejecutor, FotoReporte, ItemGasto } from "@/nucleo/tipos";
 import { TIPOS_GASTO } from "@/modulos/gastos/catalogo";
 
-export type TipoPaso = "texto" | "textarea" | "fecha" | "hora" | "email" | "tel" | "select" | "multi" | "firma" | "ejecutores" | "verificacion" | "fotos" | "gastos";
+export type TipoPaso = "texto" | "textarea" | "fecha" | "hora" | "email" | "tel" | "select" | "multi" | "firma" | "ejecutores" | "verificacion" | "fotos" | "gastos" | "componente";
 
 export interface Paso {
   id: string;
@@ -28,6 +28,8 @@ export interface Paso {
   /** Genera un borrador del texto (redacción asistida). */
   generar?: () => string;
   validar?: (v: string) => string | null;
+  /** Paso «componente»: control propio (p. ej. el selector de equipos) que llama a `avanzar` al terminar. */
+  render?: (avanzar: (v: ValorPaso, eco: string) => void) => React.ReactNode;
 }
 
 export type ValorPaso = string | string[] | Ejecutor[] | FotoReporte[] | ItemGasto[];
@@ -399,6 +401,8 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
                 </Button>
               </div>
             )}
+
+            {paso.tipo === "componente" && paso.render?.(avanzar)}
 
             {paso.tipo === "firma" && (
               <div className="flex gap-2">

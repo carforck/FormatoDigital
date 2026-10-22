@@ -1,13 +1,15 @@
 /* eslint-disable @next/next/no-img-element */
 import { cop, pesosEnLetras } from "@/nucleo/letras";
 import { asset } from "@/nucleo/rutas";
-import type { Cliente, Config, Documento } from "@/nucleo/tipos";
+import type { Cliente, Config, Documento, Proyecto } from "@/nucleo/tipos";
 
 import { totalItem, totales, type CuentaCobro } from "./tipos";
 
 interface Props {
   cuenta: CuentaCobro;
   cliente?: Cliente;
+  /** Proyecto u obra al que se carga la cuenta. */
+  proyecto?: Proyecto;
   config: Config;
   /** Documentos para mostrar el código del reporte que respalda cada línea. */
   documentos: Documento[];
@@ -21,7 +23,7 @@ function fechaLarga(iso: string) {
 }
 
 /** Cuenta de cobro de la empresa a su cliente (carta). */
-export function PlantillaCuentaCobro({ cuenta, cliente, config, documentos, firmante }: Props) {
+export function PlantillaCuentaCobro({ cuenta, cliente, proyecto, config, documentos, firmante }: Props) {
   const { subtotal, iva, total } = totales(cuenta);
   const codigoDe = (id?: string) => documentos.find((d) => d.id === id)?.codigo ?? "—";
 
@@ -43,6 +45,7 @@ export function PlantillaCuentaCobro({ cuenta, cliente, config, documentos, firm
         <div className="mt-4">
           <p>Señores:</p>
           <p className="font-bold uppercase">{cliente?.nombre ?? "—"}</p>
+          {cliente?.nit && <p>NIT {cliente.nit}</p>}
           {cliente?.direccion && <p>{cliente.direccion}</p>}
           {cliente?.contacto && (
             <p>
@@ -50,6 +53,7 @@ export function PlantillaCuentaCobro({ cuenta, cliente, config, documentos, firm
               {cliente.cargo ? ` · ${cliente.cargo}` : ""}
             </p>
           )}
+          {(cliente?.correo || cliente?.telefono) && <p className="[overflow-wrap:anywhere]">{[cliente.correo, cliente.telefono && `Tel. ${cliente.telefono}`].filter(Boolean).join(" · ")}</p>}
         </div>
 
         <div className="mt-6 text-center">
@@ -68,6 +72,12 @@ export function PlantillaCuentaCobro({ cuenta, cliente, config, documentos, firm
         <div className="mt-5">
           <p className="font-bold">POR CONCEPTO DE:</p>
           <p className="mt-0.5">{cuenta.concepto || "—"}</p>
+          {proyecto && (
+            <p className="mt-0.5">
+              <strong>Proyecto:</strong> {proyecto.codigo} · {proyecto.nombre}
+              {proyecto.sitio ? ` · ${proyecto.sitio}` : ""}
+            </p>
+          )}
         </div>
 
         <table className="mt-4 w-full border-collapse border border-black text-[11px]">

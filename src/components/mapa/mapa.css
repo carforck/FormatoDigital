@@ -1,0 +1,63 @@
+/* Mapa del sistema: lienzos de React Flow con la paleta del aplicativo (claro y oscuro). */
+.mapa-lienzo {
+  --m-fondo: #f7f9f5;
+  --m-punto: #d3dacf;
+  --m-linea: #64748b;
+  --m-rel: #3f7a12;
+  --m-firma: #b45309;
+  --m-label-bg: #ffffff;
+  --m-label-fg: #334155;
+  --m-mascara: rgb(31 31 31 / 0.08);
+  --m-nodo-mini: #cbd5e1;
+}
+.dark .mapa-lienzo {
+  --m-fondo: #0f1311;
+  --m-punto: #2b342d;
+  --m-linea: #8a9587;
+  --m-rel: #9bd66a;
+  --m-firma: #fcd34d;
+  --m-label-bg: #171c19;
+  --m-label-fg: #c2cabf;
+  --m-mascara: rgb(0 0 0 / 0.45);
+  --m-nodo-mini: #3a453c;
+}
+
+.mapa-lienzo .react-flow {
+  --xy-background-color: var(--m-fondo);
+  --xy-background-pattern-dots-color: var(--m-punto);
+  --xy-edge-label-background-color: var(--m-label-bg);
+  --xy-edge-label-color: var(--m-label-fg);
+  --xy-minimap-background-color: var(--m-label-bg);
+  --xy-minimap-mask-background-color: var(--m-mascara);
+  --xy-minimap-node-background-color: var(--m-nodo-mini);
+  --xy-controls-button-background-color: var(--m-label-bg);
+  --xy-controls-button-background-color-hover: var(--m-fondo);
+  --xy-controls-button-color: var(--m-label-fg);
+  --xy-controls-button-color-hover: var(--m-rel);
+  --xy-controls-button-border-color: transparent;
+  --xy-attribution-background-color: transparent;
+  --xy-handle-background-color: transparent;
+  --xy-handle-border-color: transparent;
+  font-family: inherit;
+}
+
+.mapa-lienzo .react-flow__controls,
+.mapa-lienzo .react-flow__minimap {
+  border: 1px solid rgb(148 163 184 / 0.35);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+}
+.mapa-lienzo .react-flow__controls-button svg { fill: currentColor; }
+.mapa-lienzo .react-flow__edge-textbg { fill: var(--m-label-bg); }
+.mapa-lienzo .react-flow__edge-text { fill: var(--m-label-fg); font-size: 11px; font-weight: 500; }
+.mapa-lienzo .react-flow__handle { width: 6px; height: 6px; min-width: 0; min-height: 0; border: 0; pointer-events: none; }
+.mapa-lienzo .react-flow__node:focus-visible { outline: 2px solid var(--m-rel); outline-offset: 3px; border-radius: 12px; }
+.mapa-lienzo .react-flow__edge.atenuada { opacity: 0.12; }
+.mapa-lienzo .react-flow__node.atenuado { opacity: 0.28; }
+.mapa-lienzo .react-flow__node,
+.mapa-lienzo .react-flow__edge { transition: opacity 0.15s ease; }
+
+@media (max-width: 640px) {
+  .mapa-lienzo .react-flow__minimap { display: none; }
+}

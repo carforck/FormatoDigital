@@ -1,6 +1,7 @@
 import type { ModuloDocumento } from "@/modulos/contrato";
 
 import { gastoVacio } from "./catalogo";
+import { PlantillaGasto } from "./PlantillaGasto";
 import { totalGastos, type DatosGasto, type ItemGasto } from "./tipos";
 import { faltantesGasto } from "./validar";
 
@@ -13,6 +14,28 @@ export const moduloGastos: ModuloDocumento<DatosGasto> = {
   totalComprobaciones: 8,
   titulo: (d) => `${d.centroCostos || "Gastos"} · ${cop(totalGastos(d))}`,
   faltantes: faltantesGasto,
+  formato: { codigo: "FO-GSST-25", nombre: "Formato de legalización y registro de gastos operativos", version: "01", fecha: "01/03/2020", corto: "Legalización de gastos", el: "la", nuevo: "Nueva", plural: "gastos" },
+  prefijo: "LG",
+  Plantilla: PlantillaGasto,
+  clienteDe: (d) => d.clienteObra,
+  campoCliente: "clienteObra",
+  // Interno: el cliente nunca lo ve, aunque el gasto se cargue a su obra
+  visibleCliente: false,
+  color: "var(--serie-c)",
+  flujo: {
+    aprobar: "Dar Vo.Bo. y firmar",
+    firmaAlAprobar: true,
+    alAprobar: (d, u, firma) => ({ voboNombre: u.nombre, firmaVobo: firma || d.firmaVobo }),
+    cierre: "revisor",
+    cerrar: "Marcar como reembolsado",
+    eventoCierre: "Marcó como reembolsado",
+  },
+  duplicar: (d, hoy) => ({ ...d, fecha: hoy, items: [], firmaColaborador: "", voboNombre: "", firmaVobo: "" }),
+  valor: totalGastos,
+  alElegirProyecto: (p, c) => ({
+    cambio: { clienteObra: c ? `${c.nombre} · ${p.nombre}` : p.nombre, centroCostos: `${p.codigo} · ${p.nombre}` },
+    mensaje: `Los gastos se cargan al proyecto ${p.codigo} · ${p.nombre} (centro de costos y obra).`,
+  }),
 
   alElegirCliente: (c) => ({
     cambio: { clienteObra: c.nombre, centroCostos: c.sitio ? `${c.nombre} · ${c.sitio}` : c.nombre },

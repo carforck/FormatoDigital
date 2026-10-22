@@ -112,8 +112,10 @@
   --serie-a: #6C8CE0;
   --serie-b: #58A72E;
   --serie-c: #9F7CE6;
+  --serie-d: #D9963A;
+  --serie-e: #3FB0AC;
 }
-:root { --serie-a: #4F6FD0; --serie-b: #4E9A2A; --serie-c: #9A6BD8; }
+:root { --serie-a: #4F6FD0; --serie-b: #4E9A2A; --serie-c: #9A6BD8; --serie-d: #B9741C; --serie-e: #1F8C88; }
 
 /* Superficies */
 .dark .bg-white { background-color: #171C19 !important; }

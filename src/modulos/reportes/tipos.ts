@@ -17,6 +17,8 @@ export interface DatosReporte {
   telefono: string;
   cargo: string;
   asunto: string;
+  /** Proyecto u obra (código y nombre) cuando el reporte pertenece a uno. */
+  proyecto?: string;
   descripcion: string;
   recomendaciones: string;
   nombreTecnico: string;

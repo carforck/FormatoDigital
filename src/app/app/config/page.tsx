@@ -6,8 +6,7 @@ import { RotateCcw, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/corporativo";
 import { Input } from "@/components/ui/input";
-import { MODULOS } from "@/modulos/registro";
-import { FORMATOS } from "@/nucleo/catalogos";
+import { MODULOS, TIPOS_DOC, formatoDe, prefijoDe } from "@/modulos/registro";
 import { CONFIG_SEED } from "@/nucleo/datos/seed";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 
@@ -30,15 +29,32 @@ export default function Config() {
           <span className="text-xs text-slate-500">NIT</span>
           <Input value={c.nit} onChange={(e) => setC({ ...c, nit: e.target.value })} />
         </label>
+        {/* Un prefijo por formato registrado (los módulos nuevos aparecen solos) */}
+        {TIPOS_DOC.map((t) => {
+          const valor = prefijoDe(c, t);
+          const cambiar = (v: string) => {
+            const p = v.toUpperCase();
+            if (t === "reporte") return setC({ ...c, prefijoReporte: p });
+            if (t === "permiso") return setC({ ...c, prefijoPermiso: p });
+            if (t === "gasto") return setC({ ...c, prefijoGasto: p });
+            setC({ ...c, prefijos: { ...c.prefijos, [t]: p } });
+          };
+          return (
+            <label key={t} className="text-sm">
+              <span className="text-xs text-slate-500">
+                Prefijo {formatoDe(t).corto.toLowerCase()} · {formatoDe(t).codigo}
+              </span>
+              <Input value={valor} maxLength={4} onChange={(e) => cambiar(e.target.value)} />
+              <span className="text-xs text-slate-500">
+                Próximo: {valor}-NNN-{yy}
+              </span>
+            </label>
+          );
+        })}
         <label className="text-sm">
-          <span className="text-xs text-slate-500">Prefijo {FORMATOS.reporte.codigo}</span>
-          <Input value={c.prefijoReporte} maxLength={4} onChange={(e) => setC({ ...c, prefijoReporte: e.target.value.toUpperCase() })} />
-          <span className="text-xs text-slate-500">Próximo: {c.prefijoReporte}-NNN-{yy}</span>
-        </label>
-        <label className="text-sm">
-          <span className="text-xs text-slate-500">Prefijo {FORMATOS.permiso.codigo}</span>
-          <Input value={c.prefijoPermiso} maxLength={4} onChange={(e) => setC({ ...c, prefijoPermiso: e.target.value.toUpperCase() })} />
-          <span className="text-xs text-slate-500">Próximo: {c.prefijoPermiso}-NNN-{yy}</span>
+          <span className="text-xs text-slate-500">Prefijo de proyecto</span>
+          <Input value={c.prefijoProyecto ?? "PRY"} maxLength={4} onChange={(e) => setC({ ...c, prefijoProyecto: e.target.value.toUpperCase() })} />
+          <span className="text-xs text-slate-500">Próximo: {c.prefijoProyecto ?? "PRY"}-NNN-{yy}</span>
         </label>
         <label className="text-sm">
           <span className="text-xs text-slate-500">Vigencia del permiso (horas)</span>
@@ -112,10 +128,10 @@ export default function Config() {
                     ? "rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 ring-1 ring-emerald-200"
                     : m.estado === "en_construccion"
                       ? "rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200"
-                      : "rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200"
+                      : "rounded-full border border-dashed border-slate-300 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600"
                 }
               >
-                {m.estado === "activo" ? "Activo" : m.estado === "en_construccion" ? "En construcción" : "Próximamente"}
+                {m.estado === "activo" ? "Activo" : m.estado === "en_construccion" ? "En construcción" : "Planeado"}
               </span>
             </li>
           ))}
@@ -125,7 +141,7 @@ export default function Config() {
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="font-semibold">Formatos digitalizados</h2>
         <ul className="mt-2 divide-y divide-slate-100 text-sm">
-          {Object.values(FORMATOS).map((f) => (
+          {TIPOS_DOC.map(formatoDe).map((f) => (
             <li key={f.codigo} className="flex justify-between py-2">
               <span>
                 <strong>{f.codigo}</strong> · {f.nombre}

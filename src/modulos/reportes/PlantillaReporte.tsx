@@ -8,6 +8,8 @@ import type { DatosReporte, FotoReporte } from "@/nucleo/tipos";
 
 import { EditableText } from "@/components/docs/EditableText";
 import { Encabezado, Firma } from "@/components/docs/Encabezado";
+import { EquiposEnFormato } from "@/modulos/equipos/EquiposEnFormato";
+import type { EquipoAtendido } from "@/modulos/equipos/tipos";
 
 interface Props {
   datos: DatosReporte;
@@ -18,18 +20,20 @@ interface Props {
   firmar?: (campo: "firmaTecnico" | "firmaCliente") => void;
   /** Campo que el asistente está preguntando; se resalta en la vista previa. */
   resaltar?: string;
+  /** Equipos atendidos (módulo Equipos), resueltos por quien muestra el formato. */
+  equipos?: EquipoAtendido[];
 }
 
 /** Réplica del FO-GSST-22 · Formato de reporte técnico (carta). */
 /** Campos de texto del formato (todo menos el registro fotográfico). */
 type CampoTexto = Exclude<keyof DatosReporte, "fotos">;
 
-export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar }: Props) {
+export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, equipos = [] }: Props) {
   const fotos = datos.fotos ?? [];
   const campo = (k: CampoTexto, opts: { multiline?: boolean; type?: "text" | "date" | "email" | "tel"; placeholder?: string } = {}) => (
     <span className={cn("rounded transition-colors", resaltar === k && "bg-sotec-green/40 ring-2 ring-sotec-green")}>
       <EditableText
-        value={datos[k]}
+        value={datos[k] ?? ""}
         disabled={!editar}
         multiline={opts.multiline}
         type={opts.type}
@@ -74,8 +78,16 @@ export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar }:
           {linea("Dirección", "direccion")}
           {linea("Cargo", "cargo")}
           {linea("Persona contactada", "personaContactada")}
+          {datos.proyecto && linea("Proyecto", "proyecto")}
         </div>
-        <div className="px-3 pb-3">{linea("Asunto", "asunto")}</div>
+        <div className="space-y-1.5 px-3 pb-3">
+          {linea("Asunto", "asunto")}
+          {(equipos.length > 0 || resaltar === "equipos") && (
+            <div className={cn("rounded", resaltar === "equipos" && "bg-sotec-green/40 ring-2 ring-sotec-green print:bg-transparent print:ring-0")}>
+              {equipos.length > 0 ? <EquiposEnFormato equipos={equipos} /> : <span className="print:hidden text-slate-400">Equipos atendidos: ninguno marcado</span>}
+            </div>
+          )}
+        </div>
       </section>
 
       <section className="border-x border-b border-black">

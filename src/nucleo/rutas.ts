@@ -19,3 +19,7 @@ export function urlPublica(ruta: string, query = ""): string {
 }
 
 export const rutaCuenta = (id: string) => `/app/cobros/ver?id=${id}`;
+
+export const rutaProyecto = (id: string) => `/app/proyectos/ver?id=${id}`;
+
+export const rutaEquipo = (id: string) => `/app/equipos/ver?id=${id}`;

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FileText, Plus, Save, Stamp, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Volver, useOrigen } from "@/components/ui/volver";
 import { PageHeader } from "@/components/ui/corporativo";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,11 +21,14 @@ function Nueva() {
   const params = useSearchParams();
   const u = demo.usuario!;
   const existente = demo.cuentas.find((c) => c.id === params.get("id") && c.estado === "borrador");
+  const origen = useOrigen(existente ? { href: rutaCuenta(existente.id), label: existente.codigo } : { href: "/app/cobros", label: "Cuentas de cobro" });
 
   const [cuenta, setCuenta] = useState<CuentaCobro>(() => {
     if (existente) return existente;
     const n = demo.nuevoCodigoCuenta();
-    const clienteId = params.get("cliente") ?? "";
+    // Desde un proyecto: ?proyecto=<id> fija el cliente del proyecto
+    const proyecto = demo.proyectosVisibles.find((p) => p.id === params.get("proyecto"));
+    const clienteId = proyecto?.clienteId ?? params.get("cliente") ?? "";
     // Solo se precarga un reporte cobrable: aprobado o cerrado, del cliente y sin otra cuenta activa
     const rep = demo.documentos.find(
       (d) => d.id === params.get("reporte") && d.tipo === "reporte" && (d.estado === "aprobado" || d.estado === "cerrado") && d.clienteId === clienteId && !demo.cuentaDeReporte(d.id),
@@ -33,8 +37,9 @@ function Nueva() {
     return {
       ...n,
       clienteId,
+      proyectoId: proyecto?.id ?? (rep?.proyectoId || undefined),
       fecha: hoy(),
-      concepto: rep && rep.tipo === "reporte" ? `Servicio técnico: ${rep.datos.asunto}` : "",
+      concepto: rep && rep.tipo === "reporte" ? `Servicio técnico: ${rep.datos.asunto}` : proyecto ? proyecto.nombre : "",
       items,
       ivaPorcentaje: demo.config.ivaPorcentaje,
       notas: "Pago a 30 días.",
@@ -54,10 +59,12 @@ function Nueva() {
     () =>
       demo.documentos.filter((d) => {
         if (d.tipo !== "reporte" || d.clienteId !== cuenta.clienteId || !["aprobado", "cerrado"].includes(d.estado)) return false;
+        // Con proyecto, solo los reportes de ese proyecto
+        if (cuenta.proyectoId && d.proyectoId !== cuenta.proyectoId) return false;
         const otra = demo.cuentaDeReporte(d.id);
         return !otra || otra.id === cuenta.id;
       }),
-    [demo, cuenta.clienteId, cuenta.id],
+    [demo, cuenta.clienteId, cuenta.id, cuenta.proyectoId],
   );
   const incluido = (docId: string) => cuenta.items.some((i) => i.documentoId === docId);
   const { total } = totales(cuenta);
@@ -71,11 +78,13 @@ function Nueva() {
     const error = demo.guardarCuenta(cuenta);
     if (error) return setAviso(error);
     if (emitir) demo.cambiarEstadoCuenta(cuenta.id, "emitida");
-    router.push(rutaCuenta(cuenta.id));
+    // replace: «atrás» desde la cuenta guardada no reabre el formulario
+    router.replace(`${rutaCuenta(cuenta.id)}${origen.query ? `&${origen.query}` : ""}`);
   }
 
   return (
     <div className="space-y-5">
+      <Volver href={origen.href} label={origen.label} />
       <PageHeader
         etiqueta="Finanzas · cuenta de cobro"
         titulo={
@@ -86,18 +95,37 @@ function Nueva() {
         descripcion="Elige el cliente, marca los reportes que vas a cobrar y pon el valor de cada uno."
       />
 
-      <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
+      <div className="grid gap-5 xl:grid-cols-[420px_1fr] [&>*]:min-w-0">
         <div className="space-y-4">
           <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <label className="block text-sm">
               <span className="text-xs text-slate-500">Cliente</span>
-              <select value={cuenta.clienteId} onChange={(e) => set({ clienteId: e.target.value, items: cuenta.items.filter((i) => !i.documentoId) })} className="h-10 w-full rounded-md border border-slate-200 bg-white px-2">
+              <select value={cuenta.clienteId} onChange={(e) => set({ clienteId: e.target.value, proyectoId: undefined, items: cuenta.items.filter((i) => !i.documentoId) })} className="h-10 w-full rounded-md border border-slate-200 bg-white px-2">
                 <option value="">Selecciona…</option>
-                {demo.clientes.map((c) => (
+                {demo.clientes
+                  .filter((c) => c.activo !== false || c.id === cuenta.clienteId)
+                  .map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.nombre}
                   </option>
                 ))}
+              </select>
+            </label>
+            <label className="block text-sm">
+              <span className="text-xs text-slate-500">Proyecto (opcional)</span>
+              <select
+                value={cuenta.proyectoId ?? ""}
+                onChange={(e) => set({ proyectoId: e.target.value || undefined, items: cuenta.items.filter((i) => !i.documentoId) })}
+                className="h-10 w-full rounded-md border border-slate-200 bg-white px-2"
+              >
+                <option value="">Sin proyecto</option>
+                {demo.proyectosVisibles
+                  .filter((p) => p.clienteId === cuenta.clienteId)
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.codigo} · {p.nombre}
+                    </option>
+                  ))}
               </select>
             </label>
             <div className="grid grid-cols-2 gap-3">
@@ -117,7 +145,7 @@ function Nueva() {
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="font-semibold text-slate-900">Reportes técnicos del cliente</p>
+            <p className="font-semibold text-slate-900">Reportes técnicos {cuenta.proyectoId ? "del proyecto" : "del cliente"}</p>
             <p className="text-xs text-slate-500">Aprobados o cerrados que aún no se han cobrado.</p>
             {!cuenta.clienteId ? (
               <p className="mt-3 text-sm text-slate-500">Elige un cliente para ver sus reportes.</p>
@@ -200,7 +228,7 @@ function Nueva() {
         </div>
 
         <div className="min-w-0 overflow-x-auto rounded-lg bg-slate-100 p-2 sm:p-4">
-          <PlantillaCuentaCobro cuenta={cuenta} cliente={demo.clientes.find((c) => c.id === cuenta.clienteId)} config={demo.config} documentos={demo.documentos} firmante={u.nombre} />
+          <PlantillaCuentaCobro cuenta={cuenta} cliente={demo.clientes.find((c) => c.id === cuenta.clienteId)} proyecto={demo.proyectos.find((p) => p.id === cuenta.proyectoId)} config={demo.config} documentos={demo.documentos} firmante={u.nombre} />
         </div>
       </div>
     </div>

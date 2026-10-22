@@ -5,17 +5,17 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
 import { EstadoBadge, fechaCorta } from "@/components/ui/badges";
 import { PageHeader } from "@/components/ui/corporativo";
-import { FORMATOS } from "@/nucleo/catalogos";
 import { rutaDoc } from "@/nucleo/rutas";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { faltantes } from "@/nucleo/validar";
-import { clienteDoc, tituloDoc } from "@/modulos/registro";
+import { clienteDoc, formatoDe, infoDoc, tituloDoc } from "@/modulos/registro";
 import { IconoDoc } from "@/components/ui/icono-doc";
 
 export default function Revision() {
   const demo = useDemo();
   const cola = demo.visibles.filter((d) => d.estado === "en_revision").sort((a, b) => a.creado.localeCompare(b.creado));
-  const porCerrar = demo.visibles.filter((d) => d.tipo === "permiso" && d.estado === "aprobado");
+  // Aprobados que cierra SST (permisos, gastos); los que cierra el cliente con su firma esperan en su portal
+  const porCerrar = demo.visibles.filter((d) => d.estado === "aprobado" && infoDoc(d.tipo).flujo.cierre !== "cliente");
   const autor = (id: string) => demo.usuarios.find((u) => u.id === id)?.nombre ?? "—";
 
   const tarjeta = (d: (typeof cola)[number], cta: string) => {
@@ -26,12 +26,12 @@ export default function Revision() {
           <IconoDoc tipo={d.tipo} className="h-4 w-4 text-slate-500" />
           <span className="font-mono text-sm font-semibold">{d.codigo}</span>
           <span className="ml-auto">
-            <EstadoBadge estado={d.estado} />
+            <EstadoBadge estado={d.estado} tipo={d.tipo} />
           </span>
         </div>
         <p className="mt-2 line-clamp-2 text-sm font-medium">{tituloDoc(d)}</p>
         <p className="text-xs text-slate-500">
-          {FORMATOS[d.tipo].corto} · {clienteDoc(d)} · {autor(d.autorId)} · {fechaCorta(d.creado)}
+          {formatoDe(d.tipo).corto} · {clienteDoc(d)} · {autor(d.autorId)} · {fechaCorta(d.creado)}
         </p>
         {p.length === 0 ? (
           <p className="mt-2 flex items-center gap-1 text-xs text-emerald-700">
@@ -59,8 +59,8 @@ export default function Revision() {
         )}
       </section>
       <section>
-        <h2 className="mb-2 font-semibold">Permisos aprobados pendientes de cierre ({porCerrar.length})</h2>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{porCerrar.map((d) => tarjeta(d, "Cerrar permiso"))}</div>
+        <h2 className="mb-2 font-semibold">Aprobados pendientes de cierre ({porCerrar.length})</h2>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{porCerrar.map((d) => tarjeta(d, infoDoc(d.tipo).flujo.cerrar))}</div>
       </section>
     </div>
   );

@@ -1,11 +1,7 @@
-import type { Estado, Rol, TipoDoc } from "./tipos";
+import type { Estado, EstadoProyecto, Rol } from "./tipos";
 
-/** `el` / `nuevo` concuerdan con el género del nombre corto («el reporte», «la legalización»). */
-export const FORMATOS: Record<TipoDoc, { codigo: string; nombre: string; version: string; fecha: string; corto: string; el: "el" | "la"; nuevo: "Nuevo" | "Nueva" }> = {
-  reporte: { codigo: "FO-GSST-22", nombre: "Formato de reporte técnico", version: "01", fecha: "01/03/2020", corto: "Reporte técnico", el: "el", nuevo: "Nuevo" },
-  permiso: { codigo: "F-GSST-13", nombre: "Permiso de trabajo", version: "01", fecha: "01/03/2019", corto: "Permiso de trabajo", el: "el", nuevo: "Nuevo" },
-  gasto: { codigo: "FO-GSST-25", nombre: "Formato de legalización y registro de gastos operativos", version: "01", fecha: "01/03/2020", corto: "Legalización de gastos", el: "la", nuevo: "Nueva" },
-};
+// El control documental de cada formato (código, versión, nombre) lo aporta su
+// módulo: ver `formatoDe(tipo)` en src/modulos/registro.ts.
 
 export const ETIQUETA_ESTADO: Record<Estado, string> = {
   borrador: "Borrador",
@@ -28,4 +24,16 @@ export const ETIQUETA_ROL: Record<Rol, string> = {
   supervisor: "Coordinador SST",
   admin: "Administrador",
   cliente: "Cliente",
+};
+
+export const ETIQUETA_ESTADO_PROYECTO: Record<EstadoProyecto, string> = {
+  activo: "Activo",
+  en_pausa: "En pausa",
+  cerrado: "Cerrado",
+};
+
+export const COLOR_ESTADO_PROYECTO: Record<EstadoProyecto, string> = {
+  activo: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  en_pausa: "bg-amber-50 text-amber-800 ring-amber-200",
+  cerrado: "bg-slate-100 text-slate-700 ring-slate-200",
 };

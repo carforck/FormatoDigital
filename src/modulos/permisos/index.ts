@@ -1,6 +1,7 @@
 import type { ModuloDocumento } from "@/modulos/contrato";
 
 import { EPP, EQUIPO_REQUERIDO, MEDIDAS, PELIGROS, PLANTILLAS_ACTIVIDAD, PREGUNTAS_VERIFICACION, permisoVacio } from "./catalogo";
+import { PlantillaPermiso } from "./PlantillaPermiso";
 import type { DatosPermiso, Ejecutor, SiNoNa } from "./tipos";
 import { faltantesPermiso } from "./validar";
 
@@ -11,6 +12,32 @@ export const moduloPermisos: ModuloDocumento<DatosPermiso> = {
   totalComprobaciones: 16,
   titulo: (d) => d.actividades,
   faltantes: faltantesPermiso,
+  formato: { codigo: "F-GSST-13", nombre: "Permiso de trabajo", version: "01", fecha: "01/03/2019", corto: "Permiso de trabajo", el: "el", nuevo: "Nuevo", plural: "permisos" },
+  prefijo: "PT",
+  Plantilla: PlantillaPermiso,
+  clienteDe: (d) => d.cliente,
+  campoCliente: "cliente",
+  visibleCliente: true,
+  color: "var(--serie-b)",
+  flujo: {
+    aprobar: "Aprobar y firmar",
+    firmaAlAprobar: true,
+    alAprobar: (d, u, firma) => ({ autoriza: d.autoriza || u.nombre, firmaAutoriza: firma || d.firmaAutoriza }),
+    cierre: "formulario",
+    cerrar: "Cerrar permiso",
+    eventoCierre: "Cerró el permiso",
+  },
+  duplicar: (d, hoy) => ({ ...d, fechaEmision: hoy, firmaAutoriza: "", firmaEncargado: "", firmaCierre: "", cierreAreaLimpia: "", cierraNombre: "", ejecutores: d.ejecutores.map((e) => ({ ...e, firma: "" })) }),
+  // Cada ejecutor firma en su fila («ejecutor:2»)
+  aplicarFirma: (campo, imagen, d) => {
+    if (!campo.startsWith("ejecutor:")) return { [campo]: imagen } as Partial<DatosPermiso>;
+    const k = Number(campo.split(":")[1]);
+    return { ejecutores: d.ejecutores.map((e, j) => (j === k ? { ...e, firma: imagen } : e)) };
+  },
+  alElegirProyecto: (p) => ({
+    cambio: { puestoProyecto: `${p.codigo} · ${p.nombre}`, ...(p.sitio ? { sitioTrabajo: p.sitio } : {}) },
+    mensaje: `Proyecto ${p.codigo} · ${p.nombre}: lo puse en «Puesto / proyecto»${p.sitio ? ` y el sitio de trabajo quedó en ${p.sitio}` : ""}.`,
+  }),
 
   alElegirCliente: (c) => ({
     cambio: { cliente: c.nombre, sitioTrabajo: c.sitio },

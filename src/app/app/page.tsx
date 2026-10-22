@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, Clock, FileText, FilterX, Gauge, HardHat, PenLine, Receipt, Timer, Wallet } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock, FileSignature, FileText, FilterX, FolderKanban, Gauge, HardHat, PenLine, Receipt, Timer, Wallet } from "lucide-react";
 
 import { Contador } from "@/components/fx/Reveal";
 import { BarrasFiltro, BarrasMes, Kpi, Sparkline, Variacion } from "@/components/tablero/piezas";
@@ -11,8 +11,8 @@ import { fechaLarga, nombreCorto, saludo } from "@/components/ui/corporativo";
 import { IconoDoc } from "@/components/ui/icono-doc";
 import { cn } from "@/lib/utils";
 import { totales } from "@/modulos/cobros/tipos";
-import { clienteDoc, tituloDoc } from "@/modulos/registro";
-import { ETIQUETA_ESTADO, ETIQUETA_ROL, FORMATOS } from "@/nucleo/catalogos";
+import { cantidadDoc, clienteDoc, formatoDe, infoDoc, tituloDoc } from "@/modulos/registro";
+import { ETIQUETA_ESTADO, ETIQUETA_ROL } from "@/nucleo/catalogos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import {
   ESTADOS_ORDEN,
@@ -43,11 +43,12 @@ export default function Tablero() {
   const [tipo, setTipo] = useState<TipoDoc | "todos">("todos");
   const [estado, setEstado] = useState<Estado | null>(null);
   const [cliente, setCliente] = useState<string | null>(null);
+  const [proyecto, setProyecto] = useState<string>("");
 
   const r = rango(periodo);
   const base = useMemo(
-    () => demo.visibles.filter((d) => (tipo === "todos" || d.tipo === tipo) && (!cliente || d.clienteId === cliente)),
-    [demo.visibles, tipo, cliente],
+    () => demo.visibles.filter((d) => (tipo === "todos" || d.tipo === tipo) && (!cliente || d.clienteId === cliente) && (!proyecto || d.proyectoId === proyecto)),
+    [demo.visibles, tipo, cliente, proyecto],
   );
   const actual = base.filter((d) => enRango(d, r.desde, r.hasta));
   const anterior = base.filter((d) => enRango(d, r.prevDesde, r.prevHasta));
@@ -71,11 +72,11 @@ export default function Tablero() {
   const diff = (a: number | null, b: number | null) => (a === null || b === null ? null : a - b);
 
   const tipos = TIPOS_ORDEN.filter((t) => (tipo === "todos" ? demo.visibles.some((d) => d.tipo === t) : t === tipo));
-  const mesesGrafica = serie.map((m) => ({ etiqueta: m.etiqueta, reporte: m.docs.filter((d) => d.tipo === "reporte").length, permiso: m.docs.filter((d) => d.tipo === "permiso").length, gasto: m.docs.filter((d) => d.tipo === "gasto").length }));
+  const mesesGrafica = serie.map((m) => ({ etiqueta: m.etiqueta, ...Object.fromEntries(tipos.map((t) => [t, m.docs.filter((d) => d.tipo === t).length])) }));
 
   const filasEstado = ESTADOS_ORDEN.map((e) => ({ clave: e, nombre: ETIQUETA_ESTADO[e], valor: actual.filter((d) => d.estado === e).length })).filter((f) => f.valor > 0 || f.clave === estado);
   const filasCliente = demo.clientes
-    .map((c) => ({ clave: c.id, nombre: c.nombre, valor: demo.visibles.filter((d) => d.clienteId === c.id && enRango(d, r.desde, r.hasta) && (tipo === "todos" || d.tipo === tipo)).length }))
+    .map((c) => ({ clave: c.id, nombre: c.nombre, valor: demo.visibles.filter((d) => d.clienteId === c.id && enRango(d, r.desde, r.hasta) && (tipo === "todos" || d.tipo === tipo) && (!proyecto || d.proyectoId === proyecto)).length }))
     .filter((f) => f.valor > 0 || f.clave === cliente)
     .sort((a, b) => b.valor - a.valor);
 
@@ -89,12 +90,14 @@ export default function Tablero() {
   const docs = demo.visibles;
   const pendientes: { d: Documento; accion: string }[] = [];
   if (puede(u.rol, "revisar")) docs.filter((d) => d.estado === "en_revision").forEach((d) => pendientes.push({ d, accion: "Revisar" }));
-  if (puede(u.rol, "cerrar_permiso")) docs.filter((d) => d.tipo === "permiso" && d.estado === "aprobado").forEach((d) => pendientes.push({ d, accion: "Cerrar permiso" }));
-  if (puede(u.rol, "revisar")) docs.filter((d) => d.tipo === "gasto" && d.estado === "aprobado").forEach((d) => pendientes.push({ d, accion: "Reembolsar" }));
-  if (u.rol === "cliente") docs.filter((d) => d.tipo === "reporte" && d.estado === "aprobado").forEach((d) => pendientes.push({ d, accion: "Firmar" }));
+  // Cierres según el formato: SST cierra permisos (formulario) y gastos (un clic); el cliente firma reportes y cotizaciones
+  if (puede(u.rol, "cerrar_permiso")) docs.filter((d) => d.estado === "aprobado" && infoDoc(d.tipo).flujo.cierre === "formulario").forEach((d) => pendientes.push({ d, accion: infoDoc(d.tipo).flujo.cerrar }));
+  if (puede(u.rol, "revisar")) docs.filter((d) => d.estado === "aprobado" && infoDoc(d.tipo).flujo.cierre === "revisor").forEach((d) => pendientes.push({ d, accion: d.tipo === "gasto" ? "Reembolsar" : infoDoc(d.tipo).flujo.cerrar }));
+  if (u.rol === "cliente") docs.filter((d) => d.estado === "aprobado" && infoDoc(d.tipo).flujo.cierre === "cliente").forEach((d) => pendientes.push({ d, accion: "Firmar" }));
   docs.filter((d) => d.autorId === u.id && (d.estado === "rechazado" || d.estado === "borrador")).forEach((d) => pendientes.push({ d, accion: d.estado === "rechazado" ? "Corregir" : "Completar" }));
 
-  const hayFiltros = tipo !== "todos" || estado !== null || cliente !== null;
+  const hayFiltros = tipo !== "todos" || estado !== null || cliente !== null || proyecto !== "";
+  const proyectosFiltro = demo.proyectosVisibles.filter((p) => !cliente || p.clienteId === cliente);
   const nombreCliente = demo.clientes.find((c) => c.id === cliente)?.nombre;
   const nombrePeriodo = PERIODOS.find((p) => p.clave === periodo)!.nombre;
 
@@ -122,6 +125,9 @@ export default function Tablero() {
             <Link href="/app/nuevo/gasto" className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-slate-50">
               <Wallet className="h-4 w-4" /> Gastos
             </Link>
+            <Link href="/app/nuevo/cotizacion" className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-slate-50">
+              <FileSignature className="h-4 w-4" /> Cotización
+            </Link>
           </div>
         )}
       </div>
@@ -141,14 +147,28 @@ export default function Tablero() {
             .map((t) => (
               <button key={t} onClick={() => setTipo(t)} aria-pressed={tipo === t} className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition sm:text-sm", tipo === t ? "bg-sotec text-white" : "text-slate-600 hover:bg-slate-100")}>
                 {t !== "todos" && <IconoDoc tipo={t} className="h-3.5 w-3.5" />}
-                {t === "todos" ? "Todos" : FORMATOS[t].corto.replace(" de trabajo", "").replace("Legalización de gastos", "Gastos")}
+                {t === "todos" ? "Todos" : formatoDe(t).plural.replace(/^./, (x) => x.toUpperCase())}
               </button>
             ))}
         </div>
+        {proyectosFiltro.length > 0 && (
+          <label className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white py-0.5 pl-2.5 pr-1 shadow-sm">
+            <FolderKanban className="h-3.5 w-3.5 text-slate-500" aria-hidden />
+            <span className="sr-only">Proyecto</span>
+            <select value={proyecto} onChange={(e) => setProyecto(e.target.value)} className="max-w-[220px] bg-transparent py-1 text-xs font-medium text-slate-700 outline-none sm:text-sm">
+              <option value="">Todos los proyectos</option>
+              {proyectosFiltro.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.codigo} · {p.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {estado && <span className="rounded-full bg-sotec-soft px-2.5 py-1 text-xs font-medium text-sotec-greenDeep">Estado: {ETIQUETA_ESTADO[estado]}</span>}
         {nombreCliente && <span className="rounded-full bg-sotec-soft px-2.5 py-1 text-xs font-medium text-sotec-greenDeep">Cliente: {nombreCliente}</span>}
         {hayFiltros && (
-          <button onClick={() => (setTipo("todos"), setEstado(null), setCliente(null))} className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">
+          <button onClick={() => (setTipo("todos"), setEstado(null), setCliente(null), setProyecto(""))} className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">
             <FilterX className="h-3.5 w-3.5" /> Limpiar filtros
           </button>
         )}
@@ -161,7 +181,7 @@ export default function Tablero() {
           icon={FileText}
           tono="bg-slate-100 text-slate-700"
           valor={<Contador valor={k.total} duracion={800} />}
-          contexto={tipos.map((t) => `${actual.filter((d) => d.tipo === t).length} ${t === "reporte" ? "reportes" : t === "permiso" ? "permisos" : "gastos"}`).join(" · ")}
+          contexto={tipos.map((t) => cantidadDoc(t, actual.filter((d) => d.tipo === t).length)).join(" · ")}
           variacion={<Variacion valor={k.totalVar} />}
           serie={<Sparkline valores={serie.map((m) => m.docs.length)} etiquetas={etiquetas} />}
           onClick={estado ? () => setEstado(null) : undefined}
@@ -285,7 +305,7 @@ export default function Tablero() {
                           {clienteDoc(d)} · {fechaCorta(d.creado)}
                         </p>
                       </div>
-                      <EstadoBadge estado={d.estado} />
+                      <EstadoBadge estado={d.estado} tipo={d.tipo} />
                     </Link>
                   </li>
                 ))}

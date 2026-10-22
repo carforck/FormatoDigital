@@ -28,6 +28,7 @@ bash scripts/reiniciar-dev.sh    # reinicia el dev con la caché limpia
 | `python3 scripts/aplicar-migracion.py <archivo.sql>` | Aplica SQL a Supabase (lee `.env.local`, que no se sube) |
 | `bash scripts/armar-instalador.sh` | Regenera `supabase/instalar.sql` |
 | `python3 scripts/generar-lottie.py` | Regenera la animación `public/lottie/digitaliza.json` |
+| `python3 scripts/generar-mapa-db.py` | Regenera el esquema del «Mapa del sistema» (`src/components/mapa/esquema.json`) desde `supabase/migrations/`; `--check` falla si está desactualizado |
 
 ## Rutas
 

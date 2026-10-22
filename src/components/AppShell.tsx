@@ -6,10 +6,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Bell,
+  Cctv,
   Building2,
   ChevronDown,
   ClipboardCheck,
+  FileSignature,
   FileText,
+  FolderKanban,
   FolderOpen,
   Globe,
   HardHat,
@@ -23,6 +26,7 @@ import {
   Plus,
   Receipt,
   ScrollText,
+  Network,
   Search,
   Settings,
   Sun,
@@ -54,12 +58,15 @@ const GRUPOS: { titulo: string; items: Item[] }[] = [
       { href: "/app/nuevo/reporte", label: "Nuevo reporte técnico", icon: FileText, req: "crear" },
       { href: "/app/nuevo/permiso", label: "Nuevo permiso de trabajo", icon: HardHat, req: "crear" },
       { href: "/app/nuevo/gasto", label: "Legalizar gastos", icon: Wallet, req: "crear" },
+      { href: "/app/nuevo/cotizacion", label: "Nueva cotización", icon: FileSignature, req: "crear" },
       { href: "/app/documentos", label: "Documentos", icon: FolderOpen, contador: "borradores" },
     ],
   },
   {
     titulo: "Gestión",
     items: [
+      { href: "/app/proyectos", label: "Proyectos", icon: FolderKanban },
+      { href: "/app/equipos", label: "Equipos", icon: Cctv },
       { href: "/app/revision", label: "Revisión y aprobación", icon: ClipboardCheck, req: "revisar", contador: "revision" },
       { href: "/app/cobros", label: "Cuentas de cobro", icon: Receipt, req: "ver_cobros" },
       { href: "/app/clientes", label: "Clientes", icon: Building2, req: "clientes" },
@@ -71,6 +78,7 @@ const GRUPOS: { titulo: string; items: Item[] }[] = [
       { href: "/app/usuarios", label: "Usuarios y roles", icon: Users, req: "usuarios" },
       { href: "/app/config", label: "Configuración", icon: Settings, req: "config" },
       { href: "/app/auditoria", label: "Auditoría", icon: ScrollText, req: "auditoria" },
+      { href: "/app/mapa", label: "Mapa del sistema", icon: Network, req: "mapa" },
     ],
   },
 ];
@@ -79,12 +87,14 @@ const GRUPOS: { titulo: string; items: Item[] }[] = [
 const RUTAS: [string, Accion][] = [
   ["/app/nuevo", "crear"],
   ["/app/cobros/nueva", "cobros"],
+  ["/app/proyectos/editar", "proyectos"],
   ["/app/cobros", "ver_cobros"],
   ["/app/revision", "revisar"],
   ["/app/clientes", "clientes"],
   ["/app/usuarios", "usuarios"],
   ["/app/config", "config"],
   ["/app/auditoria", "auditoria"],
+  ["/app/mapa", "mapa"],
 ];
 
 /** Título de la barra superior según la ruta. */
@@ -92,6 +102,12 @@ const TITULOS: [string, string][] = [
   ["/app/nuevo/reporte", "Nuevo reporte técnico"],
   ["/app/nuevo/permiso", "Nuevo permiso de trabajo"],
   ["/app/nuevo/gasto", "Legalización de gastos"],
+  ["/app/nuevo/cotizacion", "Nueva cotización"],
+  ["/app/proyectos/editar", "Proyecto"],
+  ["/app/proyectos/ver", "Detalle del proyecto"],
+  ["/app/proyectos", "Proyectos"],
+  ["/app/equipos/ver", "Ficha del equipo"],
+  ["/app/equipos", "Equipos"],
   ["/app/documentos/ver", "Detalle del documento"],
   ["/app/documentos", "Documentos"],
   ["/app/revision", "Revisión y aprobación"],
@@ -102,6 +118,7 @@ const TITULOS: [string, string][] = [
   ["/app/usuarios", "Usuarios y roles"],
   ["/app/config", "Configuración"],
   ["/app/auditoria", "Auditoría"],
+  ["/app/mapa", "Mapa del sistema"],
   ["/app", "Tablero"],
 ];
 
@@ -567,6 +584,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               { href: "/app/nuevo/reporte", t: "Reporte técnico", d: "FO-GSST-22 · visita, diagnóstico y firma del cliente", icon: FileText },
               { href: "/app/nuevo/permiso", t: "Permiso de trabajo", d: "F-GSST-13 · peligros, EPP y grupo ejecutor", icon: HardHat },
               { href: "/app/nuevo/gasto", t: "Legalización de gastos", d: "FO-GSST-25 · gastos con foto de la factura", icon: Wallet },
+              { href: "/app/nuevo/cotizacion", t: "Cotización", d: "Propuesta económica al cliente, con aceptación firmada", icon: FileSignature },
             ].map((o) => (
               <Link key={o.href} href={o.href} className="mb-2 flex items-center gap-3 rounded-xl border border-slate-200 p-3 hover:border-sotec-green">
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sotec text-sotec-green">

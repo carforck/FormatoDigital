@@ -81,4 +81,4 @@ export function meses(docs: Documento[], n = 6, hoy = new Date()) {
 }
 
 export const ESTADOS_ORDEN: Estado[] = ["borrador", "en_revision", "aprobado", "cerrado", "rechazado"];
-export const TIPOS_ORDEN: TipoDoc[] = ["reporte", "permiso", "gasto"];
+export { TIPOS_DOC as TIPOS_ORDEN } from "@/modulos/registro";

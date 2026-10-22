@@ -6,7 +6,7 @@ import { Camera, Plus, Receipt, Trash2 } from "lucide-react";
 import { EditableText } from "@/components/docs/EditableText";
 import { Firma } from "@/components/docs/Encabezado";
 import { cn } from "@/lib/utils";
-import { FORMATOS } from "@/nucleo/catalogos";
+import { formatoDe } from "@/modulos/registro";
 import { comprimirImagen } from "@/nucleo/imagenes";
 import { cop } from "@/nucleo/letras";
 import { asset } from "@/nucleo/rutas";
@@ -35,7 +35,7 @@ const SOPORTES_POR_HOJA = 6;
 
 /** Réplica del FO-GSST-25 · Legalización y registro de gastos operativos (A4). */
 export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: Props) {
-  const f = FORMATOS.gasto;
+  const f = formatoDe("gasto");
   const total = totalGastos(datos);
   const conSoporte = datos.items.filter((i) => i.soporte);
   const hojasSoporte: ItemGasto[][] = [];

@@ -2,16 +2,20 @@ import type { DatosGasto } from "@/modulos/gastos/tipos";
 import type { DatosPermiso } from "@/modulos/permisos/tipos";
 import type { DatosReporte } from "@/modulos/reportes/tipos";
 
+import type { DatosCotizacion } from "@/modulos/cotizaciones/tipos";
+
 // Los tipos propios de cada formato viven en su módulo; se reexportan aquí por comodidad.
 export type { DatosReporte, FotoReporte } from "@/modulos/reportes/tipos";
 export type { DatosPermiso, Ejecutor, SiNoNa } from "@/modulos/permisos/tipos";
 export type { DatosGasto, ItemGasto } from "@/modulos/gastos/tipos";
+export type { DatosCotizacion, ItemCotizacion } from "@/modulos/cotizaciones/tipos";
+export type { Equipo, EstadoEquipo, SistemaEquipo } from "@/modulos/equipos/tipos";
 
 export type Rol = "tecnico" | "supervisor" | "admin" | "cliente";
 
 export type Estado = "borrador" | "en_revision" | "aprobado" | "rechazado" | "cerrado";
 
-export type TipoDoc = "reporte" | "permiso" | "gasto";
+export type TipoDoc = "reporte" | "permiso" | "gasto" | "cotizacion";
 
 export interface Usuario {
   id: string;
@@ -33,6 +37,37 @@ export interface Cliente {
   correo: string;
   telefono: string;
   sitio: string;
+  /** NIT o C.C. (opcional): lo imprime la cotización. */
+  nit?: string;
+  /** Inactivo: sale de los selectores del generador, pero su historial se conserva. Por defecto, activo. */
+  activo?: boolean;
+}
+
+export type EstadoProyecto = "activo" | "en_pausa" | "cerrado";
+
+/**
+ * Proyecto u obra de un cliente: SOTEC trabaja por proyecto y por cliente.
+ * De cada proyecto cuelgan sus documentos (reportes, permisos, gastos y
+ * cotizaciones) y sus cuentas de cobro. Refleja public.proyectos (0009).
+ */
+export interface Proyecto {
+  id: string;
+  codigo: string; // PRY-001-26
+  consecutivo: number;
+  nombre: string;
+  clienteId: string;
+  /** Sitio o ubicación de la obra dentro del cliente. */
+  sitio: string;
+  /** Usuario responsable (supervisor o ingeniero a cargo). */
+  responsableId: string;
+  fechaInicio: string;
+  fechaFin?: string;
+  estado: EstadoProyecto;
+  presupuesto?: number;
+  descripcion: string;
+  creado: string;
+  actualizado: string;
+  historial: Evento[];
 }
 
 export interface Evento {
@@ -49,6 +84,10 @@ interface DocBase {
   estado: Estado;
   autorId: string;
   clienteId: string;
+  /** Proyecto u obra al que pertenece (opcional). */
+  proyectoId?: string;
+  /** Equipos atendidos (módulo Equipos; public.documento_equipos en 0010). */
+  equiposIds?: string[];
   creado: string;
   actualizado: string;
   motivoRechazo?: string;
@@ -69,7 +108,15 @@ export interface DocGasto extends DocBase {
   tipo: "gasto";
   datos: DatosGasto;
 }
-export type Documento = DocReporte | DocPermiso | DocGasto;
+
+export interface DocCotizacion extends DocBase {
+  tipo: "cotizacion";
+  datos: DatosCotizacion;
+}
+
+export type Documento = DocReporte | DocPermiso | DocGasto | DocCotizacion;
+/** Contenido del formato según el tipo de documento. */
+export type DatosDe<T extends TipoDoc> = Extract<Documento, { tipo: T }>["datos"];
 
 export interface Notificacion {
   id: string;
@@ -92,10 +139,16 @@ export interface Config {
   empresa: string;
   nit: string;
   ciudad: string;
+  /** Contacto de la organización para encabezados y pies (cotización). */
+  telefono?: string;
+  correo?: string;
   prefijoReporte: string;
   prefijoPermiso: string;
   prefijoCobro: string;
   prefijoGasto: string;
+  /** Prefijo por tipo de documento para los formatos nuevos (cotizacion…); si falta, el del módulo. */
+  prefijos?: Partial<Record<TipoDoc, string>>;
+  prefijoProyecto?: string;
   exigirFirmaCliente: boolean;
   vigenciaPermisoHoras: number;
   /** Datos que salen en la cuenta de cobro */

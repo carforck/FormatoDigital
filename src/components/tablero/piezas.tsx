@@ -5,10 +5,13 @@ import { ArrowDownRight, ArrowUpRight, Minus, Table2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { formatoDe, infoDoc } from "@/modulos/registro";
+import type { TipoDoc } from "@/nucleo/tipos";
 
-/* Colores de serie: variables de globals.css validadas en claro y oscuro
-   (reportes · permisos · gastos, en ese orden para que azul y violeta no se toquen). */
-export const SERIE = { reporte: "var(--serie-a)", permiso: "var(--serie-b)", gasto: "var(--serie-c)" } as const;
+/* Colores de serie: variables de globals.css validadas en claro y oscuro; cada
+   módulo trae la suya (reportes · permisos · gastos · cotizaciones, en ese orden
+   para que azul y violeta no se toquen). */
+const SERIE = (t: TipoDoc) => infoDoc(t).color;
 
 const fmt = (n: number, d = 0) => n.toLocaleString("es-CO", { maximumFractionDigits: d, minimumFractionDigits: d });
 
@@ -108,22 +111,23 @@ export function Kpi({
   );
 }
 
-type Mes = { etiqueta: string; reporte: number; permiso: number; gasto: number };
-const NOMBRE = { reporte: "Reportes", permiso: "Permisos", gasto: "Gastos" } as const;
+export type Mes = { etiqueta: string } & Partial<Record<TipoDoc, number>>;
+const NOMBRE = (t: TipoDoc) => formatoDe(t).plural.replace(/^./, (x) => x.toUpperCase());
 
-/** Barras apiladas por mes (reportes · permisos · gastos), con tooltip y vista de tabla. */
-export function BarrasMes({ meses, tipos }: { meses: Mes[]; tipos: (keyof typeof SERIE)[] }) {
+/** Barras apiladas por mes (una serie por tipo de documento), con tooltip y vista de tabla. */
+export function BarrasMes({ meses: crudos, tipos }: { meses: Mes[]; tipos: TipoDoc[] }) {
+  const meses = crudos.map((m) => ({ ...m, ...Object.fromEntries(tipos.map((t) => [t, m[t] ?? 0])) }) as { etiqueta: string } & Record<TipoDoc, number>);
   const [hover, setHover] = useState<number | null>(null);
   const [tabla, setTabla] = useState(false);
-  const total = (m: Mes) => tipos.reduce((a, t) => a + m[t], 0);
+  const total = (m: (typeof meses)[number]) => tipos.reduce((a, t) => a + m[t], 0);
   const max = Math.max(1, ...meses.map(total));
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-4 text-xs text-slate-600">
+        <div className="flex min-w-0 flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
           {tipos.map((t) => (
             <span key={t} className="flex items-center gap-1.5">
-              <i className="h-2.5 w-2.5 rounded-sm" style={{ background: SERIE[t] }} /> {NOMBRE[t]}
+              <i className="h-2.5 w-2.5 rounded-sm" style={{ background: SERIE(t) }} /> {NOMBRE(t)}
             </span>
           ))}
         </div>
@@ -138,7 +142,7 @@ export function BarrasMes({ meses, tipos }: { meses: Mes[]; tipos: (keyof typeof
               <th className="py-1 font-medium">Mes</th>
               {tipos.map((t) => (
                 <th key={t} className="py-1 text-right font-medium">
-                  {NOMBRE[t]}
+                  {NOMBRE(t)}
                 </th>
               ))}
               <th className="py-1 text-right font-medium">Total</th>
@@ -168,7 +172,7 @@ export function BarrasMes({ meses, tipos }: { meses: Mes[]; tipos: (keyof typeof
                 onPointerEnter={() => setHover(k)}
                 onFocus={() => setHover(k)}
                 tabIndex={0}
-                aria-label={`${m.etiqueta}: ${tipos.map((t) => `${m[t]} ${NOMBRE[t].toLowerCase()}`).join(", ")}`}
+                aria-label={`${m.etiqueta}: ${tipos.map((t) => `${m[t]} ${NOMBRE(t).toLowerCase()}`).join(", ")}`}
               >
                 {hover === k && (
                   <div className="pointer-events-none absolute bottom-full z-10 mb-1 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
@@ -177,8 +181,8 @@ export function BarrasMes({ meses, tipos }: { meses: Mes[]; tipos: (keyof typeof
                     </p>
                     {tipos.map((t) => (
                       <p key={t} className="flex items-center gap-1.5 text-slate-600">
-                        <i className="inline-block h-0.5 w-3" style={{ background: SERIE[t] }} />
-                        <strong className="text-slate-900">{m[t]}</strong> {NOMBRE[t].toLowerCase()}
+                        <i className="inline-block h-0.5 w-3" style={{ background: SERIE(t) }} />
+                        <strong className="text-slate-900">{m[t]}</strong> {NOMBRE(t).toLowerCase()}
                       </p>
                     ))}
                   </div>
@@ -191,7 +195,7 @@ export function BarrasMes({ meses, tipos }: { meses: Mes[]; tipos: (keyof typeof
                   {tipos
                     .filter((t) => m[t] > 0)
                     .map((t, j, arr) => (
-                      <div key={t} style={{ flex: m[t], background: SERIE[t], borderRadius: j === arr.length - 1 ? "4px 4px 0 0" : 0 }} />
+                      <div key={t} style={{ flex: m[t], background: SERIE(t), borderRadius: j === arr.length - 1 ? "4px 4px 0 0" : 0 }} />
                     ))}
                 </div>
               </div>

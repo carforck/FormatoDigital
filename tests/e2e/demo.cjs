@@ -1300,7 +1300,13 @@ async function comercial(b, errores) {
   }
 
   // 2. La administración: crea la cotización y la aprueba y envía en un solo paso (sin revisor aparte)
-  await comoUsuario(p, "u-adm");
+  // Cambio de rol por el menú de perfil, como el usuario: escribir el almacenamiento con la app abierta
+  // compite con el guardado de la propia app y en producción a veces gana la app
+  await ir("/app", 600);
+  await p.click('header button[aria-haspopup="menu"]');
+  await sleep(300);
+  await p.evaluate(() => [...document.querySelectorAll("[role=menuitem]")].find((x) => x.textContent.includes("Administrador")).click());
+  await p.waitForFunction(() => document.querySelector('header button[aria-haspopup="menu"]')?.innerText.includes("Administrador"), { timeout: 15000 });
   await ir("/app", 800);
   const menuAdm = await p.evaluate(() => [...document.querySelectorAll("aside a")].map((a) => a.getAttribute("href")));
   ok(menuAdm.includes("/app/nuevo/cotizacion") && menuAdm.includes("/app/cobros"), "la administración ve «Nueva cotización» y «Cuentas de cobro»");

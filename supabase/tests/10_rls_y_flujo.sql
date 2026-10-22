@@ -223,6 +223,12 @@ reset role;
 select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
 do $$ begin assert (select count(*) from public.cuentas_cobro) = 0, 'el técnico no ve cuentas de cobro'; end $$;
 reset role;
+select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
+do $$ begin
+  assert (select count(*) from public.cuentas_cobro) = 0, 'SST no ve cuentas de cobro (0011: solo la administración)';
+  assert (select count(*) from public.cuenta_cobro_items) = 0, 'SST no ve los ítems de las cuentas';
+end $$;
+reset role;
 select pg_temp.como('00000000-0000-0000-0000-0000000000a5');
 do $$ begin assert (select count(*) from public.cuentas_cobro) = 1, 'el cliente ve su cuenta emitida'; end $$;
 reset role;
@@ -317,22 +323,41 @@ do $$ begin
   perform public.crear_documento('10000000-0000-0000-0000-000000000001', 'reporte', '{}', null, 'c0000000-0000-0000-0000-000000000002', (select v::uuid from ctx where k = 'p1'));
   raise exception 'FALLO: documento en un proyecto de otro cliente';
 exception when insufficient_privilege then null; end $$;
--- Con el proyecto basta: el cliente sale de él
+-- La cotización es comercial (0011): ni SST ni el técnico la crean
+do $$ begin
+  perform public.crear_documento('10000000-0000-0000-0000-000000000001', 'cotizacion', '{"asunto":"De SST"}', null, null, (select v::uuid from ctx where k = 'p1'));
+  raise exception 'FALLO: SST creó una cotización';
+exception when insufficient_privilege then null; end $$;
+reset role;
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+do $$ begin
+  perform public.crear_documento('10000000-0000-0000-0000-000000000001', 'cotizacion', '{"asunto":"Del técnico"}');
+  raise exception 'FALLO: el técnico creó una cotización';
+exception when insufficient_privilege then null; end $$;
+reset role;
+-- La gerencia la crea; con el proyecto basta: el cliente sale de él
+select pg_temp.como('00000000-0000-0000-0000-0000000000a1');
 insert into ctx select 'cot1', (public.crear_documento('10000000-0000-0000-0000-000000000001', 'cotizacion', '{"asunto":"Ampliación CCTV"}', null, null, (select v::uuid from ctx where k = 'p1'))).id;
 do $$ begin
   assert (select cliente_id from public.documentos where id = (select v::uuid from ctx where k = 'cot1')) = 'c0000000-0000-0000-0000-000000000001', 'el documento toma el cliente del proyecto';
-  assert (select codigo from public.documentos where id = (select v::uuid from ctx where k = 'cot1')) like 'COT-001-%', 'código COT-001';
+  assert (select codigo from public.documentos where id = (select v::uuid from ctx where k = 'cot1')) like 'COT-001-%', 'código COT-001 (los intentos rechazados no queman consecutivo)';
 end $$;
-update public.documentos set estado = 'en_revision' where id = (select v::uuid from ctx where k = 'cot1');
--- Enviado, ya no cambia de proyecto
+-- Sin revisor aparte: no va a revisión; la gerencia la aprueba y queda enviada al cliente
+do $$ begin
+  update public.documentos set estado = 'en_revision' where id = (select v::uuid from ctx where k = 'cot1');
+  raise exception 'FALLO: la cotización pasó por revisión';
+exception when insufficient_privilege then null; end $$;
+update public.documentos set estado = 'aprobado' where id = (select v::uuid from ctx where k = 'cot1');
+do $$ begin
+  assert (select aprobado_por from public.documentos where id = (select v::uuid from ctx where k = 'cot1')) = '00000000-0000-0000-0000-0000000000a1', 'la gerencia aprobó su cotización';
+  assert exists (select 1 from public.documento_eventos where documento_id = (select v::uuid from ctx where k = 'cot1') and accion = 'Aprobó y envió al cliente'), 'evento «Aprobó y envió al cliente»';
+end $$;
+-- Enviada, ya no cambia de proyecto
 do $$ begin
   update public.documentos set proyecto_id = (select v::uuid from ctx where k = 'p2'), cliente_id = 'c0000000-0000-0000-0000-000000000002' where id = (select v::uuid from ctx where k = 'cot1');
   raise exception 'FALLO: cambió el proyecto de un documento enviado';
 exception when insufficient_privilege then null; end $$;
-reset role;
--- La gerencia aprueba (la cotización queda en el portal) y crea la cuenta de cobro del proyecto
-select pg_temp.como('00000000-0000-0000-0000-0000000000a1');
-update public.documentos set estado = 'aprobado' where id = (select v::uuid from ctx where k = 'cot1');
+-- La gerencia crea la cuenta de cobro del proyecto
 insert into ctx select 'cc2', (public.crear_cuenta_cobro('10000000-0000-0000-0000-000000000001', null, 'Anticipo CCTV hornos', null, (select v::uuid from ctx where k = 'p1'))).id;
 do $$ begin
   assert (select cliente_id from public.cuentas_cobro where id = (select v::uuid from ctx where k = 'cc2')) = 'c0000000-0000-0000-0000-000000000001', 'la cuenta toma el cliente del proyecto';
@@ -405,6 +430,99 @@ do $$ begin
   perform public.firmar_como_cliente((select v::uuid from ctx where k = 'cot1'), 'Técnico', 'data:image/png;base64,AAAA');
   raise exception 'FALLO: alguien que no es el cliente firmó como cliente';
 exception when insufficient_privilege then null; end $$;
+reset role;
+
+-- ------------------------------------------------- 12. lo comercial es solo de la administración (0011)
+-- Avisos de la cotización para los roles: SST no ve el suyo (el documento no le es visible)
+insert into public.notificaciones (organizacion_id, rol, texto, documento_id) values
+  ('10000000-0000-0000-0000-000000000001', 'supervisor', 'Cotización para SST', (select v::uuid from ctx where k = 'cot1')),
+  ('10000000-0000-0000-0000-000000000001', 'admin', 'Cotización para la gerencia', (select v::uuid from ctx where k = 'cot1'));
+-- La gerencia: un borrador de cotización y una cuenta en borrador
+select pg_temp.como('00000000-0000-0000-0000-0000000000a1');
+insert into ctx select 'cot2', (public.crear_documento('10000000-0000-0000-0000-000000000001', 'cotizacion', '{"asunto":"Borrador de la gerencia"}', null, 'c0000000-0000-0000-0000-000000000001')).id;
+insert into ctx select 'cc3', (public.crear_cuenta_cobro('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'Borrador de cuenta')).id;
+update public.documentos set datos = '{"asunto":"Editado por la gerencia"}' where id = (select v::uuid from ctx where k = 'cot2');
+do $$ begin
+  assert (select count(*) from public.documentos where codigo like 'COT-%') = 2, 'la gerencia ve todas las cotizaciones';
+  assert (select count(*) from public.cuentas_cobro) = 3, 'la gerencia ve todas las cuentas de cobro';
+  assert (select count(*) from public.notificaciones where texto = 'Cotización para la gerencia') = 1, 'la gerencia ve el aviso de la cotización';
+  assert (select datos ->> 'asunto' from public.documentos where id = (select v::uuid from ctx where k = 'cot2')) = 'Editado por la gerencia', 'la gerencia edita su cotización';
+end $$;
+reset role;
+-- SST y el técnico: no leen, no crean, no editan ni aprueban cotizaciones o cuentas
+create or replace function pg_temp.sin_comercial(quien text) returns void language plpgsql as $f$
+declare n int;
+begin
+  assert (select count(*) from public.documentos d join public.formatos f on f.id = d.formato_id where f.clave = 'cotizacion') = 0, quien || ' no ve cotizaciones';
+  assert (select count(*) from public.documento_eventos where documento_id = (select v::uuid from ctx where k = 'cot1')) = 0, quien || ' no ve el historial de la cotización';
+  assert (select count(*) from public.cuentas_cobro) = 0, quien || ' no ve cuentas de cobro';
+  assert (select count(*) from public.cuenta_cobro_items) = 0, quien || ' no ve ítems de cuentas';
+  assert (select count(*) from public.notificaciones where documento_id = (select v::uuid from ctx where k = 'cot1')) = 0, quien || ' no ve avisos de cotizaciones';
+  update public.documentos set datos = '{"asunto":"intruso"}' where id in (select v::uuid from ctx where k in ('cot1', 'cot2'));
+  get diagnostics n = row_count;
+  assert n = 0, quien || ' no edita cotizaciones';
+  update public.documentos set estado = 'aprobado' where id = (select v::uuid from ctx where k = 'cot2');
+  get diagnostics n = row_count;
+  assert n = 0, quien || ' no aprueba cotizaciones';
+  update public.cuentas_cobro set estado = 'emitida' where id = (select v::uuid from ctx where k = 'cc3');
+  get diagnostics n = row_count;
+  assert n = 0, quien || ' no emite cuentas de cobro';
+  begin
+    insert into public.documentos (organizacion_id, formato_id, codigo, consecutivo, autor_id)
+    select '10000000-0000-0000-0000-000000000001', f.id, 'COT-999-99', 999, auth.uid()
+    from public.formatos f where f.organizacion_id = '10000000-0000-0000-0000-000000000001' and f.clave = 'cotizacion';
+    raise exception 'FALLO: % insertó una cotización directamente', quien;
+  exception when insufficient_privilege then null; end;
+  begin
+    perform public.crear_cuenta_cobro('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'x');
+    raise exception 'FALLO: % creó una cuenta de cobro', quien;
+  exception when insufficient_privilege then null; end;
+  begin
+    insert into public.cuentas_cobro (organizacion_id, cliente_id, codigo, consecutivo, concepto, creado_por)
+    values ('10000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'CC-999-99', 999, 'x', auth.uid());
+    raise exception 'FALLO: % insertó una cuenta de cobro directamente', quien;
+  exception when insufficient_privilege then null; end;
+  begin
+    insert into public.cuenta_cobro_items (organizacion_id, cuenta_id, descripcion, valor_unitario)
+    values ('10000000-0000-0000-0000-000000000001', (select v::uuid from ctx where k = 'cc3'), 'Extra', 1);
+    raise exception 'FALLO: % agregó ítems a una cuenta', quien;
+  exception when insufficient_privilege then null; end;
+  begin
+    perform public.crear_enlace_firma((select v::uuid from ctx where k = 'cot1'), '');
+    raise exception 'FALLO: % pidió la firma de una cotización', quien;
+  exception when insufficient_privilege or check_violation then null; end;
+end $f$;
+grant execute on function pg_temp.sin_comercial(text) to authenticated;
+select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
+select pg_temp.sin_comercial('SST');
+do $$ begin
+  assert (select count(*) from public.notificaciones where texto = 'Cotización para SST') = 0, 'SST no ve el aviso de la cotización';
+  assert (select count(*) from public.documentos where codigo like 'RT-%') > 0, 'SST sigue viendo los reportes del equipo';
+end $$;
+reset role;
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+select pg_temp.sin_comercial('el técnico');
+do $$ begin assert (select count(*) from public.documentos where codigo like 'LG-%') = 1, 'el técnico sigue viendo su legalización de gastos'; end $$;
+reset role;
+do $$ begin
+  assert (select datos ->> 'asunto' from public.documentos where id = (select v::uuid from ctx where k = 'cot2')) = 'Editado por la gerencia', 'nadie más cambió la cotización';
+  assert (select estado from public.documentos where id = (select v::uuid from ctx where k = 'cot2')) = 'borrador', 'la cotización sigue en borrador';
+  assert (select estado from public.cuentas_cobro where id = (select v::uuid from ctx where k = 'cc3')) = 'borrador', 'la cuenta sigue en borrador';
+end $$;
+-- El cliente ve su cotización aceptada (no el borrador) y sus cuentas emitidas (no el borrador)
+select pg_temp.como('00000000-0000-0000-0000-0000000000a5');
+do $$ begin
+  assert (select count(*) from public.documentos where codigo like 'COT-%') = 1, 'el cliente ve solo su cotización aceptada';
+  assert (select estado from public.documentos where id = (select v::uuid from ctx where k = 'cot1')) = 'cerrado', 'la ve aceptada';
+  assert (select count(*) from public.cuentas_cobro) = 1, 'el cliente ve solo su cuenta emitida';
+end $$;
+reset role;
+-- La gerencia emite la cuenta: el cliente la ve
+select pg_temp.como('00000000-0000-0000-0000-0000000000a1');
+update public.cuentas_cobro set estado = 'emitida' where id = (select v::uuid from ctx where k = 'cc3');
+reset role;
+select pg_temp.como('00000000-0000-0000-0000-0000000000a5');
+do $$ begin assert (select count(*) from public.cuentas_cobro) = 2, 'el cliente ve la cuenta recién emitida'; end $$;
 reset role;
 
 -- ------------------------------------------------- 10. equipos (0010): inventario por cliente e historial

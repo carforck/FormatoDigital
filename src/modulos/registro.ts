@@ -6,6 +6,7 @@ import { moduloGastos } from "./gastos";
 import { moduloPermisos } from "./permisos";
 import { moduloReportes } from "./reportes";
 import { ETIQUETA_ESTADO } from "@/nucleo/catalogos";
+import type { Accion } from "@/nucleo/permisos";
 import type { Cliente, Config, DatosDe, Documento, Estado, Proyecto, TipoDoc } from "@/nucleo/tipos";
 
 /**
@@ -26,6 +27,8 @@ export interface InfoModulo {
   formato?: string;
   /** Con qué otros módulos se relaciona. */
   relaciona: string[];
+  /** Permiso que exige al personal interno (lo comercial: solo la administración). */
+  requiere?: Accion;
 }
 
 export const MODULOS: InfoModulo[] = [
@@ -35,8 +38,8 @@ export const MODULOS: InfoModulo[] = [
   { clave: "permisos", nombre: "Permisos de trabajo", descripcion: "Peligros, medidas, EPP, verificación y grupo ejecutor con firmas.", estado: "activo", formato: "F-GSST-13", relaciona: ["proyectos", "ordenes"] },
   { clave: "reportes", nombre: "Reportes técnicos", descripcion: "Diagnóstico, acción y resultado; registro fotográfico como hoja anexa; firma del técnico y del cliente en sitio o por enlace.", estado: "activo", formato: "FO-GSST-22", relaciona: ["proyectos", "ordenes", "cobros"] },
   { clave: "gastos", nombre: "Legalización de gastos", descripcion: "Transporte, alimentación, hospedaje y materiales con la foto de cada factura, Vo.Bo. de administración y reembolso.", estado: "activo", formato: "FO-GSST-25", relaciona: ["proyectos", "ordenes", "cobros"] },
-  { clave: "cotizaciones", nombre: "Cotizaciones", descripcion: "Propuesta económica al cliente por proyecto: revisión interna, envío al portal y aceptación con la firma del cliente.", estado: "activo", relaciona: ["proyectos", "cobros"] },
-  { clave: "cobros", nombre: "Cuentas de cobro", descripcion: "SOTEC le cobra a su cliente por el servicio, con ítems tomados de los reportes técnicos, IVA y valor en letras.", estado: "activo", relaciona: ["proyectos", "ordenes", "reportes"] },
+  { clave: "cotizaciones", nombre: "Cotizaciones", descripcion: "Propuesta económica al cliente por proyecto: la administración la aprueba y la envía al portal, y el cliente la acepta con su firma. Solo la administración (comercial).", estado: "activo", relaciona: ["proyectos", "cobros"], requiere: "cotizar" },
+  { clave: "cobros", nombre: "Cuentas de cobro", descripcion: "SOTEC le cobra a su cliente por el servicio, con ítems tomados de los reportes técnicos, IVA y valor en letras. Solo la administración (comercial).", estado: "activo", relaciona: ["proyectos", "ordenes", "reportes"], requiere: "cobros" },
   { clave: "requerimientos", nombre: "Requerimiento de materiales", descripcion: "Solicitud de materiales para un proyecto, con aprobación y entrega; interno, el cliente no lo ve.", estado: "planeado", relaciona: ["proyectos", "gastos"] },
   {
     clave: "equipos",
@@ -71,6 +74,8 @@ export interface InfoDoc {
   campoCliente: string;
   alElegirProyecto?: (p: Proyecto, c: Cliente | undefined) => { cambio: Record<string, unknown>; mensaje?: string };
   visibleCliente: boolean;
+  /** Permiso que exige el módulo al personal interno (ver `puedeUsarTipo`). */
+  requiere?: Accion;
   color: string;
   flujo: FlujoDocumento<Record<string, unknown>>;
   etiquetasEstado: Record<Estado, string>;
@@ -106,6 +111,7 @@ export function infoDoc(tipo: TipoDoc): InfoDoc {
     campoCliente: m.campoCliente ?? "cliente",
     alElegirProyecto: m.alElegirProyecto as InfoDoc["alElegirProyecto"],
     visibleCliente: m.visibleCliente ?? false,
+    requiere: m.requiere,
     color: m.color ?? PALETA[Math.max(0, TIPOS_DOC.indexOf(tipo)) % PALETA.length],
     flujo: m.flujo ?? { aprobar: "Aprobar", firmaAlAprobar: false, cierre: "revisor", cerrar: "Cerrar", eventoCierre: "Cerró el documento" },
     etiquetasEstado: { ...ETIQUETA_ESTADO, ...m.etiquetasEstado },

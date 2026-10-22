@@ -10,7 +10,8 @@
     "0007_gastos_como_formato.sql",
     "0008_separacion_funciones.sql",
     "0009_proyectos.sql",
-    "0010_equipos.sql"
+    "0010_equipos.sql",
+    "0011_comercial_solo_admin.sql"
   ],
   "tablas": [
     {

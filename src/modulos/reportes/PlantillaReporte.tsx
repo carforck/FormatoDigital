@@ -70,7 +70,7 @@ export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, e
 
       <section className="mt-2 border border-black">
         <div className="hdr border-b border-black py-0.5">DATOS GENERALES</div>
-        <div className="grid grid-cols-1 gap-x-8 gap-y-1.5 p-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-x-8 gap-y-1.5 p-3 sm:grid-cols-2 print:grid-cols-2">
           {linea("Tipo reporte", "tipoReporte")}
           {linea("Correo", "correo", "email")}
           {linea("Cliente", "cliente")}
@@ -192,7 +192,7 @@ function HojaFotos({
       {grupo.length === 0 ? (
         <p className="border-x border-b border-black p-6 text-center text-slate-400 print:hidden">Aún no hay fotos. Agrégalas desde el asistente o con el botón de abajo.</p>
       ) : (
-        <div className="grid grid-cols-1 gap-4 border-x border-b border-black p-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 border-x border-b border-black p-3 sm:grid-cols-2 print:grid-cols-2">
           {grupo.map((f, j) => {
             const k = desde + j;
             return (

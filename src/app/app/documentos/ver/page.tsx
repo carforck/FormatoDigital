@@ -12,8 +12,9 @@ import { fondoQueCierra, useModal } from "@/components/ui/useModal";
 import { FirmaPad } from "@/components/docs/FirmaPad";
 import { Button } from "@/components/ui/button";
 import { EstadoBadge } from "@/components/ui/badges";
-import { puede, puedeEditarDoc, puedeRevisarDoc, puedeVerDoc } from "@/nucleo/permisos";
+import { puede, puedeCrearTipo, puedeEditarDoc, puedeRevisarDoc, puedeVerDoc } from "@/nucleo/permisos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
+import { abrirImpresion } from "@/nucleo/impresion";
 import { rutaCuenta, rutaEquipo, rutaProyecto, urlPublica } from "@/nucleo/rutas";
 import { equiposAtendidos, equiposIdsDe } from "@/modulos/equipos/logica";
 import { IconoEquipo } from "@/modulos/equipos/piezas";
@@ -86,7 +87,11 @@ function Detalle() {
       {ok && (
         <p className="print:hidden flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
           <CheckCircle2 className="h-4 w-4" />
-          {ok === "enviado" ? "Enviado a revisión. El Coordinador SST recibió una notificación (cambia a ese perfil para aprobarlo)." : "Borrador guardado."}
+          {ok === "enviado"
+            ? flujo.aprobarAlEnviar
+              ? "Aprobada y enviada: el cliente ya la ve en su portal para aceptarla con su firma."
+              : "Enviado a revisión. El Coordinador SST recibió una notificación (cambia a ese perfil para aprobarlo)."
+            : "Borrador guardado."}
         </p>
       )}
 
@@ -123,7 +128,7 @@ function Detalle() {
           )}
           {editable && (
             <Button disabled={pend.length > 0} title={pend.length ? "Completa los pendientes" : ""} onClick={() => demo.enviar(doc.id)}>
-              <SendHorizonal className="h-4 w-4" /> Enviar a revisión
+              <SendHorizonal className="h-4 w-4" /> {flujo.aprobarAlEnviar ?? "Enviar a revisión"}
             </Button>
           )}
           {revisa && (
@@ -141,7 +146,7 @@ function Detalle() {
               <PenLine className="h-4 w-4" /> {flujo.cerrar}
             </Button>
           )}
-          {puede(u.rol, "crear") && (
+          {puedeCrearTipo(u.rol, doc.tipo) && (
             <Button
               variant="outline"
               onClick={() => {
@@ -186,7 +191,7 @@ function Detalle() {
               <Receipt className="h-4 w-4" /> Crear cuenta de cobro
             </Button>
           )}
-          <Button variant="outline" onClick={() => window.print()}>
+          <Button variant="outline" onClick={() => abrirImpresion(router, { doc: doc.id })}>
             <Printer className="h-4 w-4" /> PDF
           </Button>
           {editable && doc.estado === "borrador" && (

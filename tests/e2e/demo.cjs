@@ -16,8 +16,8 @@ const path = require("path");
 const puppeteer = require("puppeteer-core");
 
 const BASE = (process.env.BASE || "http://localhost:3100").replace(/\/$/, "");
-const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion"
-const CLAVE = "sotec-demo-v7";
+const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion"
+const CLAVE = "sotec-demo-v8";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function chrome() {
@@ -525,7 +525,8 @@ async function proyectos(b, errores) {
   await p.waitForFunction(() => location.pathname.includes("/app/proyectos/ver"), { timeout: 15000 });
   ok(p.url().includes(`id=${idProyecto}`), "un documento abierto desde el proyecto vuelve al proyecto con «Volver»");
 
-  // 5. Cotización en un proyecto: la crea SST, la aprueba la gerencia y el cliente la acepta firmando
+  // 5. Cotización en un proyecto: la crea la gerencia y la aprueba y envía en un paso (lo comercial es solo de la administración)
+  await comoUsuario(p, "u-adm");
   await p.goto(`${BASE}/app/nuevo/cotizacion?proyecto=p-1`, { waitUntil: "networkidle0" });
   await sleep(900);
   await clic(p, "Ladrillera Arcillas del Caribe");
@@ -540,34 +541,12 @@ async function proyectos(b, errores) {
   await clic(p, "12 meses");
   await clic(p, "Omitir");
   await clic(p, "Ver resumen");
-  await clic(p, "Enviar a revisión");
+  await clic(p, "Aprobar y enviar al cliente");
   await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
   await sleep(600);
   const urlCot = p.url();
   ok((await p.evaluate(() => document.querySelector("h1").innerText)).includes("COT-004-26") && (await texto()).includes("Proyecto PRY-001-26"), "la cotización COT-004-26 queda en el proyecto");
-  // Rechazo con motivo → el autor la corrige y la reenvía
-  await comoUsuario(p, "u-adm");
-  await p.goto(urlCot, { waitUntil: "networkidle0" });
-  await sleep(600);
-  await clic(p, "Rechazar");
-  await clic(p, "Falta detallar las recomendaciones", "[role=dialog] button");
-  await clic(p, "Rechazar", "[role=dialog] .justify-end button:last-child");
-  ok((await p.evaluate(() => document.querySelector("h1").innerText)).includes("Rechazado"), "la gerencia rechaza la cotización con motivo");
-  await comoUsuario(p, "u-sup");
-  await p.goto(urlCot, { waitUntil: "networkidle0" });
-  await sleep(600);
-  await clic(p, "Editar");
-  await p.waitForFunction(() => location.pathname.includes("/app/nuevo/cotizacion"), { timeout: 15000 });
-  await sleep(800);
-  await clic(p, "Enviar a revisión");
-  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
-  await sleep(600);
-  ok((await p.evaluate(() => document.querySelector("h1").innerText)).includes("En revisión"), "el autor edita la cotización rechazada y la reenvía");
-  await comoUsuario(p, "u-adm");
-  await p.goto(urlCot, { waitUntil: "networkidle0" });
-  await sleep(600);
-  await clic(p, "Aprobar y enviar al cliente");
-  ok((await p.evaluate(() => document.querySelector("h1").innerText)).includes("Aprobada"), "la gerencia aprueba la cotización (queda enviada al cliente)");
+  ok((await p.evaluate(() => document.querySelector("h1").innerText)).includes("Aprobada"), "la gerencia la aprueba y la envía al cliente en un paso (sin revisor aparte)");
 
   // 6. Portal del cliente: sus proyectos, solo lo visible para él, y acepta la cotización
   await comoUsuario(p, "u-cli");
@@ -708,8 +687,8 @@ async function crud(b, errores) {
   await clic(p, "Eliminar", "form button");
   ok(!(await texto()).includes("Clínica Puerto Azul") && !(await texto()).includes("Inactivo"), "un cliente sin historial se elimina y el otro vuelve a estar activo");
 
-  // Cotización: duplicar y eliminar el borrador del autor
-  await comoUsuario(p, "u-sup");
+  // Cotización: duplicar y eliminar el borrador del autor (la administración: lo comercial es suyo)
+  await comoUsuario(p, "u-adm");
   await p.goto(`${BASE}/app/documentos/ver?id=d-cot-0`, { waitUntil: "networkidle0" });
   await sleep(600);
   await clic(p, "Duplicar");
@@ -1134,7 +1113,274 @@ async function navegacion(b, errores) {
   await p.touchscreen.tap(195, 60);
   await sleep(300);
   ok(cerrada && !(await p.$('[aria-label="Nuevo documento"]')), "la hoja «Nuevo» se cierra con Esc y tocando fuera");
-  ok(tec.some((x) => x.startsWith("Equipo")) && !tec.some((x) => x.startsWith("Proyecto") || x.startsWith("Cuenta de cobro")), "la hoja del técnico no ofrece proyecto ni cuenta de cobro");
+  ok(tec.some((x) => x.startsWith("Equipo")) && !tec.some((x) => x.startsWith("Proyecto") || x.startsWith("Cuenta de cobro") || x.startsWith("Cotización")), "la hoja del técnico no ofrece proyecto, cotización ni cuenta de cobro");
+  await p.close();
+}
+
+async function impresion(b, errores) {
+  console.log("\n— Impresión y PDF (/imprimir)");
+  const p = await nuevaPagina(b, errores);
+  // window.print abriría el diálogo: se cuenta en vez de abrirlo
+  await p.evaluateOnNewDocument(() => {
+    window.__impresiones = 0;
+    window.print = () => window.__impresiones++;
+  });
+  await p.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+  await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "networkidle0" });
+  await clic(p, "Administrador");
+  await p.waitForFunction(() => location.pathname.startsWith("/app"));
+  await sleep(600);
+  const hoja = () => p.evaluate(() => [...document.querySelectorAll(".doc-print")].map((h) => h.innerText.replace(/\s+/g, " ")).join(" | "));
+  const lista = () => p.waitForSelector("[data-impresion-lista]", { timeout: 20000 });
+  const enFlujo = async () => {
+    await p.emulateMediaType("print");
+    const r = await p.evaluate(() => {
+      const malos = [];
+      for (const h of document.querySelectorAll(".doc-print"))
+        for (let e = h; e; e = e.parentElement) {
+          const cs = getComputedStyle(e);
+          if (["absolute", "fixed"].includes(cs.position) || cs.overflowX !== "visible" || cs.overflowY !== "visible") malos.push(`${e.tagName}.${e.className}`.slice(0, 80));
+        }
+      const z = document.querySelector(".doc-zona");
+      return { malos, zona: z && getComputedStyle(z).position };
+    });
+    await p.emulateMediaType("screen");
+    return r;
+  };
+
+  // 1. Cotización guardada: el botón PDF abre /imprimir con el consecutivo como nombre del archivo
+  await p.goto(`${BASE}/app/documentos/ver?id=d-cot-1`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  const codigo = await p.evaluate(() => document.querySelector("h1 .font-mono").textContent.trim());
+  const enDetalle = await hoja();
+  await clic(p, "PDF");
+  await p.waitForFunction(() => location.pathname.startsWith("/imprimir"));
+  await lista();
+  await sleep(300);
+  ok((await p.title()).startsWith(`${codigo} · Cotización`), `el título (nombre del PDF) empieza por el consecutivo ${codigo}`);
+  const enImpresion = await hoja();
+  ok(enImpresion === enDetalle && enImpresion.includes("Ladrillera Arcillas del Caribe") && /Total \$ [\d.]+/.test(enImpresion) && enImpresion.includes("Aceptación del cliente"), "la hoja trae el cliente, los totales y la aceptación, igual que el detalle");
+  ok((await p.evaluate(() => window.__impresiones)) === 1, "imprime automáticamente una sola vez");
+  ok((await p.evaluate(() => !document.querySelector("aside, nav") && [...document.querySelectorAll("button")].some((x) => x.textContent.includes("Imprimir / Guardar PDF")))), "sin el shell del aplicativo y con «Imprimir / Guardar PDF»");
+  const f = await enFlujo();
+  ok(f.zona === "static" && f.malos.length === 0, `en papel, ningún contenedor de la hoja es absoluto ni recorta${f.malos.length ? `: ${f.malos.join(", ")}` : ""}`);
+  await clic(p, "Volver");
+  await p.waitForFunction(() => location.pathname.startsWith("/app/documentos/ver"));
+  ok(new URL(p.url()).searchParams.get("id") === "d-cot-1", "«Volver» regresa al detalle");
+
+  // 2. Borrador sin guardar desde el generador: se imprime lo diligenciado
+  await p.goto(`${BASE}/app/nuevo/cotizacion`, { waitUntil: "networkidle0" });
+  await sleep(800);
+  await p.evaluate(() => {
+    const s = document.querySelector('section[aria-label="Cliente y proyecto"] select');
+    const o = [...s.options].find((x) => x.textContent.includes("Ladrillera Arcillas del Caribe"));
+    s.value = o.value;
+    s.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await sleep(300);
+  await p.evaluate(() => [...document.querySelectorAll("button")].find((x) => x.textContent.trim() === "Formato")?.click());
+  await sleep(300);
+  await clic(p, "Imprimir / PDF");
+  await p.waitForFunction(() => location.pathname.startsWith("/imprimir"));
+  await lista();
+  await sleep(300);
+  const borrador = await hoja();
+  ok(new URL(p.url()).searchParams.has("borrador") && borrador.includes("Ladrillera Arcillas del Caribe"), "un borrador sin guardar imprime lo que se diligenció");
+  ok((await p.evaluate(() => document.body.innerText)).includes("Borrador sin guardar"), "avisa que el borrador no está guardado");
+  ok(/^COT-borrador-\d{4}-\d{2}-\d{2}/.test(await p.title()), "el PDF del borrador se llama COT-borrador-<fecha>");
+  const fb = await enFlujo();
+  ok(fb.zona === "static" && fb.malos.length === 0, "el borrador también queda en el flujo en papel");
+  await clic(p, "Volver");
+  await p.waitForFunction(() => location.pathname.startsWith("/app/nuevo/cotizacion"));
+  await sleep(800);
+  ok((await p.evaluate(() => document.querySelector('section[aria-label="Cliente y proyecto"] select').selectedOptions[0].textContent)).includes("Ladrillera"), "al volver, el generador conserva lo diligenciado");
+
+  // 3. Cuenta de cobro
+  await p.goto(`${BASE}/app/cobros/ver?id=cc-1`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  const cc = await p.evaluate(() => document.querySelector("h1 .font-mono").textContent.trim());
+  await clic(p, "PDF");
+  await p.waitForFunction(() => location.pathname.startsWith("/imprimir"));
+  await lista();
+  ok((await p.title()).startsWith(`${cc} · Cuenta de cobro`) && (await hoja()).includes("TOTAL A PAGAR"), `la cuenta de cobro imprime con el título ${cc}`);
+  await p.close();
+}
+
+async function comercial(b, errores) {
+  console.log("\n— Comercial solo para la administración: cotizaciones y cuentas de cobro (técnico y SST no las ven)");
+  const p = await nuevaPagina(b, errores);
+  await p.setViewport({ width: 1440, height: 900 });
+  await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "networkidle0" });
+  await clic(p, "Técnico de campo");
+  await p.waitForFunction(() => location.pathname.includes("/app"));
+  await sleep(900);
+  const texto = () => p.evaluate(() => document.body.innerText.replace(/\s+/g, " "));
+  const principal = () => p.evaluate(() => document.querySelector("main").innerText.replace(/\s+/g, " "));
+  const ir = async (r, ms = 500) => {
+    await p.goto(`${BASE}${r}`, { waitUntil: "networkidle0" });
+    await sleep(ms);
+  };
+  const dirFotos = process.env.CAPTURAS || "";
+  const foto = async (n) => {
+    if (dirFotos) await p.screenshot({ path: path.join(dirFotos, `${n}.png`), fullPage: true });
+  };
+
+  // Avisos comerciales dirigidos a su rol (p. ej. de otra pestaña): el técnico y SST no los ven
+  await p.evaluate((k) => {
+    const st = JSON.parse(localStorage.getItem(k));
+    const n = (id, para, texto, extra) => ({ id, para, texto, fecha: "2026-10-21T08:00:00", leida: false, ...extra });
+    st.notificaciones.unshift(
+      n("n-prueba-1", "supervisor", "Prueba: cotización COT-002-26 por revisar", { docId: "d-cot-1" }),
+      n("n-prueba-2", "tecnico", "Prueba: cotización COT-003-26", { docId: "d-cot-2" }),
+      n("n-prueba-3", "supervisor", "Prueba: cuenta de cobro CC-002-26", { cuentaId: "cc-2" }),
+    );
+    localStorage.setItem(k, JSON.stringify(st));
+  }, CLAVE);
+
+  // 1. El técnico y el Coordinador SST: nada comercial en menús, tablero, listados, proyectos, avisos ni por URL
+  for (const [uid, quien] of [["u-tec1", "el técnico"], ["u-sup", "SST"]]) {
+    await comoUsuario(p, uid);
+    await ir("/app", 800);
+    const menu = await p.evaluate(() => [...document.querySelectorAll("aside a")].map((a) => a.getAttribute("href")));
+    ok(!menu.some((h) => h.includes("/app/nuevo/cotizacion") || h.startsWith("/app/cobros")) && menu.includes("/app/nuevo/gasto"), `${quien}: sin «Nueva cotización» ni «Cuentas de cobro» en el menú (sí legaliza gastos)`);
+    const tablero = await principal();
+    ok(!/Cartera por cobrar|Cobrado|Cotizaci/.test(tablero) && !(await p.evaluate(() => [...document.querySelectorAll("main a")].some((a) => a.getAttribute("href") === "/app/nuevo/cotizacion"))), `${quien}: el tablero no muestra cotizaciones, cartera ni cobrado`);
+    await foto(`${uid}-tablero`);
+    await p.click('header button[aria-label="Notificaciones"]');
+    await sleep(300);
+    ok(!/cotizaci|cuenta de cobro/i.test(await p.evaluate(() => document.querySelector("header").innerText)), `${quien}: ningún aviso de cotizaciones o cuentas de cobro`);
+    await p.keyboard.press("Escape");
+    for (const r of ["/app/nuevo/cotizacion", "/app/nuevo/cotizacion?id=d-cot-2", "/app/nuevo/cotizacion?proyecto=p-1", "/app/cobros", "/app/cobros/nueva", "/app/cobros/ver?id=cc-2", "/app/cobros/nueva?proyecto=p-1&cliente=c-clay"]) {
+      await ir(r, 400);
+      ok((await principal()).includes("Acceso restringido"), `${quien}: ${r} muestra «Acceso restringido»`);
+      if (r === "/app/nuevo/cotizacion") await foto(`${uid}-url-cotizacion`);
+    }
+    for (const id of ["d-cot-0", "d-cot-1", "d-cot-2"]) {
+      await ir(`/app/documentos/ver?id=${id}`, 400);
+      ok((await principal()).includes("no disponible"), `${quien}: la cotización ${id} por URL no está disponible`);
+    }
+    await ir("/app/documentos");
+    const docs = await principal();
+    ok(!docs.includes("COT-") && !docs.includes("Cotizaciones") && docs.includes("RT-"), `${quien}: Documentos sin cotizaciones (sí reportes)`);
+    await ir("/app/documentos?q=COT-0");
+    ok((await p.evaluate(() => document.querySelectorAll("tbody tr").length)) === 0, `${quien}: buscar «COT-0» no encuentra nada`);
+    await ir("/app/proyectos");
+    const lista = await principal();
+    ok(!/Cotizado|Cobrado|cotizaci|cuentas? de cobro/i.test(lista), `${quien}: la lista de proyectos no muestra cotizado, cobrado ni cotizaciones`);
+    await ir("/app/proyectos/ver?id=p-1");
+    const pestanas = await p.evaluate(() => [...document.querySelectorAll("[role=tab]")].map((t) => t.textContent));
+    const det = await principal();
+    ok(!pestanas.some((t) => /Cotizaciones|Cuentas de cobro/.test(t)) && pestanas.some((t) => t.startsWith("Reportes")), `${quien}: el proyecto no tiene pestañas de cotizaciones ni cuentas de cobro`);
+    ok(!/Cotizado|Cobrado|Facturado|COT-|CC-0/.test(det) && !(await p.evaluate(() => [...document.querySelectorAll("main a")].some((a) => /nuevo\/cotizacion|cobros\/nueva/.test(a.getAttribute("href") || "")))), `${quien}: el proyecto no muestra totales comerciales ni «Nueva cotización» / «Cuenta de cobro»`);
+    await foto(`${uid}-proyecto`);
+    // Un reporte ya cobrado (RT de cc-2) y uno aprobado sin cobrar: sin banner ni botón de cobro
+    for (const id of ["d-rt-3", "d-rt-2"]) {
+      await ir(`/app/documentos/ver?id=${id}`, 400);
+      const t = await principal();
+      if (!t.includes("no disponible")) ok(!t.includes("ya se cobró") && !t.includes("Crear cuenta de cobro"), `${quien}: el reporte ${id} no muestra «ya se cobró» ni «Crear cuenta de cobro»`);
+    }
+    if (uid === "u-sup") {
+      await ir("/app/revision");
+      ok(!(await principal()).includes("COT-"), "SST: la bandeja de revisión no trae cotizaciones");
+    }
+    // Celular: la hoja «Nuevo» no ofrece cotización ni cuenta de cobro
+    await p.setViewport({ width: 390, height: 844, isMobile: true });
+    await ir("/app");
+    await p.evaluate(() => [...document.querySelectorAll("nav button")].find((x) => x.textContent.includes("Nuevo")).click());
+    await sleep(300);
+    const hoja = await p.evaluate(() => [...document.querySelectorAll('[aria-label="Nuevo documento"] a')].map((a) => a.textContent.trim()));
+    ok(hoja.some((x) => x.startsWith("Legalización de gastos")) && !hoja.some((x) => x.startsWith("Cotización") || x.startsWith("Cuenta de cobro")), `${quien}: la hoja «Nuevo» del celular no ofrece cotización ni cuenta de cobro`);
+    await foto(`${uid}-nuevo-celular`);
+    await p.keyboard.press("Escape");
+    await p.setViewport({ width: 1440, height: 900 });
+  }
+
+  // 2. La administración: crea la cotización y la aprueba y envía en un solo paso (sin revisor aparte)
+  await comoUsuario(p, "u-adm");
+  await ir("/app", 800);
+  const menuAdm = await p.evaluate(() => [...document.querySelectorAll("aside a")].map((a) => a.getAttribute("href")));
+  ok(menuAdm.includes("/app/nuevo/cotizacion") && menuAdm.includes("/app/cobros"), "la administración ve «Nueva cotización» y «Cuentas de cobro»");
+  ok(/Cartera por cobrar/.test(await principal()), "la administración ve la cartera y lo cobrado en el tablero");
+  await foto("u-adm-tablero");
+  await ir("/app/nuevo/cotizacion?proyecto=p-1", 900);
+  await clic(p, "Ladrillera Arcillas del Caribe");
+  await clic(p, "PRY-001-26");
+  await clic(p, "Instalación de cámaras IP");
+  await clic(p, "Instalación de cámara IP");
+  await clic(p, "Continuar con 1");
+  await clic(p, "Omitir");
+  await clic(p, String(new Date().getFullYear()));
+  await clic(p, "Contado contra entrega");
+  await clic(p, "Inmediato");
+  await clic(p, "12 meses");
+  await clic(p, "Omitir");
+  await clic(p, "Ver resumen");
+  ok(!(await p.evaluate(() => [...document.querySelectorAll("button")].some((x) => x.textContent.includes("Enviar a revisión")))), "la cotización no se «envía a revisión»");
+  await clic(p, "Aprobar y enviar al cliente");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
+  await sleep(600);
+  const urlCot = p.url();
+  const h1 = await p.evaluate(() => document.querySelector("h1").innerText);
+  ok(h1.includes("COT-004-26") && h1.includes("Aprobada") && (await texto()).includes("Aprobó y envió al cliente"), "la administración aprueba y envía la cotización COT-004-26 en un paso");
+  await foto("u-adm-cotizacion");
+  await ir("/app/proyectos/ver?id=p-1");
+  const pestAdm = await p.evaluate(() => [...document.querySelectorAll("[role=tab]")].map((t) => t.textContent));
+  ok(pestAdm.some((t) => t.startsWith("Cotizaciones")) && pestAdm.some((t) => t.startsWith("Cuentas de cobro")) && (await principal()).includes("Cotizado"), "la administración ve en el proyecto cotizaciones, cuentas de cobro y lo cotizado");
+  await foto("u-adm-proyecto");
+  // SST no la ve aunque tenga el enlace
+  await comoUsuario(p, "u-sup");
+  await p.goto(urlCot, { waitUntil: "networkidle0" });
+  await sleep(400);
+  ok((await principal()).includes("no disponible"), "SST no abre la cotización nueva por su enlace");
+
+  // 3. El cliente: le llega a su portal, la acepta y la firma
+  await comoUsuario(p, "u-cli");
+  await ir("/app", 600);
+  await p.click('header button[aria-label="Notificaciones"]');
+  await sleep(300);
+  ok((await p.evaluate(() => document.querySelector("header").innerText)).includes("COT-004-26"), "el cliente recibe el aviso de la cotización COT-004-26");
+  await p.keyboard.press("Escape");
+  await p.goto(urlCot, { waitUntil: "networkidle0" });
+  await sleep(600);
+  await clic(p, "Aceptar y firmar");
+  await firmar(p);
+  ok((await p.evaluate(() => document.querySelector("h1").innerText)).includes("Aceptada"), "el cliente acepta la cotización con su firma");
+  await ir("/app/documentos");
+  const docsCli = await principal();
+  ok(docsCli.includes("COT-004-26") && docsCli.includes("COT-002-26") && !docsCli.includes("COT-003-26"), "el cliente ve sus cotizaciones aprobadas o aceptadas (no los borradores)");
+
+  // 4. La administración crea y emite una cuenta de cobro desde un reporte; el cliente la ve
+  await comoUsuario(p, "u-adm");
+  await ir("/app/documentos/ver?id=d-rt-2", 500);
+  await clic(p, "Crear cuenta de cobro");
+  await p.waitForFunction(() => location.pathname.includes("/app/cobros/nueva"));
+  await sleep(600);
+  await p.type('input[aria-label="Valor unitario"]', "950000");
+  await clic(p, "Emitir");
+  await p.waitForFunction(() => location.pathname.includes("/app/cobros/ver"), { timeout: 15000 });
+  await sleep(600);
+  const cc = await p.evaluate(() => document.querySelector("h1 .font-mono, h1").textContent.match(/CC-\d+-\d+/)?.[0] ?? "");
+  ok(cc.startsWith("CC-") && (await texto()).includes("Emitida"), `la administración emite la cuenta de cobro ${cc}`);
+  await ir("/app/documentos/ver?id=d-rt-2", 400);
+  ok((await principal()).includes("ya se cobró en la cuenta de cobro"), "la administración ve el reporte enlazado a su cuenta");
+  // SST ve el reporte, pero no el enlace a la cuenta
+  await comoUsuario(p, "u-sup");
+  await ir("/app/documentos/ver?id=d-rt-2", 400);
+  const rSst = await principal();
+  ok(rSst.includes("RT-004-26") && !rSst.includes("ya se cobró") && !rSst.includes(cc), "SST ve el reporte cobrado sin «ya se cobró en CC-…»");
+  // El cliente del reporte (Horizonte Azul) ve su cuenta emitida
+  await comoUsuario(p, "u-cli");
+  await ir("/app", 500);
+  await p.click('header button[aria-haspopup="menu"]');
+  await sleep(300);
+  await p.select("header select", "c-tango");
+  await sleep(900);
+  await ir("/app/cobros", 500);
+  ok((await principal()).includes(cc), `el cliente ve su cuenta emitida ${cc}`);
   await p.close();
 }
 
@@ -1150,6 +1396,8 @@ async function navegacion(b, errores) {
     if (!SOLO || SOLO === "crud") await crud(b, errores);
     if (!SOLO || SOLO === "equipos") await equipos(b, errores);
     if (!SOLO || SOLO === "navegacion") await navegacion(b, errores);
+    if (!SOLO || SOLO === "comercial") await comercial(b, errores);
+    if (!SOLO || SOLO === "impresion") await impresion(b, errores);
   } catch (e) {
     ok(false, `error: ${e.message}`);
   } finally {

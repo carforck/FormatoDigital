@@ -15,7 +15,7 @@ import { totales } from "@/modulos/cobros/tipos";
 import { TIPOS_DOC, cantidadDoc, formatoDe, rutaNuevo, tituloDoc, valorDoc } from "@/modulos/registro";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { cop } from "@/nucleo/letras";
-import { puede, puedeVerProyecto } from "@/nucleo/permisos";
+import { puede, puedeCrearTipo, puedeUsarTipo, puedeVerProyecto } from "@/nucleo/permisos";
 import { resumenProyecto } from "@/nucleo/proyectos";
 import { rutaCuenta, rutaDoc } from "@/nucleo/rutas";
 import type { TipoDoc } from "@/nucleo/tipos";
@@ -50,7 +50,9 @@ function Detalle() {
   const responsable = demo.usuarios.find((x) => x.id === p.responsableId);
   // Lo visible para el perfil: el cliente solo ve lo aprobado o cerrado de formatos visibles para él
   const r = resumenProyecto(p, demo.visibles, demo.cuentasVisibles);
-  const tipos = TIPOS_DOC.filter((t) => interno || r.porTipo[t] > 0 || t === "reporte" || t === "cotizacion").filter((t) => interno || t !== "gasto");
+  // Pestañas de los módulos del perfil: el cliente no ve gastos; el técnico y SST, nada comercial
+  const tipos = TIPOS_DOC.filter((t) => puedeUsarTipo(u.rol, t)).filter((t) => interno || r.porTipo[t] > 0 || t === "reporte" || t === "cotizacion");
+  const verCotizado = puedeUsarTipo(u.rol, "cotizacion");
   const verCobros = puede(u.rol, "ver_cobros");
   const autor = (uid: string) => demo.usuarios.find((x) => x.id === uid)?.nombre ?? "—";
   const docs = [...r.docs].sort((a, b) => b.creado.localeCompare(a.creado));
@@ -65,7 +67,7 @@ function Detalle() {
 
   const kpis = [
     { t: "Documentos", v: String(r.docs.length), d: tipos.map((t) => cantidadDoc(t, r.porTipo[t])).join(" · "), icon: FileText },
-    { t: "Cotizado", v: cop(r.cotizado), d: `Aceptado por el cliente: ${cop(r.aceptado)}`, icon: CircleDollarSign },
+    ...(verCotizado ? [{ t: "Cotizado", v: cop(r.cotizado), d: `Aceptado por el cliente: ${cop(r.aceptado)}`, icon: CircleDollarSign }] : []),
     ...(interno ? [{ t: "Gastos legalizados", v: cop(r.gastado), d: "Con Vo.Bo. o reembolsados", icon: Wallet }] : []),
     ...(verCobros ? [{ t: "Cobrado", v: cop(r.cobrado), d: `Facturado: ${cop(r.facturado)}`, icon: Receipt }] : []),
   ];
@@ -207,7 +209,7 @@ function Detalle() {
           <h2 className="text-sm font-semibold text-slate-900">Nuevo en este proyecto</h2>
           <p className="text-xs text-slate-500">El formato se abre con el cliente y el proyecto ya diligenciados.</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {TIPOS_DOC.map((t) => (
+            {TIPOS_DOC.filter((t) => puedeCrearTipo(u.rol, t)).map((t) => (
               <Link key={t} href={nuevoEn(t)} onClick={marcarEdicion} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:border-sotec-green hover:bg-slate-50">
                 <Plus className="h-4 w-4" aria-hidden />
                 <IconoDoc tipo={t} className="h-4 w-4 text-slate-500" /> {formatoDe(t).corto}
@@ -278,7 +280,7 @@ function Detalle() {
           ) : lista.length === 0 ? (
             <div className="px-4 py-6 text-sm text-slate-500">
               <p>No hay {pestana === "todos" ? "documentos" : formatoDe(pestana).plural} visibles en este proyecto.</p>
-              {crea && pestana !== "todos" && (
+              {crea && pestana !== "todos" && puedeCrearTipo(u.rol, pestana) && (
                 <Link href={nuevoEn(pestana)} onClick={marcarEdicion} className="mt-2 inline-flex items-center gap-1 font-medium text-sotec-greenDeep hover:underline">
                   <Plus className="h-4 w-4" aria-hidden /> {formatoDe(pestana).nuevo} {formatoDe(pestana).corto.toLowerCase()} en este proyecto
                 </Link>

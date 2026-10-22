@@ -391,10 +391,12 @@ export function documentosSeed(): Documento[] {
     { id: "d-cot-1", cliente: clay, fecha: "2026-10-15", estado: "aprobado", asunto: "Ampliación CCTV patio de secado", items: [servicio("inst-camara", 4, "1a"), servicio("cableado", 180, "1b"), servicio("config-nvr", 1, "1c")] },
     { id: "d-cot-2", cliente: puerto, fecha: "2026-10-21", estado: "borrador", asunto: "Mantenimiento detección de incendio bodegas", items: [servicio("visita", 2, "2a")] },
   ];
+  // Lo comercial es de la administración: la gerencia cotiza y aprueba en un solo paso (sin revisor aparte)
+  const adm = USUARIOS_SEED.find((x) => x.rol === "admin")!;
   cotizaciones.forEach((c, i) => {
     const n = i + 1;
-    const h = [{ fecha: `${c.fecha}T09:00:00`, usuarioId: sup.id, accion: "Creó el documento" }];
-    if (c.estado !== "borrador") h.push({ fecha: `${c.fecha}T10:00:00`, usuarioId: sup.id, accion: "Envió a revisión" }, { fecha: `${c.fecha}T15:00:00`, usuarioId: "u-adm", accion: "Aprobó" });
+    const h = [{ fecha: `${c.fecha}T09:00:00`, usuarioId: adm.id, accion: "Creó el documento" }];
+    if (c.estado !== "borrador") h.push({ fecha: `${c.fecha}T15:00:00`, usuarioId: adm.id, accion: "Aprobó y envió al cliente" });
     if (c.estado === "cerrado") h.push({ fecha: `${c.fecha}T18:00:00`, usuarioId: "", accion: "Cotización aceptada por el cliente" });
     docs.push({
       id: c.id,
@@ -402,14 +404,14 @@ export function documentosSeed(): Documento[] {
       codigo: codigo("COT", n, c.fecha),
       consecutivo: n,
       estado: c.estado,
-      autorId: sup.id,
+      autorId: adm.id,
       clienteId: c.cliente.id,
       creado: `${c.fecha}T09:00:00`,
       actualizado: `${c.fecha}T15:00:00`,
       historial: h,
       datos: {
         ...cotizacionVacia(c.fecha),
-        vendedor: sup.nombre,
+        vendedor: adm.nombre,
         cliente: c.cliente.nombre,
         clienteNit: c.cliente.nit ?? "",
         contacto: c.cliente.contacto,

@@ -142,12 +142,45 @@ códigos QR y licencias.
 Acción `equipos` en `src/nucleo/permisos.ts`; borrar es de `admin` y
 `supervisor` (`puedeEliminarEquipos`).
 
+### Lo comercial: solo la administración
+
+Pedido de SOTEC: «que el admin sea el único que tenga acceso a estos módulos de
+cotización y demás; el técnico no». Se interpretó como **lo comercial**
+(cotizaciones y cuentas de cobro); reportes, permisos, legalización de gastos,
+proyectos y equipos siguen igual (el técnico legaliza sus gastos).
+
+| Operación | Admin | Coordinador SST | Técnico | Cliente |
+|---|---|---|---|---|
+| Ver cotizaciones (listas, tablero, proyecto, URL, avisos) | Todas | No | No (ni las propias) | Las de su empresa aprobadas o aceptadas |
+| Crear, editar, duplicar, eliminar borrador de cotización | Sí | No | No | No |
+| Aprobar y enviar la cotización al cliente | Sí (un paso) | No | No | — |
+| Aceptar la cotización con su firma | En sitio, ante el cliente | No | No | Sí (portal) |
+| Ver cuentas de cobro, cartera, cobrado, «ya se cobró en CC-…» | Todas | No | No | Las suyas emitidas, enviadas o pagadas |
+| Crear, editar, emitir, enviar, pagar, anular cuentas | Sí | No | No | No |
+| Totales del proyecto | Cotizado, gastos, cobrado | Gastos | Barra de presupuesto | Cotizado |
+
+- **App:** acciones `cotizar` (nueva) y `cobros` / `ver_cobros` solo para
+  `admin` (y `ver_cobros` para el cliente) en `src/nucleo/permisos.ts`. Cada
+  módulo de documento declara `requiere` (la cotización: `cotizar`);
+  `puedeUsarTipo` / `puedeCrearTipo` lo aplican de forma genérica a
+  `puedeVerDoc` (listas, tablero, revisión, proyectos, notificaciones), al
+  menú, la hoja «Nuevo», las pestañas y totales del proyecto, el generador
+  (la ruta `/app/nuevo/<tipo>` muestra «Acceso restringido») y a las acciones
+  del `DemoProvider` (guardar, enviar, aprobar, rechazar, cerrar, duplicar,
+  eliminar, registrar envío).
+- **Base de datos:** `0011_comercial_solo_admin.sql` (ver abajo).
+
 ### Cotizaciones
 
 - Módulo de documento (`DOCUMENTOS.cotizacion`, prefijo COT, visible para el
-  cliente): borrador → en revisión → **aprobada** (= enviada al cliente) →
-  **aceptada** (cerrada con la firma del cliente en su portal, en sitio o por
-  enlace). Su valor (`valor`) suma al «cotizado» del proyecto.
+  cliente, `requiere: "cotizar"`). **Regla de aprobación:** la administración
+  es quien cotiza y quien aprueba, así que **no hay revisor aparte**:
+  borrador → **aprobada** (= enviada al cliente) con el botón «Aprobar y
+  enviar al cliente» (`flujo.aprobarAlEnviar`; evento «Aprobó y envió al
+  cliente») → **aceptada** (cerrada con la firma del cliente en su portal, en
+  sitio o por enlace). No pasa por «en revisión». La separación de funciones
+  (nadie aprueba lo propio) sigue para los demás formatos. Su valor (`valor`)
+  suma al «cotizado» del proyecto.
 
 ### Legalización de gastos (FO-GSST-25)
 
@@ -168,6 +201,8 @@ Acción `equipos` en `src/nucleo/permisos.ts`; borrar es de `admin` y
   (`src/nucleo/letras.ts`: «UN MILLÓN DE PESOS M/CTE»).
 - Flujo: borrador → emitida → enviada → pagada / anulada (igual al trigger
   `cuentas_cobro_flujo`). El cliente solo ve sus cuentas ya emitidas.
+- **Solo la administración** las crea, las ve y las gestiona (`cobros`,
+  `ver_cobros`); el técnico y el Coordinador SST no.
 - No es un módulo de documento: tiene su propia tabla, tipos
   (`src/modulos/cobros/tipos.ts`) y pantallas (`/app/cobros`).
 
@@ -204,6 +239,50 @@ Acción `equipos` en `src/nucleo/permisos.ts`; borrar es de `admin` y
   (`doc-compacto`); las fotos van de 6 en 6 por hoja anexa con encabezado, y
   filas, fotos y el bloque de aprobación no se parten. El pie dice «Hoja N ·
   Formato/Soportes», no «Página X de Y», porque el total depende del papel.
+  - **Ruta dedicada `/imprimir`** (`src/app/imprimir/`, ayuda en
+    `src/nucleo/impresion.ts`): todo botón «PDF» / «Imprimir» (detalle del
+    documento, generador, cuenta de cobro) abre `/imprimir?doc=<id>`,
+    `?cuenta=<id>` o `?borrador=<clave>&tipo=<tipo>&id=<id>` en la misma
+    pestaña (en el celular las ventanas emergentes se bloquean). Está fuera del
+    shell `/app`: en el DOM solo hay una barra (`print:hidden`) con «Volver» e
+    «Imprimir / Guardar PDF» y las hojas en flujo normal, en tema claro. Espera
+    `img.decode()` de cada foto y `document.fonts.ready` y llama a
+    `window.print()` una vez por apertura (marca `n` en la URL).
+  - **Por qué:** Safari (iOS) imprimía solo la franja verde de la cotización.
+    La estrategia anterior (`body * { visibility: hidden }` + `.doc-zona`
+    `position: absolute`) dejaba el contenido absoluto dentro del contenedor
+    con scroll (`overflow-x-auto`) de la vista previa, que medía 16 px; WebKit
+    recorta lo absoluto a ese contenedor y no lo pagina. Chrome sí lo pinta.
+    Regla: en papel nada que envuelva una hoja es `absolute`/`fixed` ni
+    recorta (`overflow` visible), y la hoja es `display: block` (la
+    cotización es flex + `overflow-hidden` en pantalla; WebKit no pagina bien
+    un flex), sin altura mínima fija. Las rejillas que dependen de `sm:` tienen
+    su `print:` (si el navegador imprime con el ancho del celular, las fotos
+    siguen de 2 en 2).
+  - **Papel:** `@page { size: letter | A4; margin: 0 }` según el formato
+    (permiso y legalización A4; reporte, cotización y cuenta de cobro carta);
+    cada hoja trae su margen interior.
+  - **Nombre del PDF = consecutivo:** `document.title` es
+    `COT-004-26 · Cotización · <cliente>` (sin `/ : * ? " < > |`); Chrome,
+    Android y Safari lo usan como nombre del archivo. Un borrador nunca
+    guardado se llama `COT-borrador-<aaaa-mm-dd>` y la hoja muestra el código
+    provisional, como el generador.
+  - **Borrador sin guardar:** el generador pasa su contenido en memoria por
+    `sessionStorage` (`fd-imprimir-borrador-*`, solo el último); si no está,
+    la página usa el guardado automático `fd-generador-<tipo>-<usuario>`. Se
+    avisa «Borrador sin guardar — guárdalo para asignarle su consecutivo». Al
+    volver, un documento nuevo se recupera del guardado automático y uno ya
+    guardado con cambios pendientes, de `fd-generador-retorno`.
+  - **«Volver»:** si la impresión se abrió desde el aplicativo en esta pestaña
+    (`fd-imprimir-origen`), regresa con «atrás»; si no, a `volver` (solo rutas
+    `/app…`).
+  - **Ctrl+P dentro del aplicativo** (respaldo de escritorio): con `:has()` se
+    saca del flujo todo lo que no lleva a `.doc-zona` y su cadena de
+    contenedores queda en bloque sin recorte; sin `visibility` ni `absolute`.
+  - **Pruebas:** e2e `impresion` (botón → `/imprimir`, título, contenido,
+    borrador, sin `absolute` ni recorte en papel). Safari agrega su propio
+    encabezado y pie (título y URL) según su configuración; eso no se controla
+    desde la página.
 - **Ventanas modales** (`src/components/ui/useModal.ts`): Esc cierra, foco
   inicial dentro, foco atrapado y devuelto al botón que la abrió.
 
@@ -272,8 +351,9 @@ aporta en `ModuloDocumento` lo que el resto lee del registro con
 | `clienteDe`, `campoCliente` | Cliente u obra en listados y dónde va el cliente escrito a mano |
 | `alElegirProyecto` | Autollenado de los campos de proyecto u obra |
 | `visibleCliente` | Si el portal del cliente lo ve (`puedeVerDoc`, igual a `formatos.visible_cliente`) |
+| `requiere` | Permiso que exige al personal interno además de `crear` (`cotizar`: lo comercial, solo la administración). Sin él, el módulo no aparece en menús, «Nuevo», listas, pestañas ni totales y su URL queda bloqueada (`puedeUsarTipo`, `puedeCrearTipo`; en la base, `formato_comercial`) |
 | `color` | Serie de las gráficas (`--serie-a…e` en `globals.css`) |
-| `flujo` | Botón y firma al aprobar, qué escribe al aprobar, quién cierra (`cliente`, `revisor` o `formulario`) y el evento de cierre |
+| `flujo` | Botón y firma al aprobar, qué escribe al aprobar, quién cierra (`cliente`, `revisor` o `formulario`) y el evento de cierre; `aprobarAlEnviar`: sin revisor aparte, quien tiene el permiso del módulo aprueba al enviar (cotización) |
 | `etiquetasEstado` | Concordancia («Aprobada», «Aceptada») en `EstadoBadge tipo=` |
 | `duplicar`, `aplicarFirma`, `valor` | Qué se limpia al duplicar, cómo se guarda una firma, valor monetario para los proyectos |
 
@@ -316,6 +396,7 @@ Migraciones en `supabase/migrations/`:
 | `0008_separacion_funciones.sql` | separación de funciones: solo el autor edita y envía su documento, nadie aprueba ni rechaza lo propio; los enlaces de firma solo se crean sobre reportes aprobados sin firma del cliente, y `firmar_con_enlace` invalida los demás enlaces del documento y nunca sobrescribe una firma |
 | `0009_proyectos.sql` | tabla `proyectos` (código PRY por consecutivos, `crear_proyecto` solo admin y SST, RLS: el equipo ve los de su empresa y el cliente los suyos); `documentos.proyecto_id` y `cuentas_cobro.proyecto_id` (misma organización y mismo cliente, se bloquean al enviar o emitir); `crear_documento` y `crear_cuenta_cobro` reciben el proyecto (el cliente sale de él; no en proyectos cerrados); formato `cotizacion` (COT, visible para el cliente); `firmar_como_cliente`: el cliente firma en su portal un reporte o cotización aprobados y eso lo cierra |
 | `0010_equipos.sql` | tabla `equipos` (nombre único por organización, cliente y sistema; trigger `equipos_coherencia`: cliente y proyecto de la misma organización, el cliente no cambia, auditoría al registrar y al cambiar de estado; RLS: el equipo interno ve, crea y edita, admin y SST borran, el cliente ve los de su empresa) y `documento_equipos` (equipos atendidos en un documento: solo el autor, solo en borrador o rechazado y solo equipos del cliente del documento; visible si el documento lo es; FK `restrict`: un equipo con historial no se borra, se retira) |
+| `0011_comercial_solo_admin.sql` | lo comercial es solo de la administración: `formato_comercial(formato)` (hoy `cotizacion`); `documentos_ver`/`crear`/`editar` dejan esos documentos solo al `admin` (el cliente sigue viendo los suyos aprobados o aceptados); `documentos_flujo`: la cotización pasa de borrador o rechazado a aprobado por el admin autor en un paso («Aprobó y envió al cliente»), no va a revisión, y SST o técnico no la tocan; `crear_documento('cotizacion')`, `crear_cuenta_cobro` y `crear_enlace_firma` (sobre lo comercial) exigen admin; cuentas de cobro e ítems: ver, crear y editar solo `admin` (el cliente, las suyas emitidas); `notif_ver` solo muestra avisos de documentos visibles; `proyectos_borrar` cuenta documentos y cuentas sin RLS (`proyecto_vacio`) |
 | `seed.sql` | organización SOTEC, sus formatos y un cliente ficticio |
 
 `supabase/instalar.sql` une migraciones y semilla para instalar un proyecto
@@ -328,6 +409,7 @@ nuevo de una vez (SQL Editor → Run). Se regenera, no se edita a mano.
 - **Roles por organización** (`miembros.rol`): `admin`, `supervisor`,
   `tecnico`, `cliente`. Un cliente queda atado a su empresa (`cliente_id`) y
   solo ve sus documentos aprobados o cerrados de formatos visibles para él.
+  Lo comercial (cotizaciones y cuentas de cobro) es solo de `admin` (0011).
 - **Reglas en la base de datos, no solo en la app** (trigger
   `documentos_flujo`): transiciones válidas (borrador → en revisión →
   aprobado → cerrado; rechazo con motivo obligatorio), quién puede hacer cada
@@ -382,7 +464,7 @@ bash scripts/armar-instalador.sh                                # 3. regenera su
 |---|---|
 | `npm run test:db` | Migraciones, RLS y flujo en PostgreSQL desechable |
 | `npm run test:unit` | Valor en letras, 22 casos (`tests/unit/letras.test.ts`) |
-| `npm run test:e2e` | Demo en el navegador (`tests/e2e/demo.cjs`): secciones `flujo`, `responsive`, `controles`, `magno`, `proyectos`, `crud`, `equipos`, `navegacion` |
+| `npm run test:e2e` | Demo en el navegador (`tests/e2e/demo.cjs`): secciones `flujo`, `responsive`, `controles`, `magno`, `proyectos`, `crud`, `equipos`, `navegacion`, `comercial` |
 
 - `SOLO=<sección> npm run test:e2e` corre una sola sección.
 - `BASE=https://formato-digital-nine.vercel.app npm run test:e2e` prueba el
@@ -443,3 +525,6 @@ datos; los módulos y las pantallas no cambian.
 - Incluir los gastos reembolsables en las cuentas de cobro.
 - Requerimiento de materiales: planeado.
 - Equipos: aplicar `0010_equipos.sql` en Supabase (probada solo en local).
+- Comercial solo admin: aplicar `0011_comercial_solo_admin.sql` en Supabase
+  (probada solo en local). Los archivos del bucket `archivos` siguen con
+  acceso por organización (0004), no por documento.

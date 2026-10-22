@@ -38,12 +38,24 @@
 @media print {
   @page { margin: 0; }
   html, body { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body * { visibility: hidden; }
-  .doc-print, .doc-print * { visibility: visible; }
-  /* La zona del documento se fija arriba; sus hojas (formato + anexos) van una por página */
-  .doc-zona { position: absolute !important; inset: 0 0 auto 0 !important; width: 100% !important; margin: 0 !important; }
+  /*
+   * Ctrl+P dentro del aplicativo (respaldo de escritorio; los botones «PDF» abren
+   * /imprimir). Nada de posición absoluta ni de visibility: WebKit (Safari iOS)
+   * recorta lo absoluto dentro de un contenedor con scroll y no lo pagina. Se
+   * quita del flujo todo lo que no lleva a la zona del documento y la cadena de
+   * contenedores que la envuelve queda en bloque, sin recorte ni altura fija.
+   * Sin :has() (navegadores viejos) la regla se descarta completa.
+   */
+  *:has(.doc-zona) > :not(:has(.doc-zona)):not(.doc-zona) { display: none !important; }
+  *:has(.doc-zona) { display: block !important; position: static !important; overflow: visible !important; height: auto !important; min-height: 0 !important; max-height: none !important; margin: 0 !important; padding: 0 !important; border: 0 !important; background: #fff !important; box-shadow: none !important; transform: none !important; }
+  .doc-zona { position: static !important; width: 100% !important; margin: 0 !important; }
   .doc-zona > * + * { margin-top: 0 !important; }
-  .doc-print { width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0.8cm 1cm !important; box-shadow: none !important; border: 0 !important; --tw-ring-shadow: 0 0 #0000 !important; }
+  /* Página de impresión (/imprimir): hojas en el flujo, sin recortes ni anchos mínimos */
+  .fd-impresion .overflow-x-auto, .fd-impresion .overflow-auto { overflow: visible !important; }
+  .fd-impresion table { min-width: 0 !important; }
+  /* La hoja nunca recorta (la cotización es flex + overflow-hidden en pantalla) ni se estira
+     a una altura fija que pueda dejar una página en blanco; WebKit no pagina bien un flex */
+  .doc-print { display: block !important; overflow: visible !important; min-height: 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0.8cm 1cm !important; box-shadow: none !important; border: 0 !important; --tw-ring-shadow: 0 0 #0000 !important; }
   .doc-print + .doc-print { break-before: page; page-break-before: always; }
   .break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
   .break-after-avoid { break-after: avoid; page-break-after: avoid; }

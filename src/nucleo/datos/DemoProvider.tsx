@@ -7,7 +7,7 @@ import { puedeVerEquipo } from "@/modulos/equipos/logica";
 import * as reglasEquipos from "@/modulos/equipos/reglas";
 import type { ApiEquipos, Equipo } from "@/modulos/equipos/tipos";
 import { infoDoc, prefijoDe } from "@/modulos/registro";
-import { puede, puedeVerCuenta, puedeVerDoc, puedeVerProyecto } from "@/nucleo/permisos";
+import { puede, puedeCrearTipo, puedeUsarTipo, puedeVerCuenta, puedeVerDoc, puedeVerProyecto } from "@/nucleo/permisos";
 import {
   CLIENTES_SEED,
   CONFIG_SEED,
@@ -22,7 +22,7 @@ import {
 import type { Auditoria, Cliente, Config, Documento, EnlaceFirma, EstadoProyecto, Notificacion, Proyecto, Rol, TipoDoc, Usuario } from "@/nucleo/tipos";
 
 // Subir la versión al cambiar la semilla: los navegadores cargan los datos nuevos
-const KEY = "sotec-demo-v7";
+const KEY = "sotec-demo-v8";
 
 interface Estado {
   usuarioId: string | null;
@@ -221,6 +221,13 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       const r = rolDe(prev);
       return r === "admin" || r === "supervisor";
     };
+    /** El perfil actual tiene acceso al módulo del documento (lo comercial es solo de la administración). */
+    const usaTipo = (prev: Estado, tipo: TipoDoc) => {
+      const r = rolDe(prev);
+      return Boolean(r && puedeUsarTipo(r, tipo));
+    };
+    /** Revisor con acceso al módulo del documento. */
+    const revisaTipo = (prev: Estado, tipo: TipoDoc) => esRevisor(prev) && usaTipo(prev, tipo);
     /** Un enlace sirve si no se usó, no venció y el reporte está aprobado y sin firma del cliente. */
     const enlaceValido = (st: Estado, token: string): { enlace: EnlaceFirma; doc: Documento } | null => {
       const enlace = st.enlaces.find((e) => e.token === token);
@@ -265,8 +272,15 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       listo,
       usuario,
       visibles: usuario ? s.documentos.filter((d) => puedeVerDoc(usuario, d)) : [],
+      // Solo avisos de lo que el perfil puede abrir (nada comercial para el técnico o SST)
       misNotificaciones: usuario
-        ? s.notificaciones.filter((n) => n.para === usuario.rol || n.para === usuario.id)
+        ? s.notificaciones.filter((n) => {
+            if (n.para !== usuario.rol && n.para !== usuario.id) return false;
+            const d = n.docId ? s.documentos.find((x) => x.id === n.docId) : undefined;
+            if (d && !puedeVerDoc(usuario, d)) return false;
+            const c = n.cuentaId ? s.cuentas.find((x) => x.id === n.cuentaId) : undefined;
+            return !c || puedeVerCuenta(usuario, c);
+          })
         : [],
 
       entrarComo(rol, usuarioId) {
@@ -302,12 +316,15 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
           const existente = prev.documentos.find((d) => d.id === doc.id);
           if (existente) {
             // Solo el autor edita, y solo en borrador o rechazado; se conserva lo que no es contenido
-            const editable = existente.autorId === prev.usuarioId && (existente.estado === "borrador" || existente.estado === "rechazado");
+            const editable = existente.autorId === prev.usuarioId && usaTipo(prev, existente.tipo) && (existente.estado === "borrador" || existente.estado === "rechazado");
             if (!editable) return prev;
             const merged = { ...existente, datos: doc.datos, clienteId: doc.clienteId, proyectoId: doc.proyectoId || undefined, equiposIds: equiposDelCliente(prev, doc), actualizado: ahora() } as Documento;
             return { ...prev, documentos: prev.documentos.map((d) => (d.id === doc.id ? merged : d)) };
           }
-          // Documento nuevo: toma el consecutivo definitivo del año (no se reutiliza aunque se elimine)
+          // Documento nuevo: solo de un módulo que el perfil puede diligenciar (lo comercial, la administración)
+          const r = rolDe(prev);
+          if (!r || !puedeCrearTipo(r, doc.tipo)) return prev;
+          // Toma el consecutivo definitivo del año (no se reutiliza aunque se elimine)
           const anio = anioDe(hoy());
           const clave = `${doc.tipo}-${anio}`;
           const n = (prev.consecutivos[clave] ?? 0) + 1;
@@ -332,15 +349,26 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
 
       enviar(id) {
         transicion(id, (d, prev) => {
-          if (d.autorId !== prev.usuarioId || (d.estado !== "borrador" && d.estado !== "rechazado")) return null;
+          if (d.autorId !== prev.usuarioId || !usaTipo(prev, d.tipo) || (d.estado !== "borrador" && d.estado !== "rechazado")) return null;
+          const info = infoDoc(d.tipo);
+          // Formato sin revisor aparte (cotización): quien tiene el permiso del módulo la aprueba al enviarla
+          if (info.flujo.aprobarAlEnviar) {
+            const accion = info.visibleCliente ? "Aprobó y envió al cliente" : "Aprobó";
+            const aviso = info.visibleCliente && info.flujo.cierre === "cliente"
+              ? aClientes(prev, d.clienteId, `${prev.config.empresa} compartió ${info.formato.el} ${info.formato.corto.toLowerCase()} ${d.codigo} para tu firma`, d.id)
+              : [];
+            return {
+              doc: { ...d, estado: "aprobado", motivoRechazo: undefined, historial: [...d.historial, evento(prev, accion)] },
+              notificaciones: [...aviso, ...prev.notificaciones],
+              auditoria: registrar(prev, accion, d.codigo),
+            };
+          }
           const texto = `${nombre(prev.usuarioId)} envió ${d.codigo} a revisión`;
+          // Solo a los revisores con acceso al módulo
+          const revisores = (["supervisor", "admin"] as const).filter((r) => puedeUsarTipo(r, d.tipo));
           return {
             doc: { ...d, estado: "en_revision", motivoRechazo: undefined, historial: [...d.historial, evento(prev, "Envió a revisión")] },
-            notificaciones: [
-              { id: uid("n"), para: "supervisor", texto, docId: d.id, fecha: ahora(), leida: false },
-              { id: uid("n"), para: "admin", texto, docId: d.id, fecha: ahora(), leida: false },
-              ...prev.notificaciones,
-            ],
+            notificaciones: [...revisores.map((r) => ({ id: uid("n"), para: r, texto, docId: d.id, fecha: ahora(), leida: false })), ...prev.notificaciones],
             auditoria: registrar(prev, "Envió a revisión", d.codigo),
           };
         });
@@ -349,7 +377,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       aprobar(id, firmaAutoriza) {
         transicion(id, (d, prev) => {
           // Solo un revisor, solo en revisión y nunca sobre un documento propio
-          if (d.estado !== "en_revision" || !esRevisor(prev) || d.autorId === prev.usuarioId) return null;
+          if (d.estado !== "en_revision" || !revisaTipo(prev, d.tipo) || d.autorId === prev.usuarioId) return null;
           const u = prev.usuarios.find((x) => x.id === prev.usuarioId);
           const info = infoDoc(d.tipo);
           // Cada formato escribe en su casilla quién autoriza (permiso) o da el Vo.Bo. (gastos)
@@ -369,7 +397,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
 
       rechazar(id, motivo) {
         transicion(id, (d, prev) => {
-          if (d.estado !== "en_revision" || !esRevisor(prev) || d.autorId === prev.usuarioId || !motivo.trim()) return null;
+          if (d.estado !== "en_revision" || !revisaTipo(prev, d.tipo) || d.autorId === prev.usuarioId || !motivo.trim()) return null;
           return {
             doc: { ...d, estado: "rechazado", motivoRechazo: motivo, historial: [...d.historial, evento(prev, "Rechazó", motivo)] },
             notificaciones: notificar(prev, d.autorId, `${d.codigo} fue rechazado: ${motivo}`, d.id),
@@ -386,7 +414,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
           // Reporte y cotización: los cierra la firma del cliente (su portal, o en sitio ante un revisor);
           // permiso, gastos: un revisor
           const delCliente = flujo.cierre === "cliente";
-          const puedeCerrar = esRevisor(prev) || (delCliente && u?.rol === "cliente" && u.clienteId === d.clienteId);
+          const puedeCerrar = revisaTipo(prev, d.tipo) || (delCliente && u?.rol === "cliente" && u.clienteId === d.clienteId);
           if (!puedeCerrar) return null;
           const datos = { ...d.datos, ...cambios } as Record<string, unknown>;
           // Nadie cierra sin la firma real del cliente (igual que el trigger documentos_flujo)
@@ -401,7 +429,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
 
       duplicar(id) {
         const d = s.documentos.find((x) => x.id === id);
-        if (!d || !usuario) return null;
+        if (!d || !usuario || !puedeCrearTipo(usuario.rol, d.tipo) || !puedeVerDoc(usuario, d)) return null;
         const n = api.nuevoId(d.tipo);
         // Cada módulo decide qué se limpia al duplicar (fechas y firmas)
         const datos = infoDoc(d.tipo).duplicar(d.datos, hoy());
@@ -414,7 +442,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         setS((prev) => {
           const d = prev.documentos.find((x) => x.id === id);
           // Solo borradores propios; el consecutivo no se libera
-          if (!d || d.estado !== "borrador" || d.autorId !== prev.usuarioId) return prev;
+          if (!d || d.estado !== "borrador" || d.autorId !== prev.usuarioId || !usaTipo(prev, d.tipo)) return prev;
           return { ...prev, documentos: prev.documentos.filter((x) => x.id !== id), auditoria: registrar(prev, "Eliminó", d.codigo) };
         });
       },
@@ -534,6 +562,9 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
 
       registrarEnvio({ docId, cuentaId }, canal, destino) {
         const accion = canal === "correo" ? "Envió por correo" : "Envió por WhatsApp";
+        // Solo lo que el perfil puede ver; una cuenta de cobro, solo la administración
+        const dEnv = docId ? s.documentos.find((x) => x.id === docId) : undefined;
+        if (!usuario || (docId && (!dEnv || !puedeVerDoc(usuario, dEnv))) || (cuentaId && !puede(usuario.rol, "cobros"))) return;
         setS((prev) => ({
           ...prev,
           documentos: docId ? prev.documentos.map((d) => (d.id === docId ? { ...d, historial: [...d.historial, evento(prev, accion, destino)] } : d)) : prev.documentos,
@@ -599,8 +630,9 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         });
       },
 
+      // Solo entre las cuentas que el perfil ve (el técnico y SST, ninguna)
       cuentaDeReporte(docId) {
-        return s.cuentas.find((c) => c.estado !== "anulada" && c.items.some((i) => i.documentoId === docId));
+        return s.cuentas.find((c) => c.estado !== "anulada" && c.items.some((i) => i.documentoId === docId) && Boolean(usuario && puedeVerCuenta(usuario, c)));
       },
 
       errorGuardado,

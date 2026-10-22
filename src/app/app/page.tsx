@@ -29,7 +29,7 @@ import {
   type Periodo,
 } from "@/nucleo/indicadores";
 import { cop } from "@/nucleo/letras";
-import { puede } from "@/nucleo/permisos";
+import { puede, puedeCrearTipo } from "@/nucleo/permisos";
 import { rutaDoc } from "@/nucleo/rutas";
 import type { Documento, Estado, TipoDoc } from "@/nucleo/tipos";
 
@@ -80,8 +80,9 @@ export default function Tablero() {
     .filter((f) => f.valor > 0 || f.clave === cliente)
     .sort((a, b) => b.valor - a.valor);
 
-  // Finanzas (administración)
-  const finanzas = puede(u.rol, "cobros");
+  // Finanzas: la cartera y lo cobrado son de la administración (comercial); los gastos, de quien revisa
+  const comercial = puede(u.rol, "cobros");
+  const finanzas = comercial || puede(u.rol, "revisar");
   const porCobrar = demo.cuentasVisibles.filter((c) => c.estado === "emitida" || c.estado === "enviada").reduce((a, c) => a + totales(c).total, 0);
   const cobrado = demo.cuentasVisibles.filter((c) => c.estado === "pagada").reduce((a, c) => a + totales(c).total, 0);
   const gastosPend = demo.visibles.filter((d) => d.tipo === "gasto" && (d.estado === "en_revision" || d.estado === "aprobado")).length;
@@ -125,9 +126,11 @@ export default function Tablero() {
             <Link href="/app/nuevo/gasto" className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-slate-50">
               <Wallet className="h-4 w-4" /> Gastos
             </Link>
-            <Link href="/app/nuevo/cotizacion" className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-slate-50">
-              <FileSignature className="h-4 w-4" /> Cotización
-            </Link>
+            {puedeCrearTipo(u.rol, "cotizacion") && (
+              <Link href="/app/nuevo/cotizacion" className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-slate-50">
+                <FileSignature className="h-4 w-4" /> Cotización
+              </Link>
+            )}
           </div>
         )}
       </div>
@@ -221,8 +224,12 @@ export default function Tablero() {
       {finanzas && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {[
-            { t: "Cartera por cobrar", v: cop(porCobrar), d: "Cuentas emitidas o enviadas", icon: Receipt, href: "/app/cobros" },
-            { t: "Cobrado", v: cop(cobrado), d: "Cuentas pagadas", icon: CheckCircle2, href: "/app/cobros" },
+            ...(comercial
+              ? [
+                  { t: "Cartera por cobrar", v: cop(porCobrar), d: "Cuentas emitidas o enviadas", icon: Receipt, href: "/app/cobros" },
+                  { t: "Cobrado", v: cop(cobrado), d: "Cuentas pagadas", icon: CheckCircle2, href: "/app/cobros" },
+                ]
+              : []),
             { t: "Gastos por legalizar o reembolsar", v: String(gastosPend), d: "Legalizaciones en revisión o aprobadas", icon: Wallet, href: "/app/documentos" },
           ].map((f) => (
             <Link key={f.t} href={f.href} className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-sotec-green hover:shadow-md">

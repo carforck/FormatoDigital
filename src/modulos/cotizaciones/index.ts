@@ -41,6 +41,8 @@ export const moduloCotizaciones: ModuloDocumento<DatosCotizacion> = {
   prefijo: PREFIJO_COTIZACION,
   Plantilla: PlantillaCotizacion,
   visibleCliente: true,
+  // Comercial: solo la administración la crea, la ve y la aprueba (el técnico y SST no)
+  requiere: "cotizar",
   clienteDe: (d) => d.cliente,
   campoCliente: "cliente",
   valor: (d) => totalesCotizacion(d).total,
@@ -118,13 +120,16 @@ export const moduloCotizaciones: ModuloDocumento<DatosCotizacion> = {
     }
     if (id === "confirmar") {
       const f = faltantesCotizacion(datos);
-      return { cambio: {}, mensaje: `${resumenTotal(datos)}${f.length ? ` Falta: ${f.join(", ")}.` : " Lista para enviar a revisión; al aprobarla queda enviada al cliente, que la acepta firmando."}` };
+      return { cambio: {}, mensaje: `${resumenTotal(datos)}${f.length ? ` Falta: ${f.join(", ")}.` : " Lista: al aprobarla y enviarla queda en el portal del cliente, que la acepta firmando."}` };
     }
     return { cambio: { [id]: v } as Partial<DatosCotizacion> };
   },
 
+  // La administración es quien cotiza y quien aprueba: un solo paso, sin revisor aparte
+  // (borrador → aprobada = enviada al cliente). Ver docs/ARQUITECTURA.md y la migración 0011.
   flujo: {
     aprobar: "Aprobar y enviar al cliente",
+    aprobarAlEnviar: "Aprobar y enviar al cliente",
     firmaAlAprobar: false,
     cierre: "cliente",
     campoFirmaCliente: "firmaCliente",

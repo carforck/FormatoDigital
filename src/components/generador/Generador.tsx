@@ -15,6 +15,7 @@ import type { EquipoMinimo } from "@/modulos/equipos/tipos";
 import { clienteDoc, empresaDe, infoDoc, moduloDe } from "@/modulos/registro";
 import { ETIQUETA_ESTADO_PROYECTO } from "@/nucleo/catalogos";
 import { hoy, useDemo } from "@/nucleo/datos/DemoProvider";
+import { CLAVE_RETORNO_GENERADOR, abrirImpresion, leerBorradorImpresion } from "@/nucleo/impresion";
 import { rutaDoc } from "@/nucleo/rutas";
 import type { Cliente, Documento, Proyecto, TipoDoc } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
@@ -82,7 +83,18 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   };
 
   const [doc, setDoc] = useState<Documento>(() => {
-    if (existente) return existente;
+    if (existente) {
+      // De vuelta de «Imprimir / PDF»: se recupera lo que no se había guardado
+      try {
+        const r = JSON.parse(sessionStorage.getItem(CLAVE_RETORNO_GENERADOR) ?? "null") as { id: string; clave: string; t: number } | null;
+        sessionStorage.removeItem(CLAVE_RETORNO_GENERADOR);
+        const d = r && r.id === existente.id && Date.now() - r.t < 2 * 3600e3 ? leerBorradorImpresion(r.clave) : null;
+        if (d && d.id === existente.id && d.tipo === existente.tipo) return { ...existente, datos: d.datos, clienteId: d.clienteId, proyectoId: d.proyectoId, equiposIds: d.equiposIds } as Documento;
+      } catch {
+        /* sin almacenamiento */
+      }
+      return existente;
+    }
     try {
       const cache = localStorage.getItem(claveCache);
       if (cache) {
@@ -106,7 +118,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   const [guardando, setGuardando] = useState(false);
   // Lo preseleccionado desde un proyecto no cuenta como cambio sin guardar
   const contenido = (d: Documento) => JSON.stringify([d.datos, d.equiposIds ?? []]);
-  const inicialJson = useRef(contenido(doc));
+  const inicialJson = useRef(contenido(existente ?? doc));
   const sucio = contenido(doc) !== inicialJson.current;
 
   // Guardado local continuo del documento nuevo
@@ -262,6 +274,20 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     else router.replace(rutaDoc(g.id, `&ok=${enviar ? "enviado" : "guardado"}${origen.query ? `&${origen.query}` : ""}`));
   }
 
+  /** Imprime lo que hay en pantalla, guardado o no (la página de impresión lo recibe en memoria). */
+  function imprimir() {
+    if (existente && !sucio) return abrirImpresion(router, { doc: existente.id });
+    const clave = abrirImpresion(router, { borrador: doc });
+    // Un documento ya guardado no tiene guardado automático: al volver se recupera de aquí
+    if (existente && clave) {
+      try {
+        sessionStorage.setItem(CLAVE_RETORNO_GENERADOR, JSON.stringify({ id: existente.id, clave, t: Date.now() }));
+      } catch {
+        /* sin almacenamiento */
+      }
+    }
+  }
+
   const f = info.formato;
   const Plantilla = info.Plantilla;
   const clienteSel = demo.clientes.find((c) => c.id === doc.clienteId);
@@ -272,7 +298,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
         <Save className="h-4 w-4" /> Guardar borrador
       </Button>
       <Button disabled={guardando} onClick={() => guardar(true)}>
-        <SendHorizonal className="h-4 w-4" /> Enviar a revisión
+        <SendHorizonal className="h-4 w-4" /> {info.flujo.aprobarAlEnviar ?? "Enviar a revisión"}
       </Button>
     </div>
   );
@@ -299,7 +325,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
               <div className="h-1.5 rounded bg-sotec-green transition-all" style={{ width: `${pct}%` }} />
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => window.print()}>
+          <Button variant="outline" size="sm" onClick={imprimir}>
             <Printer className="h-4 w-4" /> Imprimir / PDF
           </Button>
         </div>
@@ -352,7 +378,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
           )}
           {aviso && pendientes.length === 0 && (
             <p className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 print:hidden">
-              <CheckCircle2 className="h-4 w-4" /> Todo completo: ya puedes enviarlo a revisión.
+              <CheckCircle2 className="h-4 w-4" /> Todo completo: ya puedes {info.flujo.aprobarAlEnviar ? "aprobarlo y enviarlo al cliente" : "enviarlo a revisión"}.
             </p>
           )}
           {/* Cliente y proyecto también desde el formulario: autollenan el formato igual que el asistente */}

@@ -14,7 +14,7 @@ import type { Estado, TipoDoc } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 import { avance } from "@/nucleo/validar";
 import { TIPOS_DOC, clienteDoc, formatoDe, rutaNuevo, tituloDoc } from "@/modulos/registro";
-import { puede } from "@/nucleo/permisos";
+import { puedeCrearTipo } from "@/nucleo/permisos";
 import { IconoDoc } from "@/components/ui/icono-doc";
 
 export default function Page() {
@@ -169,7 +169,7 @@ function Documentos() {
                   Limpiar filtros
                 </button>
               )}
-              {demo.usuario && puede(demo.usuario.rol, "crear") && (
+              {demo.usuario && puedeCrearTipo(demo.usuario.rol, tipo || "reporte") && (
                 <Link href={rutaNuevo(tipo || "reporte", proyecto && proyecto !== "ninguno" ? `proyecto=${proyecto}` : "")} className="rounded-lg bg-sotec px-3 py-1.5 font-medium text-white hover:bg-black">
                   {formatoDe(tipo || "reporte").nuevo} {formatoDe(tipo || "reporte").corto.toLowerCase()}
                 </Link>

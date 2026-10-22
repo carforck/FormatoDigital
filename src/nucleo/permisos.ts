@@ -1,9 +1,10 @@
 import type { CuentaCobro } from "@/modulos/cobros/tipos";
 import { infoDoc } from "@/modulos/registro";
-import type { Documento, Proyecto, Rol, Usuario } from "@/nucleo/tipos";
+import type { Documento, Proyecto, Rol, TipoDoc, Usuario } from "@/nucleo/tipos";
 
 export type Accion =
   | "crear"
+  | "cotizar"
   | "ver_todos"
   | "revisar"
   | "cerrar_permiso"
@@ -18,21 +19,27 @@ export type Accion =
   | "auditoria"
   | "mapa";
 
+/**
+ * Matriz de roles. Lo COMERCIAL (cotizaciones y cuentas de cobro: `cotizar`, `cobros`,
+ * `ver_cobros`) es solo de la administración; el técnico y el Coordinador SST no lo ven.
+ * El cliente consulta sus cotizaciones (por `visibleCliente`) y sus cuentas emitidas.
+ */
 const MATRIZ: Record<Rol, Accion[]> = {
   tecnico: ["crear", "equipos"],
-  supervisor: ["crear", "ver_todos", "revisar", "cerrar_permiso", "clientes", "cobros", "ver_cobros", "proyectos", "equipos"],
-  admin: ["crear", "ver_todos", "revisar", "cerrar_permiso", "clientes", "cobros", "ver_cobros", "proyectos", "equipos", "usuarios", "config", "auditoria", "mapa"],
+  supervisor: ["crear", "ver_todos", "revisar", "cerrar_permiso", "clientes", "proyectos", "equipos"],
+  admin: ["crear", "cotizar", "ver_todos", "revisar", "cerrar_permiso", "clientes", "cobros", "ver_cobros", "proyectos", "equipos", "usuarios", "config", "auditoria", "mapa"],
   cliente: ["firmar_cliente", "ver_cobros"],
 };
 
 export const DESCRIPCION_ACCION: Record<Accion, string> = {
-  crear: "Crear reportes, permisos, legalizaciones de gastos y cotizaciones",
+  crear: "Crear reportes, permisos y legalizaciones de gastos",
+  cotizar: "Crear, aprobar y enviar cotizaciones al cliente (comercial)",
   ver_todos: "Ver documentos de todo el equipo",
   revisar: "Aprobar o rechazar documentos",
   cerrar_permiso: "Cerrar permisos de trabajo",
   firmar_cliente: "Firmar reportes como cliente",
   clientes: "Gestionar clientes",
-  cobros: "Crear y emitir cuentas de cobro",
+  cobros: "Crear y emitir cuentas de cobro (comercial)",
   proyectos: "Crear y gestionar proyectos",
   equipos: "Registrar, editar y retirar equipos de los clientes",
   ver_cobros: "Consultar cuentas de cobro",
@@ -48,8 +55,26 @@ export function puede(rol: Rol, accion: Accion): boolean {
   return MATRIZ[rol].includes(accion);
 }
 
+/**
+ * Si el perfil tiene acceso al módulo de un tipo de documento. El personal interno
+ * necesita el permiso que exige el módulo (`requiere`, p. ej. `cotizar`); el cliente
+ * ve en su portal los formatos visibles para él (`visibleCliente`).
+ */
+export function puedeUsarTipo(rol: Rol, tipo: TipoDoc): boolean {
+  const info = infoDoc(tipo);
+  if (rol === "cliente") return info.visibleCliente;
+  return !info.requiere || puede(rol, info.requiere);
+}
+
+/** Si el perfil diligencia documentos nuevos de ese tipo (generador, «Nuevo», duplicar). */
+export function puedeCrearTipo(rol: Rol, tipo: TipoDoc): boolean {
+  return puede(rol, "crear") && puedeUsarTipo(rol, tipo);
+}
+
 /** Qué documentos ve cada usuario. */
 export function puedeVerDoc(u: Usuario, d: Documento): boolean {
+  // Módulos restringidos (lo comercial): sin el permiso no se ven, ni los propios
+  if (!puedeUsarTipo(u.rol, d.tipo)) return false;
   if (puede(u.rol, "ver_todos")) return true;
   // Igual que la política documentos_ver de la base: solo aprobados o cerrados, y nunca
   // formatos internos (gastos; formatos.visible_cliente = false)
@@ -57,20 +82,19 @@ export function puedeVerDoc(u: Usuario, d: Documento): boolean {
   return d.autorId === u.id;
 }
 
-/** El autor solo edita mientras el documento está en borrador o rechazado. */
 /**
  * Solo el autor edita su documento, y solo mientras está en borrador o rechazado.
  * Los revisores no editan contenido ajeno: lo aprueban o lo devuelven con motivo
  * (separación de funciones del SGC; la base de datos aplica la misma regla).
  */
 export function puedeEditarDoc(u: Usuario, d: Documento): boolean {
-  if (u.rol === "cliente") return false;
+  if (u.rol === "cliente" || !puedeUsarTipo(u.rol, d.tipo)) return false;
   return d.autorId === u.id && (d.estado === "borrador" || d.estado === "rechazado");
 }
 
 /** Revisa (aprueba o rechaza) un revisor, sobre un documento en revisión que no sea suyo. */
 export function puedeRevisarDoc(u: Usuario, d: Documento): boolean {
-  return puede(u.rol, "revisar") && d.estado === "en_revision" && d.autorId !== u.id;
+  return puede(u.rol, "revisar") && puedeUsarTipo(u.rol, d.tipo) && d.estado === "en_revision" && d.autorId !== u.id;
 }
 
 /** El cliente solo ve sus cuentas ya emitidas; la administración, todas. */

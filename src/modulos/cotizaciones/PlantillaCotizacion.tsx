@@ -235,7 +235,7 @@ export function PlantillaCotizacion({ datos, codigoDoc, editar, firmar, resaltar
 
         {/* Totales */}
         <div className={cn("break-inside-avoid mt-0 flex justify-end", marca("total"))}>
-          <table className="w-full border-collapse sm:w-1/2">
+          <table className="w-full border-collapse sm:w-1/2 print:w-1/2">
             <tbody>
               <tr className="border-b border-slate-200" style={{ background: GRIS_FILA }}>
                 <td className={cn("px-2 py-2", pk("print:py-1"))}>Subtotal (base sin impuestos)</td>
@@ -279,7 +279,7 @@ export function PlantillaCotizacion({ datos, codigoDoc, editar, firmar, resaltar
           <h2 className="border-b pb-1 text-[12.5px] sm:text-[13px]" style={{ color: VERDE, borderColor: VERDE }}>
             Condiciones comerciales
           </h2>
-          <dl className={cn("mt-2 grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2", pk("print:mt-1 print:grid-cols-4 print:gap-x-3"))}>
+          <dl className={cn("mt-2 grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2 print:grid-cols-2", pk("print:mt-1 print:grid-cols-4 print:gap-x-3"))}>
             {(
               [
                 ["Forma de pago", "formaPago"],
@@ -315,8 +315,8 @@ export function PlantillaCotizacion({ datos, codigoDoc, editar, firmar, resaltar
             Aceptación del cliente
           </h2>
           <p className="mt-0.5 text-[10.5px] text-slate-600 sm:text-[11px]">Acepto la presente cotización con sus ítems, valores y condiciones comerciales.</p>
-          <div className="mt-2 grid grid-cols-2 items-end gap-x-4 gap-y-2 sm:grid-cols-[1.3fr_1fr_1fr_0.8fr]">
-            <div className="col-span-2 sm:col-span-1">
+          <div className="mt-2 grid grid-cols-2 items-end gap-x-4 gap-y-2 sm:grid-cols-[1.3fr_1fr_1fr_0.8fr] print:grid-cols-[1.3fr_1fr_1fr_0.8fr]">
+            <div className="col-span-2 sm:col-span-1 print:col-span-1">
               <Firma src={datos.firmaCliente} etiqueta="cliente" onFirmar={firmar ? () => firmar("firmaCliente") : undefined} />
               <p className="border-t border-slate-500 pt-0.5 text-[10px] text-slate-500">Firma</p>
             </div>

@@ -23,7 +23,7 @@ export const PERFILES: { rol: Rol; titulo: string; persona: string; icon: typeof
     titulo: "Administrador",
     persona: "Gerencia SOTEC",
     icon: ShieldCheck,
-    puede: ["Todo lo anterior", "Usuarios, roles y activación", "Consecutivos y reglas de los formatos", "Auditoría completa"],
+    puede: ["Todo lo anterior", "Cotizaciones y cuentas de cobro (solo la gerencia)", "Usuarios, roles y activación", "Consecutivos y reglas de los formatos", "Auditoría completa"],
   },
   {
     rol: "cliente",

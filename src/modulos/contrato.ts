@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 
 import type { Paso, ValorPaso } from "@/components/chat/ChatAsistente";
 import type { EquipoAtendido } from "@/modulos/equipos/tipos";
+import type { Accion } from "@/nucleo/permisos";
 import type { Cliente, Estado, Proyecto, TipoDoc, Usuario } from "@/nucleo/tipos";
 
 /** Contexto que el generador le pasa a un módulo para armar los pasos del asistente. */
@@ -59,6 +60,12 @@ export interface FlujoDocumento<D> {
   aprobar: string;
   /** Si aprobar exige la firma del revisor (abre el pad). */
   firmaAlAprobar: boolean;
+  /**
+   * Sin revisor aparte: quien tiene el permiso del módulo (`requiere`) aprueba al enviar,
+   * de borrador a aprobado, con este texto en el botón («Aprobar y enviar al cliente»).
+   * Por defecto: no (el autor envía a revisión y aprueba otro revisor).
+   */
+  aprobarAlEnviar?: string;
   /** Lo que se escribe en el formato al aprobar (nombre y firma de quien autoriza). */
   alAprobar?: (datos: D, revisor: Usuario, firma?: string) => Partial<D>;
   /**
@@ -116,6 +123,13 @@ export interface ModuloDocumento<D> {
   campoCliente?: keyof D & string;
   /** Autollenado al elegir un proyecto (obra, sitio, centro de costos). Por defecto: nada. */
   alElegirProyecto?: (p: Proyecto, c: Cliente | undefined) => { cambio: Partial<D>; mensaje?: string };
+  /**
+   * Permiso que exige el módulo al personal interno, además de `crear`: sin él no aparece
+   * en menús, «Nuevo», listados, pestañas ni totales, y la URL queda bloqueada
+   * (p. ej. `cotizar`: lo comercial es solo de la administración). Por defecto: ninguno.
+   * El cliente lo ve según `visibleCliente`.
+   */
+  requiere?: Accion;
   /** Si el cliente lo ve en su portal (aprobado o cerrado). Por defecto: false (interno). */
   visibleCliente?: boolean;
   /** Color de la serie en las gráficas (variable CSS). Por defecto: uno de la paleta según el orden. */

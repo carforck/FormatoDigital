@@ -100,7 +100,7 @@ const META: Record<string, Meta> = {
   reportes: { rama: "pertenece a", notaFlujo: "Rechazado vuelve al autor; la firma del cliente lo cierra" },
   permisos: { rama: "autoriza el trabajo de", notaFlujo: "Rechazado vuelve al autor; se cierra al terminar la labor" },
   gastos: { rama: "legaliza los gastos de", notaFlujo: "Aprobado = Vo.Bo.; cerrado = reembolsado. Interno: el cliente no lo ve" },
-  cotizaciones: { padre: ["clientes"], rama: "se cotiza a", notaFlujo: "Rechazado vuelve al autor" },
+  cotizaciones: { padre: ["clientes"], rama: "se cotiza a", notaFlujo: "Solo la administración: la aprueba y envía en un paso; la firma del cliente la acepta" },
   cobros: {
     padre: ["proyectos", "ordenes", "clientes"],
     rama: "se emite a",

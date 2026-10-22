@@ -39,7 +39,9 @@ import { Avatar } from "@/components/ui/corporativo";
 import { useSeguirEdicion } from "@/components/ui/volver";
 import { asset, rutaCuenta, rutaDoc } from "@/nucleo/rutas";
 import { ETIQUETA_ROL } from "@/nucleo/catalogos";
-import { puede, type Accion } from "@/nucleo/permisos";
+import { TIPOS_DOC, rutaNuevo } from "@/modulos/registro";
+import { puede, puedeCrearTipo, type Accion } from "@/nucleo/permisos";
+import type { TipoDoc } from "@/nucleo/tipos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +50,8 @@ interface Item {
   label: string;
   icon: typeof FileText;
   req?: Accion;
+  /** Generador de un formato: se muestra si el perfil lo puede diligenciar (permiso `requiere` del módulo). */
+  tipo?: TipoDoc;
   contador?: "revision" | "borradores";
 }
 
@@ -56,10 +60,10 @@ const GRUPOS: { titulo: string; items: Item[] }[] = [
     titulo: "Documentos",
     items: [
       { href: "/app", label: "Tablero", icon: LayoutDashboard },
-      { href: "/app/nuevo/reporte", label: "Nuevo reporte técnico", icon: FileText, req: "crear" },
-      { href: "/app/nuevo/permiso", label: "Nuevo permiso de trabajo", icon: HardHat, req: "crear" },
-      { href: "/app/nuevo/gasto", label: "Legalizar gastos", icon: Wallet, req: "crear" },
-      { href: "/app/nuevo/cotizacion", label: "Nueva cotización", icon: FileSignature, req: "crear" },
+      { href: "/app/nuevo/reporte", label: "Nuevo reporte técnico", icon: FileText, tipo: "reporte" },
+      { href: "/app/nuevo/permiso", label: "Nuevo permiso de trabajo", icon: HardHat, tipo: "permiso" },
+      { href: "/app/nuevo/gasto", label: "Legalizar gastos", icon: Wallet, tipo: "gasto" },
+      { href: "/app/nuevo/cotizacion", label: "Nueva cotización", icon: FileSignature, tipo: "cotizacion" },
       { href: "/app/documentos", label: "Documentos", icon: FolderOpen, contador: "borradores" },
     ],
   },
@@ -244,7 +248,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const bloqueada = RUTAS.find(([r, a]) => path.startsWith(r) && !puede(usuario.rol, a));
+  // Además de la tabla de rutas, cada generador exige el permiso de su módulo (lo comercial: solo la administración)
+  const bloqueada =
+    RUTAS.find(([r, a]) => path.startsWith(r) && !puede(usuario.rol, a)) ?? TIPOS_DOC.find((t) => path === rutaNuevo(t) && !puedeCrearTipo(usuario.rol, t));
   const contadores = {
     revision: demo.visibles.filter((d) => d.estado === "en_revision").length,
     borradores: demo.visibles.filter((d) => d.autorId === usuario.id && (d.estado === "borrador" || d.estado === "rechazado")).length,
@@ -277,7 +283,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const nav = (
     <nav className="space-y-6">
       {GRUPOS.map((g) => {
-        const items = g.items.filter((i) => !i.req || puede(usuario.rol, i.req));
+        const items = g.items.filter((i) => (!i.req || puede(usuario.rol, i.req)) && (!i.tipo || puedeCrearTipo(usuario.rol, i.tipo)));
         if (!items.length) return null;
         return (
           <div key={g.titulo}>
@@ -613,12 +619,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div role="dialog" aria-modal="true" aria-label="Nuevo documento" className="w-full rounded-t-2xl bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] animate-in slide-in-from-bottom duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-200" />
             <p className="mb-3 text-sm font-semibold text-slate-900">¿Qué formato vas a diligenciar?</p>
-            {[
-              { href: "/app/nuevo/reporte", t: "Reporte técnico", d: "FO-GSST-22 · visita, diagnóstico y firma del cliente", icon: FileText },
-              { href: "/app/nuevo/permiso", t: "Permiso de trabajo", d: "F-GSST-13 · peligros, EPP y grupo ejecutor", icon: HardHat },
-              { href: "/app/nuevo/gasto", t: "Legalización de gastos", d: "FO-GSST-25 · gastos con foto de la factura", icon: Wallet },
-              { href: "/app/nuevo/cotizacion", t: "Cotización", d: "Propuesta económica al cliente, con aceptación firmada", icon: FileSignature },
-            ].map((o) => (
+            {(
+              [
+                { tipo: "reporte", t: "Reporte técnico", d: "FO-GSST-22 · visita, diagnóstico y firma del cliente", icon: FileText },
+                { tipo: "permiso", t: "Permiso de trabajo", d: "F-GSST-13 · peligros, EPP y grupo ejecutor", icon: HardHat },
+                { tipo: "gasto", t: "Legalización de gastos", d: "FO-GSST-25 · gastos con foto de la factura", icon: Wallet },
+                { tipo: "cotizacion", t: "Cotización", d: "Propuesta económica al cliente, con aceptación firmada", icon: FileSignature },
+              ] as { tipo: TipoDoc; t: string; d: string; icon: typeof FileText }[]
+            )
+              .filter((o) => puedeCrearTipo(usuario.rol, o.tipo))
+              .map((o) => ({ ...o, href: rutaNuevo(o.tipo) }))
+              .map((o) => (
               <Link key={o.href} href={o.href} className="mb-2 flex items-center gap-3 rounded-xl border border-slate-200 p-3 hover:border-sotec-green">
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sotec text-sotec-green">
                   <o.icon className="h-5 w-5" />

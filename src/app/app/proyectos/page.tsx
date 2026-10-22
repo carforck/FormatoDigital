@@ -10,11 +10,11 @@ import { EstadoProyectoBadge, fechaCorta } from "@/components/ui/badges";
 import { PageHeader } from "@/components/ui/corporativo";
 import { IconoDoc } from "@/components/ui/icono-doc";
 import { cn } from "@/lib/utils";
-import { TIPOS_DOC, cantidadDoc } from "@/modulos/registro";
+import { TIPOS_DOC, cantidadDoc, formatoDe } from "@/modulos/registro";
 import { ETIQUETA_ESTADO_PROYECTO } from "@/nucleo/catalogos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { cop } from "@/nucleo/letras";
-import { puede } from "@/nucleo/permisos";
+import { puede, puedeUsarTipo } from "@/nucleo/permisos";
 import { resumenProyecto } from "@/nucleo/proyectos";
 import { rutaProyecto } from "@/nucleo/rutas";
 import type { EstadoProyecto } from "@/nucleo/tipos";
@@ -34,7 +34,10 @@ export default function Proyectos() {
     .filter((p) => !estado || p.estado === estado)
     .filter((p) => !q.trim() || `${p.codigo} ${p.nombre} ${p.sitio} ${nombreCliente(p.clienteId)}`.toLowerCase().includes(q.toLowerCase()))
     .sort((a, b) => (a.estado === b.estado ? b.fechaInicio.localeCompare(a.fechaInicio) : ["activo", "en_pausa", "cerrado"].indexOf(a.estado) - ["activo", "en_pausa", "cerrado"].indexOf(b.estado)));
-  const tipos = TIPOS_DOC.filter((t) => interno || t !== "gasto");
+  // Solo los módulos del perfil: el cliente no ve gastos; el técnico y SST, nada comercial
+  const tipos = TIPOS_DOC.filter((t) => puedeUsarTipo(u.rol, t));
+  const verCotizado = puedeUsarTipo(u.rol, "cotizacion");
+  const verCobrado = puede(u.rol, "ver_cobros");
   const sel = "rounded-md border border-slate-200 bg-white px-2 py-2 text-sm";
 
   return (
@@ -42,7 +45,11 @@ export default function Proyectos() {
       <PageHeader
         etiqueta="Gestión"
         titulo="Proyectos"
-        descripcion={interno ? "Cada obra de un cliente con sus reportes, permisos, gastos, cotizaciones y cuentas de cobro." : "Las obras que adelantamos en tu empresa, con sus reportes y cotizaciones."}
+        descripcion={
+          interno
+            ? `Cada obra de un cliente con sus ${[...tipos.map((t) => formatoDe(t).plural), ...(verCobrado ? ["cuentas de cobro"] : [])].join(", ").replace(/, ([^,]*)$/, " y $1")}.`
+            : "Las obras que adelantamos en tu empresa, con sus reportes y cotizaciones."
+        }
         acciones={
           puede(u.rol, "proyectos") && (
             <Link href="/app/proyectos/editar" onClick={marcarEdicion} className="inline-flex items-center gap-2 rounded-lg bg-sotec px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-black">
@@ -146,16 +153,22 @@ export default function Proyectos() {
                       </li>
                     )}
                   </ul>
-                  <dl className="mt-auto grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 text-xs">
-                    <div className="min-w-0">
-                      <dt className="text-slate-500">Cotizado</dt>
-                      <dd className="truncate font-semibold tabular-nums text-slate-900">{cop(r.cotizado)}</dd>
-                    </div>
-                    <div className="min-w-0">
-                      <dt className="text-slate-500">Cobrado</dt>
-                      <dd className="truncate font-semibold tabular-nums text-slate-900">{cop(r.cobrado)}</dd>
-                    </div>
-                  </dl>
+                  {(verCotizado || verCobrado) && (
+                    <dl className="mt-auto grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 text-xs">
+                      {verCotizado && (
+                        <div className="min-w-0">
+                          <dt className="text-slate-500">Cotizado</dt>
+                          <dd className="truncate font-semibold tabular-nums text-slate-900">{cop(r.cotizado)}</dd>
+                        </div>
+                      )}
+                      {verCobrado && (
+                        <div className="min-w-0">
+                          <dt className="text-slate-500">Cobrado</dt>
+                          <dd className="truncate font-semibold tabular-nums text-slate-900">{cop(r.cobrado)}</dd>
+                        </div>
+                      )}
+                    </dl>
+                  )}
                   {interno && <BarraPresupuesto gastado={r.gastado} presupuesto={p.presupuesto} />}
                 </Link>
               </li>

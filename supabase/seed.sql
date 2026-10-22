@@ -24,6 +24,6 @@ update public.formatos set visible_cliente = false where clave = 'gasto';
 with o as (select id from public.organizaciones where slug = 'sotec')
 insert into public.clientes (organizacion_id, nombre, direccion, contacto, cargo, correo, telefono)
 select o.id, c.* from o, (values
-  ('Ladrillera Arcillas del Caribe', 'Pasacaballos, Cartagena', 'Ing. José', 'Ing. sistemas', 'sistemas@arcillas.example', '3000000000')
+  ('Ladrillera Arcillas del Caribe', 'Zona Industrial, Cartagena', 'Ing. Daniel', 'Ing. sistemas', 'sistemas@arcillasdelcaribe.example', '3000000000')
 ) as c(nombre, direccion, contacto, cargo, correo, telefono)
 on conflict (organizacion_id, nombre) do nothing;

@@ -7,7 +7,6 @@
     "build": "next build",
     "start": "next start -p 3100",
     "lint": "next lint",
-    "deploy": "bash scripts/deploy-pages.sh",
     "test:e2e": "node tests/e2e/demo.cjs",
     "test:db": "bash scripts/probar-db.sh",
     "test:unit": "tsx tests/unit/letras.test.ts"

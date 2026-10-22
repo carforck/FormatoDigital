@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Eye, MessageSquare, Printer, Save, SendHorizonal } from "lucide-react";
 
@@ -34,8 +34,24 @@ export function Generador({ tipo, existente }: Props) {
   const router = useRouter();
   const usuario = demo.usuario!;
   const modulo = moduloDe(tipo);
+  // Lo que se va diligenciando en un documento nuevo se guarda en el navegador:
+  // si se recarga o se cambia de perfil a mitad, se recupera al volver.
+  const claveCache = `fd-generador-${tipo}-${usuario.id}`;
+  const recuperado = useRef(false);
   const [doc, setDoc] = useState<Documento>(() => {
     if (existente) return existente;
+    try {
+      const cache = localStorage.getItem(claveCache);
+      if (cache) {
+        const d = JSON.parse(cache) as Documento;
+        if (d.tipo === tipo && d.autorId === usuario.id && !demo.documentos.some((x) => x.id === d.id)) {
+          recuperado.current = true;
+          return { ...d, ...demo.nuevoId(tipo), id: d.id };
+        }
+      }
+    } catch {
+      /* sin almacenamiento */
+    }
     const n = demo.nuevoId(tipo);
     const base = { ...n, estado: "borrador" as const, autorId: usuario.id, clienteId: "", creado: hoy(), actualizado: hoy(), historial: [] };
     return tipo === "reporte"
@@ -48,6 +64,30 @@ export function Generador({ tipo, existente }: Props) {
   const [firmando, setFirmando] = useState<string | null>(null);
   const [vista, setVista] = useState<"chat" | "doc">("chat");
   const [aviso, setAviso] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const inicialJson = useRef(JSON.stringify(doc.datos));
+  const sucio = JSON.stringify(doc.datos) !== inicialJson.current;
+
+  // Guardado local continuo del documento nuevo
+  useEffect(() => {
+    if (existente || guardando) return;
+    try {
+      if (sucio || recuperado.current) localStorage.setItem(claveCache, JSON.stringify(doc));
+    } catch {
+      /* sin almacenamiento */
+    }
+  }, [doc, existente, guardando, sucio, claveCache]);
+
+  // Aviso del navegador si se intenta salir con cambios sin guardar
+  useEffect(() => {
+    if (!sucio || guardando) return;
+    const avisar = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", avisar);
+    return () => window.removeEventListener("beforeunload", avisar);
+  }, [sucio, guardando]);
 
   const pendientes = useMemo(() => faltantes(doc), [doc]);
   const pct = avance(doc);
@@ -91,24 +131,31 @@ export function Generador({ tipo, existente }: Props) {
   }
 
   function guardar(enviar: boolean) {
+    if (guardando) return; // un solo envío aunque se haga doble clic
     if (enviar && pendientes.length) {
       setAviso(`Faltan ${pendientes.length} punto(s) por completar antes de enviar.`);
       setVista("doc");
       return;
     }
     const clienteId = doc.clienteId || demo.clientes.find((c) => c.nombre === clienteDoc(doc))?.id || "";
+    setGuardando(true);
     const g = demo.guardar({ ...doc, clienteId });
     if (enviar) demo.enviar(g.id);
+    try {
+      localStorage.removeItem(claveCache);
+    } catch {
+      /* sin almacenamiento */
+    }
     router.push(rutaDoc(g.id, `&ok=${enviar ? "enviado" : "guardado"}`));
   }
 
   const f = FORMATOS[tipo];
   const acciones = (
     <div className="grid grid-cols-2 gap-2">
-      <Button variant="outline" onClick={() => guardar(false)}>
+      <Button variant="outline" disabled={guardando} onClick={() => guardar(false)}>
         <Save className="h-4 w-4" /> Guardar borrador
       </Button>
-      <Button onClick={() => guardar(true)}>
+      <Button disabled={guardando} onClick={() => guardar(true)}>
         <SendHorizonal className="h-4 w-4" /> Enviar a revisión
       </Button>
     </div>
@@ -161,11 +208,13 @@ export function Generador({ tipo, existente }: Props) {
             onFirmar={(id) => setFirmando(id)}
             firmado={(id) => Boolean((doc.datos as unknown as Record<string, string>)[id])}
             ejecutoresIniciales={doc.tipo === "permiso" ? doc.datos.ejecutores : []}
-            retomando={Boolean(existente)}
+            retomando={Boolean(existente) || recuperado.current}
             bienvenida={
               existente
                 ? `Retomamos ${doc.codigo}. Edita lo que necesites directamente en el formato.${doc.motivoRechazo ? `\n\nMotivo del rechazo: ${doc.motivoRechazo}` : ""}`
-                : `Hola, ${usuario.nombre.split(" ")[0]}. Te guío para diligenciar ${f.el} ${f.corto.toLowerCase()} (${f.codigo}). Lo que respondas aparece al instante en el formato.`
+                : recuperado.current
+                  ? `Recuperé lo que estabas diligenciando en ${f.el} ${f.corto.toLowerCase()}. Revisa el formato y continúa donde quedaste.`
+                  : `Hola, ${usuario.nombre.split(" ")[0]}. Te guío para diligenciar ${f.el} ${f.corto.toLowerCase()} (${f.codigo}). Lo que respondas aparece al instante en el formato.`
             }
             acciones={acciones}
           />

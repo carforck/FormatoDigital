@@ -25,7 +25,10 @@ function Nueva() {
     if (existente) return existente;
     const n = demo.nuevoCodigoCuenta();
     const clienteId = params.get("cliente") ?? "";
-    const rep = demo.documentos.find((d) => d.id === params.get("reporte") && d.tipo === "reporte");
+    // Solo se precarga un reporte cobrable: aprobado o cerrado, del cliente y sin otra cuenta activa
+    const rep = demo.documentos.find(
+      (d) => d.id === params.get("reporte") && d.tipo === "reporte" && (d.estado === "aprobado" || d.estado === "cerrado") && d.clienteId === clienteId && !demo.cuentaDeReporte(d.id),
+    );
     const items: ItemCuentaCobro[] = rep && rep.tipo === "reporte" ? [{ id: `i-${rep.id}`, documentoId: rep.id, descripcion: rep.datos.asunto, cantidad: 1, valorUnitario: 0 }] : [];
     return {
       ...n,
@@ -65,7 +68,8 @@ function Nueva() {
     if (emitir && (cuenta.items.length === 0 || cuenta.items.some((i) => !i.descripcion.trim() || i.valorUnitario <= 0 || i.cantidad <= 0))) {
       return setAviso("Para emitir, cada ítem necesita descripción, cantidad y valor mayor que cero.");
     }
-    demo.guardarCuenta(cuenta);
+    const error = demo.guardarCuenta(cuenta);
+    if (error) return setAviso(error);
     if (emitir) demo.cambiarEstadoCuenta(cuenta.id, "emitida");
     router.push(rutaCuenta(cuenta.id));
   }
@@ -103,7 +107,7 @@ function Nueva() {
               </label>
               <label className="block text-sm">
                 <span className="text-xs text-slate-500">IVA %</span>
-                <Input type="number" min={0} max={100} value={cuenta.ivaPorcentaje} onChange={(e) => set({ ivaPorcentaje: Math.max(0, Number(e.target.value)) })} />
+                <Input type="number" min={0} max={100} value={cuenta.ivaPorcentaje} onChange={(e) => set({ ivaPorcentaje: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} />
               </label>
             </div>
             <label className="block text-sm">
@@ -192,7 +196,7 @@ function Nueva() {
               <Stamp className="h-4 w-4" /> Emitir
             </Button>
           </div>
-          <p className="text-xs text-slate-500">Al emitirla queda bloqueada, toma su consecutivo definitivo y el cliente la ve en su portal.</p>
+          <p className="text-xs text-slate-500">El número se asigna al guardarla por primera vez. Al emitirla queda bloqueada y el cliente la ve en su portal.</p>
         </div>
 
         <div className="min-w-0 overflow-x-auto rounded-lg bg-slate-100 p-2 sm:p-4">

@@ -17,7 +17,7 @@ const puppeteer = require("puppeteer-core");
 
 const BASE = (process.env.BASE || "http://localhost:3100").replace(/\/$/, "");
 const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno"
-const CLAVE = "sotec-demo-v2";
+const CLAVE = "sotec-demo-v4";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function chrome() {
@@ -39,6 +39,8 @@ function ok(cond, msg) {
 
 async function nuevaPagina(b, errores) {
   const p = await b.newPage();
+  // El generador avisa al salir con cambios sin guardar: en las pruebas se acepta, como haría el usuario
+  p.on("dialog", (d) => d.accept().catch(() => {}));
   p.on("pageerror", (e) => errores.push(e.message));
   p.on("console", (m) => m.type() === "error" && errores.push(m.text().slice(0, 200)));
   return p;
@@ -115,7 +117,7 @@ async function flujo(b, errores) {
   await p.goto(`${BASE}/app/nuevo/permiso`, { waitUntil: "networkidle0" });
   await sleep(600);
   await clic(p, "Constructora Horizonte Azul");
-  await clic(p, "Torre Norte");
+  await clic(p, "Hotel Brisas del Mar");
   await clic(p, "07:30");
   await clic(p, "Trabajo en alturas");
   await clic(p, "Trabajo en alturas en");
@@ -123,7 +125,7 @@ async function flujo(b, errores) {
   await clic(p, "Todas en SÍ");
   await clic(p, "Confirmar verificación");
   await p.type('input[placeholder="Nombre completo"]', "Kevin Mendoza Ortiz");
-  await p.type('input[placeholder="Cédula"]', "1000000004");
+  await p.type('input[placeholder="Cédula"]', "1000000003");
   await p.type('input[placeholder="ARL / EPS"]', "ARL Andina / EPS Vital");
   await clic(p, "Agregar");
   await clic(p, "Continuar");
@@ -196,13 +198,57 @@ async function controles(b, errores) {
   await p.evaluate(() => [...document.querySelectorAll("[role=menuitem]")].find((x) => x.textContent.includes("Coordinador SST")).click());
   await sleep(900);
   ok((await p.evaluate(() => document.querySelector('header button[aria-haspopup="menu"]').innerText)).includes("Coordinador SST"), "el menú de perfil cambia de rol");
+  await p.waitForFunction(() => location.pathname.replace(/\/$/, "") === "/app", { timeout: 15000 });
+  await sleep(500);
   await p.type("header input", "fibra");
   await p.keyboard.press("Enter");
-  await sleep(1200);
+  await p.waitForFunction(() => location.search === "?q=fibra", { timeout: 15000 }).catch(() => {});
+  await sleep(800);
   ok((await p.evaluate(() => location.search === "?q=fibra" && document.querySelectorAll("tbody tr").length === 1)), "el buscador superior filtra documentos");
   await p.goto(`${BASE}/app/config`, { waitUntil: "networkidle0" });
   await sleep(500);
   ok((await p.evaluate(() => document.body.innerText)).includes("Acceso restringido"), "el coordinador SST no entra a Configuración");
+  // Barra lateral colapsable: riel de íconos, se abre al pasar el mouse y se puede fijar
+  await p.evaluate(() => localStorage.removeItem("fd-sidebar"));
+  await p.goto(`${BASE}/app`, { waitUntil: "networkidle0" });
+  await sleep(700);
+  const ancho = () => p.evaluate(() => Math.round(document.querySelector("aside").getBoundingClientRect().width));
+  await p.mouse.move(900, 400);
+  await sleep(400);
+  ok((await ancho()) === 72, "la barra lateral arranca como riel de 72 px");
+  await p.mouse.move(30, 320);
+  await sleep(400);
+  ok((await ancho()) === 264, "al pasar el mouse la barra lateral se abre");
+  await p.click('aside button[aria-label="Fijar la barra lateral abierta"]');
+  await p.mouse.move(900, 400);
+  await sleep(400);
+  ok((await ancho()) === 264 && (await p.evaluate(() => localStorage.getItem("fd-sidebar"))) === "fija", "fijada se queda abierta y se recuerda");
+  await p.click('aside button[aria-label="Contraer la barra lateral"]');
+  await p.mouse.move(900, 400);
+  await sleep(400);
+
+  // Modo oscuro: claro → oscuro → sistema; los documentos siguen en claro
+  await p.evaluate(() => localStorage.setItem("fd-tema", "claro"));
+  await p.goto(`${BASE}/app/documentos/ver?id=d-rt-clay`, { waitUntil: "networkidle0" });
+  await sleep(700);
+  await p.click('header button[aria-label*="Cambiar tema"]');
+  await sleep(300);
+  const tema = await p.evaluate(() => ({
+    oscuro: !!document.querySelector(".dark"),
+    guardado: localStorage.getItem("fd-tema"),
+    fondoDoc: getComputedStyle(document.querySelector(".doc-print")).backgroundColor,
+    fondoTarjeta: getComputedStyle(document.querySelector("aside.print\\:hidden.h-fit") || document.body).backgroundColor,
+  }));
+  ok(tema.oscuro && tema.guardado === "oscuro", "el botón de tema activa el modo oscuro y lo recuerda");
+  ok(tema.fondoDoc === "rgb(255, 255, 255)", "en modo oscuro el formato se mantiene blanco como el papel");
+  await p.reload({ waitUntil: "networkidle0" });
+  await sleep(600);
+  ok(await p.evaluate(() => !!document.querySelector(".dark")), "el modo oscuro persiste al recargar");
+  await p.click('header button[aria-label*="Cambiar tema"]');
+  await p.click('header button[aria-label*="Cambiar tema"]');
+  await sleep(300);
+  ok((await p.evaluate(() => localStorage.getItem("fd-tema"))) === "claro", "el ciclo vuelve a claro (oscuro → sistema → claro)");
+
   await p.setViewport({ width: 390, height: 844, isMobile: true });
   await p.goto(`${BASE}/app`, { waitUntil: "networkidle0" });
   await sleep(800);
@@ -257,7 +303,7 @@ async function magno(b, errores) {
   await clic(p, "Cerrar", "button[aria-label]").catch(() => {});
   await p.goto(enlace, { waitUntil: "networkidle0" });
   await sleep(800);
-  await p.type('input[placeholder="Nombre de quien firma"]', "Arq. Laura Gómez");
+  await p.type('input[placeholder="Nombre de quien firma"]', "Arq. Laura Méndez");
   await clic(p, "Dibujar firma");
   await firmar(p);
   await clic(p, "Firmar y enviar");
@@ -292,7 +338,7 @@ async function magno(b, errores) {
   await p.goto(`${BASE}/app/nuevo/gasto`, { waitUntil: "networkidle0" });
   await sleep(800);
   await clic(p, "Ladrillera Arcillas del Caribe");
-  await clic(p, "Ladrillera Arcillas del Caribe · Hornilla");
+  await clic(p, "Ladrillera Arcillas del Caribe · Área de hornos");
   await clic(p, String(new Date().getFullYear()));
   await clic(p, "Omitir");
   await clic(p, "Transporte");

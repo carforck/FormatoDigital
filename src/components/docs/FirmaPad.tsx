@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Eraser, PenLine, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useModal } from "@/components/ui/useModal";
 
 interface Props {
   titulo: string;
@@ -16,6 +17,8 @@ export function FirmaPad({ titulo, onGuardar, onCerrar }: Props) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const dibujando = useRef(false);
   const [vacio, setVacio] = useState(true);
+  const dialogo = useModal<HTMLDivElement>(onCerrar);
+  const idTitulo = useId();
 
   useEffect(() => {
     const c = ref.current;
@@ -43,18 +46,20 @@ export function FirmaPad({ titulo, onGuardar, onCerrar }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" role="dialog" aria-modal="true" aria-label={titulo}>
-      <div className="w-full max-w-lg rounded-xl bg-white p-4 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" >
+      <div ref={dialogo} role="dialog" aria-modal="true" aria-labelledby={idTitulo} className="w-full max-w-lg rounded-xl bg-white p-4 shadow-xl outline-none">
         <div className="mb-3 flex items-center justify-between">
-          <p className="flex items-center gap-2 font-semibold">
+          <p id={idTitulo} className="flex items-center gap-2 font-semibold">
             <PenLine className="h-4 w-4" /> {titulo}
           </p>
-          <button onClick={onCerrar} aria-label="Cerrar" className="rounded p-1 hover:bg-slate-100">
+          <button type="button" onClick={onCerrar} aria-label="Cerrar" className="rounded p-1 hover:bg-slate-100">
             <X className="h-4 w-4" />
           </button>
         </div>
         <canvas
           ref={ref}
+          role="img"
+          aria-label="Área para firmar"
           className="h-44 w-full touch-none rounded-lg border-2 border-dashed border-slate-300 bg-slate-50"
           onPointerDown={(e) => {
             dibujando.current = true;

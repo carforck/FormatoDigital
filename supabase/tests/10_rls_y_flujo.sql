@@ -127,11 +127,11 @@ do $$ begin
   assert (select count(*) from public.documentos) = 0, 'anónimo no lee la tabla directamente';
 end $$;
 do $$ begin
-  perform public.firmar_con_enlace((select v from ctx where k = 'token'), 'Ing. José', 'no-es-imagen');
+  perform public.firmar_con_enlace((select v from ctx where k = 'token'), 'Ing. Daniel', 'no-es-imagen');
   raise exception 'FALLO: aceptó una firma inválida';
 exception when check_violation then null; end $$;
 do $$ begin
-  assert public.firmar_con_enlace((select v from ctx where k = 'token'), 'Ing. José', 'data:image/png;base64,iVBORw0KGgo=') = 'cerrado', 'la firma del cliente cierra el reporte';
+  assert public.firmar_con_enlace((select v from ctx where k = 'token'), 'Ing. Daniel', 'data:image/png;base64,iVBORw0KGgo=') = 'cerrado', 'la firma del cliente cierra el reporte';
 end $$;
 do $$ begin
   perform public.firmar_con_enlace((select v from ctx where k = 'token'), 'Otra persona', 'data:image/png;base64,iVBORw0KGgo=');
@@ -142,14 +142,16 @@ reset role;
 select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
 do $$ begin
   assert (select estado from public.documentos where id = (select v::uuid from ctx where k = 'rt1')) = 'cerrado', 'quedó cerrado';
-  assert (select firmante_nombre from public.firmas where documento_id = (select v::uuid from ctx where k = 'rt1') and campo = 'firmaCliente') = 'Ing. José', 'firma guardada';
-  assert exists (select 1 from public.documento_eventos where documento_id = (select v::uuid from ctx where k = 'rt1') and accion = 'Cerró con la firma del cliente' and actor_nombre = 'Ing. José'), 'evento de cierre con nombre';
+  assert (select firmante_nombre from public.firmas where documento_id = (select v::uuid from ctx where k = 'rt1') and campo = 'firmaCliente') = 'Ing. Daniel', 'firma guardada';
+  assert exists (select 1 from public.documento_eventos where documento_id = (select v::uuid from ctx where k = 'rt1') and accion = 'Cerró con la firma del cliente' and actor_nombre = 'Ing. Daniel'), 'evento de cierre con nombre';
 end $$;
 reset role;
 
 -- El técnico no puede cerrar su reporte "fingiendo" el enlace
-select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
 update public.documentos set estado = 'en_revision' where id = (select v::uuid from ctx where k = 'rt2');
+reset role;
+select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
 update public.documentos set estado = 'aprobado' where id = (select v::uuid from ctx where k = 'rt2');
 reset role;
 select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
@@ -245,6 +247,51 @@ do $$ begin
   perform public.crear_enlace_firma((select v::uuid from ctx where k = 'rt2'), '');
   raise exception 'FALLO: un anónimo pidió una firma';
 exception when insufficient_privilege then null; end $$;
+reset role;
+
+-- ------------------------------------------------- 10. separación de funciones y enlaces (0008)
+-- La coordinadora crea un documento propio: no puede aprobarlo
+select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
+insert into ctx select 'propio', (public.crear_documento('10000000-0000-0000-0000-000000000001', 'reporte', '{}', null, 'c0000000-0000-0000-0000-000000000001')).id;
+update public.documentos set estado = 'en_revision' where id = (select v::uuid from ctx where k = 'propio');
+do $$ begin
+  update public.documentos set estado = 'aprobado' where id = (select v::uuid from ctx where k = 'propio');
+  raise exception 'FALLO: aprobó su propio documento';
+exception when insufficient_privilege then null; end $$;
+reset role;
+-- La coordinadora no edita el borrador de un técnico
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+insert into ctx select 'borr', (public.crear_documento('10000000-0000-0000-0000-000000000001', 'reporte', '{"asunto":"x"}', null, 'c0000000-0000-0000-0000-000000000001')).id;
+reset role;
+select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
+do $$ begin
+  update public.documentos set datos = '{"asunto":"editado por otro"}' where id = (select v::uuid from ctx where k = 'borr');
+  raise exception 'FALLO: editó un borrador ajeno';
+exception when insufficient_privilege then null; end $$;
+-- No hay enlace de firma para un documento en revisión
+do $$ begin
+  perform public.crear_enlace_firma((select v::uuid from ctx where k = 'propio'), '');
+  raise exception 'FALLO: creó un enlace sobre un documento en revisión';
+exception when check_violation then null; end $$;
+reset role;
+-- Dos enlaces sobre un reporte aprobado: al firmar con uno, el otro queda anulado
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+update public.documentos set estado = 'en_revision' where id = (select v::uuid from ctx where k = 'borr');
+reset role;
+select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
+update public.documentos set estado = 'aprobado' where id = (select v::uuid from ctx where k = 'borr');
+insert into ctx select 'tk1', public.crear_enlace_firma((select v::uuid from ctx where k = 'borr'), '');
+insert into ctx select 'tk2', public.crear_enlace_firma((select v::uuid from ctx where k = 'borr'), '');
+reset role;
+select pg_temp.como(null);
+do $$ begin assert public.firmar_con_enlace((select v from ctx where k = 'tk1'), 'Cliente Uno', 'data:image/png;base64,iVBORw0KGgo=') = 'cerrado', 'firma con el primer enlace'; end $$;
+do $$ begin
+  perform public.firmar_con_enlace((select v from ctx where k = 'tk2'), 'Otra persona', 'data:image/png;base64,iVBORw0KGgo=');
+  raise exception 'FALLO: el segundo enlace reemplazó la firma';
+exception when insufficient_privilege then null; end $$;
+reset role;
+select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
+do $$ begin assert (select firmante_nombre from public.firmas where documento_id = (select v::uuid from ctx where k = 'borr') and campo = 'firmaCliente') = 'Cliente Uno', 'la firma original se conserva'; end $$;
 reset role;
 
 select 'OK: todas las pruebas pasaron' as resultado;

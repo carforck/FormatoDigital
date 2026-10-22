@@ -196,7 +196,7 @@ bash scripts/armar-instalador.sh                                # 3. regenera su
 | `npm run test:e2e` | Demo en el navegador (`tests/e2e/demo.cjs`): secciones `flujo`, `responsive`, `controles`, `magno` |
 
 - `SOLO=<sección> npm run test:e2e` corre una sola sección.
-- `BASE=https://carforck.github.io/FormatoDigital npm run test:e2e` prueba el
+- `BASE=https://formato-digital-nine.vercel.app npm run test:e2e` prueba el
   sitio publicado (por defecto usa `http://localhost:3100`).
 - `bash scripts/reiniciar-dev.sh` reinicia el servidor de desarrollo con la
   caché limpia (útil si la página carga sin estilos o con «Cannot find

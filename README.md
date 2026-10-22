@@ -9,10 +9,8 @@ Arquitectura, módulos, base de datos y pendientes: [`docs/ARQUITECTURA.md`](doc
 
 ## Publicación
 
-- **Vercel:** se despliega solo desde la rama `main` de GitHub `carforck/FormatoDigital`.
-- **GitHub Pages (demo):** https://carforck.github.io/FormatoDigital/ con `npm run deploy`
-  (compila con `GITHUB_PAGES=true`, exporta bajo `/FormatoDigital` en `.next-pages/` y lo sube
-  a la rama `gh-pages`; puede correr aunque `npm run dev` esté encendido).
+- **Vercel:** https://formato-digital-nine.vercel.app — se despliega solo con cada push a `main`
+  de GitHub `carforck/FormatoDigital`. Es el único despliegue (GitHub Pages ya no se usa).
 
 ## Desarrollo
 

@@ -30,11 +30,16 @@ const VERDE_CLARO = "#F1F8E9";
 
 type CampoTexto = Exclude<keyof DatosGasto, "items">;
 
+/** Soportes por hoja del anexo: 3 filas de 2 caben en carta y A4 con su franja y pie. */
+const SOPORTES_POR_HOJA = 6;
+
 /** Réplica del FO-GSST-25 · Legalización y registro de gastos operativos (A4). */
 export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: Props) {
   const f = FORMATOS.gasto;
   const total = totalGastos(datos);
   const conSoporte = datos.items.filter((i) => i.soporte);
+  const hojasSoporte: ItemGasto[][] = [];
+  for (let i = 0; i < conSoporte.length; i += SOPORTES_POR_HOJA) hojasSoporte.push(conSoporte.slice(i, i + SOPORTES_POR_HOJA));
 
   const campo = (k: CampoTexto, opts: { multiline?: boolean; type?: "text" | "date" | "tel"; placeholder?: string } = {}) => (
     <span className={cn("rounded", resaltar === k && "bg-[#2E7D32]/20 ring-2 ring-[#2E7D32]")}>
@@ -57,8 +62,9 @@ export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: P
     item(id, { soporte: await comprimirImagen(archivo, 1400, 0.75) });
   };
 
+  // Solo se resalta si hay una sección pedida y coincide (en vistas de lectura ambas son undefined)
   const seccion = (titulo: string, clave?: string) => (
-    <div className={cn("mt-4 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-white", resaltar === clave && "ring-2 ring-amber-400")} style={{ background: VERDE }}>
+    <div className={cn("mt-4 break-after-avoid px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-white", clave !== undefined && resaltar === clave && "ring-2 ring-amber-400")} style={{ background: VERDE }}>
       {titulo}
     </div>
   );
@@ -94,6 +100,7 @@ export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: P
           </tbody>
         </table>
 
+        <div className="break-inside-avoid">
         {seccion("Datos generales")}
         <table className="w-full border-collapse">
           <tbody>
@@ -123,6 +130,7 @@ export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: P
             </tr>
           </tbody>
         </table>
+        </div>
 
         {seccion("Detalle de gastos y soportes", "items")}
         <table className="w-full border-collapse text-[10.5px]">
@@ -151,7 +159,7 @@ export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: P
                 </tr>
               ))}
             {datos.items.map((i, k) => (
-              <tr key={i.id}>
+              <tr key={i.id} className="break-inside-avoid">
                 <td className="border border-slate-300 py-1 text-center">{k + 1}</td>
                 <td className="border border-slate-300 px-1 text-center">
                   <EditableText value={i.fecha} type="date" disabled={!editar} ariaLabel={`Fecha gasto ${k + 1}`} onCommit={(v) => item(i.id, { fecha: v })} />
@@ -182,7 +190,11 @@ export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: P
                     {editar && (
                       <label className="print:hidden cursor-pointer rounded p-0.5 text-[#2E7D32] hover:bg-[#F1F8E9]" title={i.soporte ? "Cambiar foto de la factura" : "Adjuntar foto de la factura"}>
                         <Camera className="h-3.5 w-3.5" />
-                        <input type="file" accept="image/*" capture="environment" className="sr-only" aria-label={`Foto factura gasto ${k + 1}`} onChange={(e) => fotoFactura(i.id, e.target.files?.[0])} />
+                        <input type="file" accept="image/*" capture="environment" className="sr-only" aria-label={`Foto factura gasto ${k + 1}`} onChange={(e) => {
+                            const archivo = e.target.files?.[0];
+                            e.target.value = "";
+                            void fotoFactura(i.id, archivo);
+                          }} />
                       </label>
                     )}
                   </div>
@@ -206,7 +218,7 @@ export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: P
                 </td>
               </tr>
             ))}
-            <tr>
+            <tr className="break-inside-avoid">
               <td colSpan={6} className="border border-slate-300 px-2 py-1.5 text-right font-bold uppercase">
                 Valor total legalizado:
               </td>
@@ -226,11 +238,15 @@ export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: P
           </button>
         )}
 
+        {/* Encabezado de sección + contenido en un solo bloque: nunca quedan en páginas distintas */}
+        <div className="break-inside-avoid">
         {seccion("Observaciones y justificaciones", "observaciones")}
         <div className="min-h-[56px] border border-slate-300 p-2 italic text-slate-600">
           {campo("observaciones", { multiline: true, placeholder: editar ? "Describa detalles adicionales de los gastos o justifique novedades relevantes durante la comisión…" : " " })}
         </div>
+        </div>
 
+        <div className="break-inside-avoid">
         {seccion("Control y aprobación", "firmaColaborador")}
         <table className="w-full border-collapse">
           <thead>
@@ -259,23 +275,25 @@ export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: P
           </tbody>
         </table>
 
-        <div className="mt-8 flex justify-between border-t border-slate-200 pt-2 text-[9.5px] text-slate-500">
+        {/* Pie sin «Página X de Y»: el número real de páginas depende de la impresora y el papel */}
+        <div className="mt-8 flex justify-between border-t border-slate-200 pt-2 text-[9.5px] text-slate-500 print:mt-4">
           <span>Documento emitido por el Sistema de Gestión de SOTEC</span>
-          <span>{conSoporte.length ? "Página 1 de 2" : "Página 1 de 1"}</span>
+          <span>Hoja 1 · Formato{conSoporte.length ? ` · ${conSoporte.length} soporte${conSoporte.length === 1 ? "" : "s"} anexo${conSoporte.length === 1 ? "" : "s"}` : ""}</span>
+        </div>
         </div>
       </article>
 
-      {conSoporte.length > 0 && (
-        <article className="doc-print mx-auto w-full max-w-[794px] bg-white p-6 text-[11px] leading-snug text-slate-800 shadow-sm ring-1 ring-slate-200 sm:p-9">
+      {hojasSoporte.map((grupo, h) => (
+        <article key={h} className="doc-print mx-auto w-full max-w-[794px] bg-white p-6 text-[11px] leading-snug text-slate-800 shadow-sm ring-1 ring-slate-200 sm:p-9">
           <div className="flex items-center justify-between gap-3 px-2 py-1.5 text-white" style={{ background: VERDE }}>
-            <span className="text-[11px] font-bold uppercase tracking-wider">Soportes · facturas y recibos</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider">Soportes · facturas y recibos{hojasSoporte.length > 1 ? ` (${h + 1}/${hojasSoporte.length})` : ""}</span>
             <span className="font-mono text-[10px]">
               {f.codigo}
               {codigoDoc ? ` · ${codigoDoc}` : ""}
             </span>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-3">
-            {conSoporte.map((i) => {
+            {grupo.map((i) => {
               const n = datos.items.indexOf(i) + 1;
               return (
                 <figure key={i.id} className="break-inside-avoid border border-slate-300 p-1.5">
@@ -293,10 +311,10 @@ export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: P
           </div>
           <div className="mt-8 flex justify-between border-t border-slate-200 pt-2 text-[9.5px] text-slate-500">
             <span>Documento emitido por el Sistema de Gestión de SOTEC</span>
-            <span>Página 2 de 2</span>
+            <span>Hoja {h + 2} · Soportes</span>
           </div>
         </article>
-      )}
+      ))}
     </div>
   );
 }

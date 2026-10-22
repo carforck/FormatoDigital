@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Check, Copy, ExternalLink, Mail, MessageCircle, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useModal } from "@/components/ui/useModal";
 
 interface Props {
   titulo: string;
@@ -36,20 +37,23 @@ export function EnviarDocumento({ titulo, correo: c0, telefono: t0, asunto: a0, 
   const [asunto, setAsunto] = useState(a0);
   const [mensaje, setMensaje] = useState(m0);
   const [copiado, setCopiado] = useState(false);
+  const dialogo = useModal<HTMLDivElement>(onCerrar);
+  const idTitulo = useId();
+  const idDescripcion = useId();
 
   const cuerpo = enlace ? `${mensaje}\n\n${enlace}` : mensaje;
   const correoValido = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(correo);
   const telValido = telefono.replace(/\D/g, "").length >= 10;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={titulo}>
-      <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" >
+      <div ref={dialogo} role="dialog" aria-modal="true" aria-labelledby={idTitulo} aria-describedby={idDescripcion} className="max-h-[92vh] outline-none w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="font-semibold text-slate-900">{titulo}</p>
-            <p className="text-sm text-slate-500">Revisa el mensaje y elige por dónde enviarlo.</p>
+            <p id={idTitulo} className="font-semibold text-slate-900">{titulo}</p>
+            <p id={idDescripcion} className="text-sm text-slate-500">Revisa el mensaje y elige por dónde enviarlo.</p>
           </div>
-          <button onClick={onCerrar} aria-label="Cerrar" className="rounded p-1 hover:bg-slate-100">
+          <button type="button" onClick={onCerrar} aria-label="Cerrar" className="rounded p-1 hover:bg-slate-100">
             <X className="h-4 w-4" />
           </button>
         </div>

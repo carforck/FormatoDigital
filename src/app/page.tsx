@@ -2,6 +2,7 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  ArrowUpRight,
   Building,
   Building2,
   FileCheck2,
@@ -15,8 +16,10 @@ import { asset } from "@/nucleo/rutas";
 import { FondoInteractivo } from "@/components/fx/FondoInteractivo";
 import { Contador, Icono, ProgresoScroll, Reveal, TextoRotativo } from "@/components/fx/Reveal";
 import { GraficasImpacto } from "@/components/landing/GraficasImpacto";
-import { HeroDemo } from "@/components/landing/HeroDemo";
-import { AccesoRoles, Calculadora, Contacto, Faq, VitrinaFormatos } from "@/components/landing/Interactivos";
+import { AccesoRoles, Contacto, Faq, VitrinaFormatos } from "@/components/landing/Interactivos";
+import { CalculadoraROI } from "@/components/landing/CalculadoraROI";
+import { ChatEnVivo } from "@/components/landing/ChatEnVivo";
+import { FirmaDigital, Foto, ServiciosSotec } from "@/components/landing/Fotos";
 import { FuncionesBento } from "@/components/landing/FuncionesBento";
 import { LottieDigitaliza } from "@/components/landing/LottieDigitaliza";
 import { NormasReferencia } from "@/components/landing/NormasReferencia";
@@ -70,6 +73,17 @@ export default function Landing() {
 
       {/* Hero */}
       <section className="relative overflow-hidden bg-sotec text-white">
+        {/* Foto de fondo: oscurecida y con degradado para mantener el contraste del texto */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 lg:left-[35%]">
+          <img
+            src={asset("/landing/tecnico-tablet-obra.webp")}
+            alt=""
+            width={1600}
+            height={1067}
+            className="h-full w-full object-cover object-[70%_center] opacity-25 lg:opacity-45"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-sotec/70 via-sotec/80 to-sotec lg:bg-gradient-to-r lg:from-sotec lg:via-sotec/70 lg:to-sotec/30" />
+        </div>
         <FondoInteractivo />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-sotec to-transparent" />
         <div className="container relative grid items-center gap-12 py-16 lg:grid-cols-2 lg:py-24">
@@ -107,9 +121,7 @@ export default function Landing() {
       <section className="border-b border-slate-200 bg-slate-50">
         <div className="container flex flex-col items-center gap-6 py-8 md:flex-row">
           <div className="flex items-center gap-4">
-            <span className="rounded-xl bg-white px-3 py-2 shadow-sm ring-1 ring-slate-200">
-              <img src={asset("/sotec-logo-v3.png")} alt="SOTEC" className="h-14 w-auto" />
-            </span>
+            <img src={asset("/sotec-logo-v3.png")} alt="SOTEC" className="h-16 w-auto shrink-0" />
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-sotec-greenDeep">Caso de cliente</p>
               <p className="font-semibold">SOTEC · seguridad electrónica y telecomunicaciones</p>
@@ -136,23 +148,35 @@ export default function Landing() {
       {/* Míralo llenarse */}
       <section className="relative overflow-hidden bg-sotec py-16 text-white sm:py-24">
         <div aria-hidden className="pointer-events-none absolute -right-40 top-1/2 h-[480px] w-[480px] -translate-y-1/2 rounded-full bg-sotec-green/10 blur-3xl" />
-        <div className="container relative grid items-center gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-14">
+        <div className="container relative grid items-center gap-10 lg:grid-cols-[0.8fr_1.4fr] lg:gap-12">
           <Reveal>
             <p className="text-sm font-semibold uppercase tracking-wider text-sotec-green">Así se llena</p>
             <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">El técnico conversa; el formato se diligencia solo</h2>
             <p className="mt-3 text-white/70">
               El asistente pregunta en lenguaje sencillo, valida cada respuesta y la ubica en el campo correcto del formato oficial. Al final el técnico firma con el dedo y el documento sale a revisión.
             </p>
-            <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+            <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
               {["Autocompleta desde el directorio", "Bloquea campos inválidos", "Redacción asistida", "Firma y envío en un toque"].map((x, k) => (
                 <Reveal key={x} delay={k * 90} as="li" className="group flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm transition hover:border-sotec-green/50 hover:bg-white/10">
                   <Icono efecto="bounce"><FileCheck2 className="h-4 w-4 text-sotec-green" /></Icono> {x}
                 </Reveal>
               ))}
             </ul>
+            <Foto
+              src="/landing/inspeccion-obra-tablet-radio.webp"
+              alt="Supervisor con radio e ingeniera con tablet haciendo una inspección en obra"
+              ancho={1600}
+              alto={1067}
+              className="mt-8 aspect-[16/9] ring-white/10 sm:aspect-[21/9]"
+            >
+              <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-t from-sotec/90 via-transparent to-transparent" />
+              <figcaption className="absolute bottom-3 left-4 right-4 flex items-center gap-2 text-sm font-medium text-white">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-sotec-green" /> Inspección en obra, diligenciada desde la tablet
+              </figcaption>
+            </Foto>
           </Reveal>
-          <Reveal delay={150}>
-            <HeroDemo />
+          <Reveal delay={150} className="min-w-0">
+            <ChatEnVivo />
           </Reveal>
         </div>
       </section>
@@ -180,6 +204,8 @@ export default function Landing() {
         </div>
       </section>
 
+      <ServiciosSotec />
+
       {/* Cómo funciona */}
       <section className="container py-20">
         <h2 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">De tu formato a la app, en cuatro pasos</h2>
@@ -199,6 +225,8 @@ export default function Landing() {
           ))}
         </div>
       </section>
+
+      <FirmaDigital />
 
       {/* Funcionalidades */}
       <section id="funciones" className="scroll-mt-16 bg-slate-50 py-20">
@@ -231,11 +259,35 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Frase gancho */}
+      <section aria-label="Medición" className="relative overflow-hidden border-b border-slate-200 bg-white py-14 sm:py-16">
+        <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-sotec-green via-sotec-green/60 to-transparent" />
+        <Reveal className="container relative">
+          <figure className="mx-auto max-w-4xl">
+            <span aria-hidden className="block select-none font-serif text-7xl leading-none text-sotec-green sm:text-8xl">“</span>
+            <blockquote className="-mt-6 space-y-1 text-2xl font-semibold leading-tight tracking-tight text-sotec sm:-mt-8 sm:text-3xl lg:text-4xl">
+              <p>Lo que no se define, no se puede <span className="text-sotec-greenDeep">medir</span>.</p>
+              <p>Lo que no se mide, no se puede <span className="text-sotec-greenDeep">mejorar</span>.</p>
+              <p>Lo que no se mejora, se <span className="text-sotec-greenDeep">degrada</span> siempre.</p>
+            </blockquote>
+            <p className="mt-3 text-sm text-slate-500">— Frase atribuida a Lord Kelvin (William Thomson)</p>
+            <figcaption className="mt-5 flex flex-col gap-4 border-l-2 border-sotec-green pl-4 sm:flex-row sm:items-center sm:justify-between">
+              <span className="max-w-2xl text-slate-600">
+                Con cada formato digital, tu sistema de gestión mide en tiempo real: tiempos, aprobaciones, pendientes y cumplimiento.
+              </span>
+              <a href="#impacto" className="icono-nudge inline-flex shrink-0 items-center gap-1.5 font-semibold text-sotec-greenDeep hover:underline">
+                Ver los indicadores <ArrowRight className="h-4 w-4" />
+              </a>
+            </figcaption>
+          </figure>
+        </Reveal>
+      </section>
+
       {/* Impacto */}
       <section id="impacto" className="scroll-mt-16 bg-slate-50 py-20">
         <div className="container">
           <Reveal className="mx-auto mb-10 max-w-2xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-wider text-sotec-greenDeep">Impacto medible</p>
+            <p className="text-sm font-semibold uppercase tracking-wider text-sotec-greenDeep">Impacto medible<span aria-hidden>*</span></p>
             <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Menos tiempo, menos errores, cero papeles perdidos</h2>
             <p className="mt-3 text-slate-600">Pasa el mouse por las gráficas para ver cada valor.</p>
           </Reveal>
@@ -249,10 +301,11 @@ export default function Landing() {
           <p className="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-sotec-greenDeep">
             <Icono><Timer className="h-4 w-4" /></Icono> Calcula tu ahorro
           </p>
-          <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">¿Cuánto tiempo pierde tu equipo en papeleo?</h2>
+          <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">¿Cuánto le cuesta el papel a tu empresa?</h2>
+          <p className="mt-3 text-slate-600">Un caso de negocio con supuestos visibles y fuentes: ajústalo con tus datos y descárgalo en PDF.</p>
         </div>
         <Reveal>
-          <Calculadora />
+          <CalculadoraROI />
         </Reveal>
       </section>
 
@@ -343,8 +396,20 @@ export default function Landing() {
       </section>
 
       {/* Contacto */}
-      <section id="contacto" className="scroll-mt-16 bg-sotec py-20 text-white">
-        <div className="container grid items-center gap-10 lg:grid-cols-2">
+      <section id="contacto" className="relative scroll-mt-16 overflow-hidden bg-sotec py-20 text-white">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <img
+            src={asset("/landing/equipo-revision-reportes.webp")}
+            alt=""
+            width={1600}
+            height={1069}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover opacity-30"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-sotec via-sotec/85 to-sotec/60" />
+        </div>
+        <div className="container relative grid items-center gap-10 lg:grid-cols-2">
           <div>
             <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Digitalicemos tu primer formato</h2>
             <p className="mt-3 text-white/70">Cuéntanos qué formatos usa tu equipo y te mostramos cómo se verían funcionando, como lo hicimos con SOTEC.</p>
@@ -356,10 +421,40 @@ export default function Landing() {
         </div>
       </section>
 
-      <footer className="border-t border-white/10 bg-black py-8 text-sm text-white/50">
-        <div className="container flex flex-col justify-between gap-2 sm:flex-row">
-          <p>© {new Date().getFullYear()} FormatoDigital · Prototipo de demostración para SOTEC</p>
-          <p>* Cifras ilustrativas de un piloto típico (50 min en papel frente a 9 min digital por formato).</p>
+      <footer className="border-t border-white/10 bg-black py-10 text-white/60">
+        <div className="container">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="flex items-center gap-2 font-semibold text-white">
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-sotec-green text-sotec">
+                  <FileCheck2 className="h-4 w-4" />
+                </span>
+                FormatoDigital
+              </p>
+              <p className="mt-2 text-sm">Digitalización de formatos para sistemas de gestión</p>
+            </div>
+            <p className="text-sm">
+              Desarrollado por{" "}
+              <a
+                href="https://vanttagetech.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 font-semibold text-sotec-green hover:underline"
+              >
+                Vanttage <ArrowUpRight className="h-3.5 w-3.5" />
+              </a>
+            </p>
+          </div>
+          <div className="mt-8 border-t border-white/10 pt-5 text-xs leading-relaxed text-white/50">
+            <p className="font-semibold uppercase tracking-wider text-white/60">Notas</p>
+            <ul className="mt-2 space-y-1">
+              <li>* Cifras ilustrativas de un piloto típico (50 min en papel frente a 9 min digital por formato).</li>
+              <li>Las normas ISO y la legislación se citan solo como referencia; FormatoDigital no otorga certificación ni está avalado por ISO u organismos certificadores.</li>
+              <li>Los clientes, personas y datos de la demo son ficticios. SOTEC aparece con su autorización.</li>
+              <li>Fotografías: Pexels (licencia libre).</li>
+            </ul>
+            <p className="mt-4">© {new Date().getFullYear()} FormatoDigital · Prototipo de demostración para SOTEC</p>
+          </div>
         </div>
       </footer>
     </div>

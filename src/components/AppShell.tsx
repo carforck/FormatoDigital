@@ -14,12 +14,17 @@ import {
   HardHat,
   LayoutDashboard,
   LogOut,
+  Monitor,
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   Menu,
   Plus,
   Receipt,
   ScrollText,
   Search,
   Settings,
+  Sun,
   Users,
   Wallet,
   X,
@@ -121,6 +126,60 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [bell, setBell] = useState(false);
   const [perfil, setPerfil] = useState(false);
   const [nuevo, setNuevo] = useState(false);
+  // Barra lateral en escritorio: riel de íconos que se abre al pasar el mouse; se puede fijar abierta
+  const [fijada, setFijada] = useState(false);
+  const [hover, setHover] = useState(false);
+  const [escritorio, setEscritorio] = useState(false);
+  // Tema del aplicativo (la landing y los formatos impresos van siempre claros)
+  const [tema, setTema] = useState<"claro" | "oscuro" | "sistema">("sistema");
+  const [sistemaOscuro, setSistemaOscuro] = useState(false);
+
+  useEffect(() => {
+    try {
+      const f = localStorage.getItem("fd-sidebar");
+      if (f) setFijada(f === "fija");
+      const t = localStorage.getItem("fd-tema");
+      if (t === "claro" || t === "oscuro" || t === "sistema") setTema(t);
+    } catch {
+      /* sin almacenamiento */
+    }
+    const mqLg = window.matchMedia("(min-width: 1024px)");
+    const mqOsc = window.matchMedia("(prefers-color-scheme: dark)");
+    const sync = () => {
+      setEscritorio(mqLg.matches);
+      setSistemaOscuro(mqOsc.matches);
+    };
+    sync();
+    mqLg.addEventListener("change", sync);
+    mqOsc.addEventListener("change", sync);
+    return () => {
+      mqLg.removeEventListener("change", sync);
+      mqOsc.removeEventListener("change", sync);
+    };
+  }, []);
+
+  const oscuro = tema === "oscuro" || (tema === "sistema" && sistemaOscuro);
+  // Fondo del documento acorde (rebote del scroll en móvil)
+  useEffect(() => {
+    document.body.style.backgroundColor = oscuro ? "#0F1311" : "";
+    return () => {
+      document.body.style.backgroundColor = "";
+    };
+  }, [oscuro]);
+
+  const guardar = (k: string, v: string) => {
+    try {
+      localStorage.setItem(k, v);
+    } catch {
+      /* sin almacenamiento */
+    }
+  };
+  const cambiarTema = () => {
+    const sig = tema === "claro" ? "oscuro" : tema === "oscuro" ? "sistema" : "claro";
+    setTema(sig);
+    guardar("fd-tema", sig);
+  };
+  const compacta = escritorio && !fijada && !hover;
   const [q, setQ] = useState("");
   const refBell = useFueraDe<HTMLDivElement>(bell, () => setBell(false));
   const refPerfil = useFueraDe<HTMLDivElement>(perfil, () => setPerfil(false));
@@ -151,7 +210,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     borradores: demo.visibles.filter((d) => d.autorId === usuario.id && (d.estado === "borrador" || d.estado === "rechazado")).length,
   };
   const sinLeer = demo.misNotificaciones.filter((n) => !n.leida).length;
-  const titulo = TITULOS.find(([r]) => path.startsWith(r))?.[1] ?? "Tablero";
+  const tituloBase = TITULOS.find(([r]) => path.startsWith(r))?.[1] ?? "Tablero";
+  // En el generador con ?id= se continúa un documento existente
+  const continuando = path.startsWith("/app/nuevo") && typeof window !== "undefined" && new URLSearchParams(window.location.search).has("id");
+  const titulo = continuando ? tituloBase.replace(/^Nuev[oa] /, "Continuar ") : tituloBase;
   const activo = (href: string) => (href === "/app" ? path === "/app" : path.startsWith(href));
 
   const cambiarPerfil = (id: string) => {
@@ -168,7 +230,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         if (!items.length) return null;
         return (
           <div key={g.titulo}>
-            <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/35">{g.titulo}</p>
+            <p className={cn("mb-1.5 whitespace-nowrap px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/35 transition-opacity", compacta && "opacity-0")}>{g.titulo}</p>
             {items.map((i) => {
               const on = activo(i.href);
               const n = i.contador ? contadores[i.contador] : 0;
@@ -176,15 +238,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={i.href}
                   href={i.href}
+                  title={compacta ? i.label : undefined}
+                  aria-label={compacta ? i.label : undefined}
                   className={cn(
                     "relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-white/70 transition hover:bg-white/[0.06] hover:text-white",
                     on && "bg-white/[0.08] font-medium text-white",
                   )}
                 >
                   {on && <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-sotec-green" />}
-                  <i.icon className={cn("h-4 w-4", on ? "text-sotec-green" : "text-white/50")} />
-                  <span className="flex-1">{i.label}</span>
-                  {n > 0 && <span className="rounded-md bg-sotec-green/15 px-1.5 text-[11px] font-semibold text-sotec-green">{n}</span>}
+                  <span className="relative shrink-0">
+                    <i.icon className={cn("h-4 w-4", on ? "text-sotec-green" : "text-white/50")} />
+                    {n > 0 && compacta && <span className="absolute -right-1.5 -top-1.5 h-2 w-2 rounded-full bg-sotec-green ring-2 ring-sotec" />}
+                  </span>
+                  <span className={cn("flex-1 whitespace-nowrap transition-opacity", compacta && "opacity-0")}>{i.label}</span>
+                  {n > 0 && !compacta && <span className="rounded-md bg-sotec-green/15 px-1.5 text-[11px] font-semibold text-sotec-green">{n}</span>}
                 </Link>
               );
             })}
@@ -204,7 +271,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F5F7F3]">
+    <div className={cn("min-h-screen", oscuro ? "dark bg-[#0F1311] text-slate-100" : "bg-[#F5F7F3]")}>
       {/* Franja de demostración discreta */}
       <div className="print:hidden flex h-7 items-center justify-center gap-2 bg-[#141414] px-3 text-[11px] text-white/60">
         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-sotec-green" />
@@ -219,30 +286,48 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Barra lateral */}
       <aside
+        onMouseEnter={() => escritorio && setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        onFocus={() => escritorio && setHover(true)}
+        onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setHover(false)}
         className={cn(
-          "print:hidden fixed inset-y-0 left-0 z-50 flex w-[264px] flex-col border-r border-white/5 bg-sotec transition-transform duration-300 lg:top-7 lg:z-30 lg:translate-x-0",
+          "print:hidden fixed inset-y-0 left-0 z-50 flex w-[264px] flex-col overflow-hidden border-r border-white/5 bg-sotec transition-[transform,width,box-shadow] duration-200 lg:top-7 lg:z-40 lg:translate-x-0",
           menu ? "translate-x-0" : "-translate-x-full",
+          compacta && "lg:w-[72px]",
+          escritorio && !fijada && hover && "shadow-2xl shadow-black/40",
         )}
       >
-        <div className="flex items-center justify-between px-4 pb-4 pt-5">
-          <Link href="/app" className="flex items-center gap-2.5">
-            <span className="rounded-lg bg-white px-2 py-1.5">
-              <img src={asset("/sotec-logo-v3.png")} alt="SOTEC" className="h-10 w-auto" />
-            </span>
+        <div className={cn("flex items-center justify-between pb-4 pt-5", compacta ? "px-3" : "px-4")}>
+          <Link href="/app" className="flex items-center gap-2.5" aria-label="Ir al tablero">
+            <img src={asset("/sotec-logo-v3-oscuro.png")} alt="SOTEC" className={cn("w-auto transition-all", compacta ? "h-9" : "h-12")} />
           </Link>
           <button className="rounded p-1 text-white/70 hover:text-white lg:hidden" onClick={() => setMenu(false)} aria-label="Cerrar menú">
             <X className="h-5 w-5" />
           </button>
+          {escritorio && !compacta && (
+            <button
+              onClick={() => {
+                setFijada(!fijada);
+                guardar("fd-sidebar", fijada ? "riel" : "fija");
+                if (fijada) setHover(false);
+              }}
+              className="rounded-md p-1.5 text-white/50 hover:bg-white/10 hover:text-white"
+              aria-label={fijada ? "Contraer la barra lateral" : "Fijar la barra lateral abierta"}
+              title={fijada ? "Contraer (se abre al pasar el mouse)" : "Fijar abierta"}
+            >
+              {fijada ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+            </button>
+          )}
         </div>
-        <div className="mx-4 mb-5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+        <div className={cn("mx-4 mb-5 whitespace-nowrap rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 transition-opacity", compacta && "opacity-0")}>
           <p className="text-[10px] uppercase tracking-[0.12em] text-white/40">Espacio de trabajo</p>
           <p className="text-sm font-medium text-white">Sistema de gestión SG-SST</p>
         </div>
-        <div className="scrollbar-thin flex-1 overflow-y-auto px-3">{nav}</div>
-        <div className="border-t border-white/10 p-4">
+        <div className={cn("scrollbar-thin flex-1 overflow-y-auto overflow-x-hidden", compacta ? "px-2.5" : "px-3")}>{nav}</div>
+        <div className={cn("border-t border-white/10", compacta ? "px-3.5 py-4" : "p-4")}>
           <div className="flex items-center gap-3">
             <Avatar nombre={usuario.nombre} className="bg-sotec-green text-sotec" />
-            <div className="min-w-0 flex-1">
+            <div className={cn("min-w-0 flex-1 transition-opacity", compacta && "opacity-0")}>
               <p className="truncate text-sm font-medium text-white">{usuario.nombre}</p>
               <p className="truncate text-xs text-white/50">{ETIQUETA_ROL[usuario.rol]}</p>
             </div>
@@ -258,12 +343,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <LogOut className="h-4 w-4" />
             </button>
           </div>
-          <p className="mt-3 text-[10px] text-white/30">FormatoDigital · v0.1 demo</p>
+          <p className={cn("mt-3 whitespace-nowrap text-[10px] text-white/30", compacta && "opacity-0")}>FormatoDigital · v0.1 demo</p>
         </div>
       </aside>
       {menu && <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px] lg:hidden" onClick={() => setMenu(false)} />}
 
-      <div className="lg:pl-[264px]">
+      <div className={cn("transition-[padding] duration-200", escritorio && !fijada ? "lg:pl-[72px]" : "lg:pl-[264px]")}>
         {/* Barra superior */}
         <header className="print:hidden sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur sm:px-6">
           <button className="rounded-md p-1.5 hover:bg-slate-100 lg:hidden" onClick={() => setMenu(true)} aria-label="Abrir menú">
@@ -292,7 +377,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </label>
           </form>
 
-          <div className="relative ml-auto md:ml-0" ref={refBell}>
+          <button
+            onClick={cambiarTema}
+            className="ml-auto rounded-lg p-2 text-slate-600 hover:bg-slate-100 md:ml-0"
+            aria-label={`Tema: ${tema === "claro" ? "claro" : tema === "oscuro" ? "oscuro" : "según el sistema"}. Cambiar tema`}
+            title={tema === "claro" ? "Tema claro" : tema === "oscuro" ? "Tema oscuro" : "Tema del sistema"}
+          >
+            {tema === "claro" ? <Sun className="h-5 w-5" /> : tema === "oscuro" ? <Moon className="h-5 w-5" /> : <Monitor className="h-5 w-5" />}
+          </button>
+          <div className="relative" ref={refBell}>
             <button
               onClick={() => {
                 setBell(!bell);

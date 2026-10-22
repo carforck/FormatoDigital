@@ -20,9 +20,7 @@ export default function Acceso() {
           <ArrowLeft className="h-4 w-4" /> Volver a la presentación
         </Link>
         <div className="mt-6 flex items-center gap-3">
-          <span className="rounded-md bg-white px-2 py-1.5">
-            <img src={asset("/sotec-logo-v3.png")} alt="SOTEC" className="h-12 w-auto" />
-          </span>
+          <img src={asset("/sotec-logo-v3-oscuro.png")} alt="SOTEC" className="h-16 w-auto" />
           <span className="text-sm text-white/60">Prototipo de demostración</span>
         </div>
         <h1 className="mt-6 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">¿Con qué perfil quieres recorrer la demo?</h1>

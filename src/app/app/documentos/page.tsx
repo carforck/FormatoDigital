@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { FileText, HardHat, Search } from "lucide-react";
+import { Search } from "lucide-react";
 
 import { EstadoBadge, fechaCorta } from "@/components/ui/badges";
 import { PageHeader } from "@/components/ui/corporativo";
@@ -14,6 +14,7 @@ import type { Estado, TipoDoc } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 import { avance } from "@/nucleo/validar";
 import { clienteDoc, tituloDoc } from "@/modulos/registro";
+import { IconoDoc } from "@/components/ui/icono-doc";
 
 export default function Page() {
   return (
@@ -103,7 +104,7 @@ function Documentos() {
                 <tr key={d.id} className="block hover:bg-slate-50 md:table-row">
                   <td className="block px-4 pt-3 md:table-cell md:py-3">
                     <Link href={rutaDoc(d.id)} className="flex items-center gap-2 font-medium hover:underline">
-                      {d.tipo === "reporte" ? <FileText className="h-4 w-4 text-slate-500" /> : <HardHat className="h-4 w-4 text-slate-500" />}
+                      <IconoDoc tipo={d.tipo} className="h-4 w-4 text-slate-500" />
                       <span className="font-mono">{d.codigo}</span>
                     </Link>
                     <p className="truncate text-xs text-slate-500 md:max-w-xs">{tituloDoc(d)}</p>

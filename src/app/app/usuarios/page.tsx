@@ -15,7 +15,9 @@ const ROLES = Object.keys(ETIQUETA_ROL) as Rol[];
 
 export default function Usuarios() {
   const demo = useDemo();
-  const [nuevo, setNuevo] = useState({ nombre: "", email: "", cargo: "", rol: "tecnico" as Rol });
+  const [nuevo, setNuevo] = useState({ nombre: "", email: "", cargo: "", rol: "tecnico" as Rol, clienteId: "" });
+  const primerCliente = demo.clientes[0]?.id;
+  const sinClientes = demo.clientes.length === 0;
 
   return (
     <div className="space-y-6">
@@ -26,7 +28,7 @@ export default function Usuarios() {
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th className="px-4 py-2">Persona</th>
-              <th className="px-4 py-2">Rol</th>
+              <th className="px-4 py-2">Rol / empresa</th>
               <th className="px-4 py-2">Activo</th>
             </tr>
           </thead>
@@ -45,19 +47,42 @@ export default function Usuarios() {
                     </div>
                   </div>
                 </td>
-                <td className="px-4">
-                  <select
-                    value={u.rol}
-                    disabled={u.id === demo.usuario?.id}
-                    onChange={(e) => demo.actualizarUsuario({ ...u, rol: e.target.value as Rol, clienteId: e.target.value === "cliente" ? u.clienteId ?? demo.clientes[0].id : undefined })}
-                    className="rounded-md border border-slate-200 bg-white px-2 py-1"
-                  >
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {ETIQUETA_ROL[r]}
-                      </option>
-                    ))}
-                  </select>
+                <td className="px-4 py-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={u.rol}
+                      aria-label={`Rol de ${u.nombre}`}
+                      disabled={u.id === demo.usuario?.id}
+                      onChange={(e) => {
+                        const rol = e.target.value as Rol;
+                        // Al pasar a Cliente conserva su empresa si ya tenía; si no, toma la primera y se puede cambiar al lado
+                        demo.actualizarUsuario({ ...u, rol, clienteId: rol === "cliente" ? u.clienteId ?? primerCliente : undefined });
+                      }}
+                      className="rounded-md border border-slate-200 bg-white px-2 py-1"
+                    >
+                      {ROLES.map((r) => (
+                        <option key={r} value={r} disabled={r === "cliente" && sinClientes}>
+                          {ETIQUETA_ROL[r]}
+                        </option>
+                      ))}
+                    </select>
+                    {u.rol === "cliente" && (
+                      <select
+                        value={u.clienteId ?? ""}
+                        aria-label={`Empresa cliente de ${u.nombre}`}
+                        disabled={u.id === demo.usuario?.id}
+                        onChange={(e) => demo.actualizarUsuario({ ...u, clienteId: e.target.value })}
+                        className="max-w-[16rem] truncate rounded-md border border-slate-200 bg-white px-2 py-1"
+                      >
+                        {!u.clienteId && <option value="">Elegir empresa…</option>}
+                        {demo.clientes.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4">
                   <input type="checkbox" aria-label="Activo" checked={u.activo} disabled={u.id === demo.usuario?.id} onChange={(e) => demo.actualizarUsuario({ ...u, activo: e.target.checked })} />
@@ -72,8 +97,10 @@ export default function Usuarios() {
         className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
         onSubmit={(e) => {
           e.preventDefault();
-          demo.actualizarUsuario({ id: `u-${Date.now()}`, ...nuevo, activo: true, clienteId: nuevo.rol === "cliente" ? demo.clientes[0].id : undefined });
-          setNuevo({ nombre: "", email: "", cargo: "", rol: "tecnico" });
+          const { clienteId, ...resto } = nuevo;
+          if (nuevo.rol === "cliente" && !clienteId) return;
+          demo.actualizarUsuario({ id: `u-${Date.now()}`, ...resto, activo: true, clienteId: nuevo.rol === "cliente" ? clienteId : undefined });
+          setNuevo({ nombre: "", email: "", cargo: "", rol: "tecnico", clienteId: "" });
         }}
       >
         <label className="min-w-[180px] flex-1 text-sm">
@@ -88,13 +115,42 @@ export default function Usuarios() {
           <span className="text-xs text-slate-500">Cargo</span>
           <Input value={nuevo.cargo} onChange={(e) => setNuevo({ ...nuevo, cargo: e.target.value })} />
         </label>
-        <select value={nuevo.rol} onChange={(e) => setNuevo({ ...nuevo, rol: e.target.value as Rol })} className="h-10 rounded-md border border-slate-200 bg-white px-2 text-sm" aria-label="Rol">
+        <select
+          value={nuevo.rol}
+          onChange={(e) => {
+            const rol = e.target.value as Rol;
+            setNuevo({ ...nuevo, rol, clienteId: rol === "cliente" ? nuevo.clienteId || primerCliente || "" : "" });
+          }}
+          className="h-10 rounded-md border border-slate-200 bg-white px-2 text-sm"
+          aria-label="Rol"
+        >
           {ROLES.map((r) => (
-            <option key={r} value={r}>
+            <option key={r} value={r} disabled={r === "cliente" && sinClientes}>
               {ETIQUETA_ROL[r]}
             </option>
           ))}
         </select>
+        {nuevo.rol === "cliente" && (
+          <label className="min-w-[200px] flex-1 text-sm">
+            <span className="text-xs text-slate-500">Empresa cliente</span>
+            <select
+              required
+              value={nuevo.clienteId}
+              onChange={(e) => setNuevo({ ...nuevo, clienteId: e.target.value })}
+              className="h-10 w-full rounded-md border border-slate-200 bg-white px-2 text-sm"
+              aria-label="Empresa cliente"
+            >
+              <option value="" disabled>
+                Elegir empresa…
+              </option>
+              {demo.clientes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <Button type="submit">
           <Plus className="h-4 w-4" /> Invitar
         </Button>

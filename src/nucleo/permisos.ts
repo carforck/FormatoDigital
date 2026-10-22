@@ -50,10 +50,19 @@ export function puedeVerDoc(u: Usuario, d: Documento): boolean {
 }
 
 /** El autor solo edita mientras el documento está en borrador o rechazado. */
+/**
+ * Solo el autor edita su documento, y solo mientras está en borrador o rechazado.
+ * Los revisores no editan contenido ajeno: lo aprueban o lo devuelven con motivo
+ * (separación de funciones del SGC; la base de datos aplica la misma regla).
+ */
 export function puedeEditarDoc(u: Usuario, d: Documento): boolean {
   if (u.rol === "cliente") return false;
-  const abierto = d.estado === "borrador" || d.estado === "rechazado";
-  return abierto && (d.autorId === u.id || puede(u.rol, "revisar"));
+  return d.autorId === u.id && (d.estado === "borrador" || d.estado === "rechazado");
+}
+
+/** Revisa (aprueba o rechaza) un revisor, sobre un documento en revisión que no sea suyo. */
+export function puedeRevisarDoc(u: Usuario, d: Documento): boolean {
+  return puede(u.rol, "revisar") && d.estado === "en_revision" && d.autorId !== u.id;
 }
 
 /** El cliente solo ve sus cuentas ya emitidas; la administración, todas. */

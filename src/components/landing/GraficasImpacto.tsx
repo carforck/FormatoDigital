@@ -285,7 +285,6 @@ export function GraficasImpacto() {
         <BarrasEtapas />
         <LineaCalidad />
       </div>
-      <p className="text-center text-xs text-slate-500">Cifras ilustrativas de un piloto típico de digitalización; se recalculan con los datos reales de cada empresa.</p>
     </div>
   );
 }

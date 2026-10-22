@@ -42,9 +42,9 @@ export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar }:
   );
 
   const linea = (etiqueta: string, k: CampoTexto, type?: "text" | "email" | "tel") => (
-    <div className="flex items-end gap-1">
+    <div className="flex min-w-0 items-end gap-1">
       <span className="shrink-0">{etiqueta}:</span>
-      <span className="min-w-0 flex-1 border-b border-black leading-tight">{campo(k, { type })}</span>
+      <span className={cn("min-w-0 flex-1 border-b border-black leading-tight", type === "email" ? "[overflow-wrap:anywhere]" : "break-words")}>{campo(k, { type })}</span>
     </div>
   );
 
@@ -111,26 +111,81 @@ export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar }:
   );
 }
 
-/** Hoja anexa «Registro fotográfico»: se imprime como página siguiente del reporte. */
+/** Fotos por hoja del anexo: 3 filas de 2 caben en carta y A4 con encabezado y pie. */
+const FOTOS_POR_HOJA = 6;
+
+/**
+ * Hoja(s) anexa(s) «Registro fotográfico»: cada grupo de 6 fotos es una hoja propia
+ * con su encabezado, así ninguna foto queda partida entre páginas al imprimir.
+ */
 function AnexoFotos({ fotos, codigoDoc, editar, resaltar }: { fotos: FotoReporte[]; codigoDoc?: string; editar?: Props["editar"]; resaltar: boolean }) {
+  const hojas: FotoReporte[][] = [];
+  for (let i = 0; i < fotos.length; i += FOTOS_POR_HOJA) hojas.push(fotos.slice(i, i + FOTOS_POR_HOJA));
+  if (hojas.length === 0) hojas.push([]);
+  return (
+    <>
+      {hojas.map((grupo, h) => (
+        <HojaFotos
+          key={h}
+          fotos={fotos}
+          grupo={grupo}
+          desde={h * FOTOS_POR_HOJA}
+          hoja={h + 1}
+          totalHojas={hojas.length}
+          codigoDoc={codigoDoc}
+          editar={editar}
+          resaltar={resaltar && h === 0}
+          ultima={h === hojas.length - 1}
+        />
+      ))}
+    </>
+  );
+}
+
+function HojaFotos({
+  fotos,
+  grupo,
+  desde,
+  hoja,
+  totalHojas,
+  codigoDoc,
+  editar,
+  resaltar,
+  ultima,
+}: {
+  fotos: FotoReporte[];
+  grupo: FotoReporte[];
+  desde: number;
+  hoja: number;
+  totalHojas: number;
+  codigoDoc?: string;
+  editar?: Props["editar"];
+  resaltar: boolean;
+  ultima: boolean;
+}) {
   const cambiar = (id: string, patch: Partial<FotoReporte>) => editar?.({ fotos: fotos.map((f) => (f.id === id ? { ...f, ...patch } : f)) });
-  const subir = async (lista: FileList | null) => {
-    if (!lista?.length || !editar) return;
+  const subir = async (lista: File[]) => {
+    if (!lista.length || !editar) return;
     const nuevas: FotoReporte[] = [];
-    for (const f of Array.from(lista).slice(0, 12)) nuevas.push({ id: `f-${Date.now()}-${nuevas.length}`, src: await comprimirImagen(f), descripcion: "", etiqueta: "" });
+    for (const f of lista.slice(0, 12)) nuevas.push({ id: `f-${Date.now()}-${nuevas.length}`, src: await comprimirImagen(f), descripcion: "", etiqueta: "" });
     editar({ fotos: [...fotos, ...nuevas] });
   };
   return (
     <article className={cn("doc-print mx-auto w-full max-w-[816px] bg-white p-6 text-[12px] leading-snug shadow-sm ring-1 ring-slate-200 sm:p-10", resaltar && "ring-2 ring-sotec-green")}>
       <Encabezado tipo="reporte" codigoDoc={codigoDoc} />
-      <div className="hdr mt-6 border border-black py-0.5">REGISTRO FOTOGRÁFICO · ANEXO{codigoDoc ? ` DEL REPORTE ${codigoDoc}` : ""}</div>
-      {fotos.length === 0 ? (
+      <div className="hdr mt-6 border border-black py-0.5 print:mt-3">
+        REGISTRO FOTOGRÁFICO · ANEXO{codigoDoc ? ` DEL REPORTE ${codigoDoc}` : ""}
+        {totalHojas > 1 ? ` · HOJA ${hoja} DE ${totalHojas}` : ""}
+      </div>
+      {grupo.length === 0 ? (
         <p className="border-x border-b border-black p-6 text-center text-slate-400 print:hidden">Aún no hay fotos. Agrégalas desde el asistente o con el botón de abajo.</p>
       ) : (
         <div className="grid grid-cols-1 gap-4 border-x border-b border-black p-3 sm:grid-cols-2">
-          {fotos.map((f, k) => (
+          {grupo.map((f, j) => {
+            const k = desde + j;
+            return (
             <figure key={f.id} className="break-inside-avoid">
-              <div className="relative aspect-[4/3] overflow-hidden border border-black bg-slate-100">
+              <div className="relative aspect-[4/3] overflow-hidden border border-black bg-slate-100 print:aspect-auto print:h-[222px]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={f.src} alt={f.descripcion || `Foto ${k + 1}`} className="h-full w-full object-cover" />
                 {editar && (
@@ -156,16 +211,21 @@ function AnexoFotos({ fotos, codigoDoc, editar, resaltar }: { fotos: FotoReporte
                 </span>
               </figcaption>
             </figure>
-          ))}
+            );
+          })}
         </div>
       )}
-      {editar && (
+      {editar && ultima && (
         <label className="print:hidden mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-sotec-green/60 bg-sotec-soft px-3 py-3 text-sm font-medium text-sotec-greenDeep hover:bg-sotec-green/20">
           <Camera className="h-4 w-4" /> Agregar fotos
-          <input type="file" accept="image/*" capture="environment" multiple className="sr-only" onChange={(e) => subir(e.target.files)} />
+          <input type="file" accept="image/*" capture="environment" multiple className="sr-only" onChange={(e) => {
+              const lista = e.target.files ? Array.from(e.target.files) : [];
+              e.target.value = "";
+              void subir(lista);
+            }} />
         </label>
       )}
-      <p className="mt-6 text-center text-[9.5px] font-bold">
+      <p className="mt-6 text-center text-[9.5px] font-bold print:mt-3">
         Documento emitido por el Servicio de Calidad de la Compañía. El documento es propiedad de SOTEC.
       </p>
     </article>

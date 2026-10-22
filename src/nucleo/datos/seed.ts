@@ -12,18 +12,18 @@ export function firmaDemo(seed: number): string {
 }
 
 export const USUARIOS_SEED: Usuario[] = [
-  { id: "u-tec1", nombre: "Andrés Camacho Ruiz", cargo: "Ingeniero de campo", rol: "tecnico", email: "tecnico1@sotec.example", cedula: "1.000.000.001", activo: true },
-  { id: "u-tec2", nombre: "Julián Herrera Pacheco", cargo: "Técnico electrónico", rol: "tecnico", email: "tecnico2@sotec.example", cedula: "1.000.000.002", activo: true },
-  { id: "u-sup", nombre: "Andrea Ríos Martínez", cargo: "Coordinadora SST", rol: "supervisor", email: "sst@sotecse.com", cedula: "1.000.000.003", activo: true },
-  { id: "u-adm", nombre: "Gerencia SOTEC", cargo: "Gerente general", rol: "admin", email: "info@sotecse.com", activo: true },
-  { id: "u-cli", nombre: "Ing. Daniel Ortega", cargo: "Ing. de sistemas · Ladrillera Arcillas del Caribe", rol: "cliente", email: "sistemas@arcillas.example", clienteId: "c-clay", activo: true },
+  { id: "u-tec1", nombre: "Andrés Camacho Ruiz", cargo: "Ingeniero de campo", rol: "tecnico", email: "acamacho@sotec.example", cedula: "1.000.000.001", activo: true },
+  { id: "u-tec2", nombre: "Julián Herrera Pacheco", cargo: "Técnico electrónico", rol: "tecnico", email: "jherrera@sotec.example", cedula: "1.000.000.002", activo: true },
+  { id: "u-sup", nombre: "Andrea Ríos Martínez", cargo: "Coordinadora SST", rol: "supervisor", email: "sst@sotec.example", cedula: "1.000.000.005", activo: true },
+  { id: "u-adm", nombre: "Gerencia SOTEC", cargo: "Gerente general", rol: "admin", email: "gerencia@sotec.example", activo: true },
+  { id: "u-cli", nombre: "Ing. Daniel Ortega", cargo: "Ing. de sistemas · Ladrillera Arcillas del Caribe", rol: "cliente", email: "sistemas@arcillasdelcaribe.example", clienteId: "c-clay", activo: true },
 ];
 
 export const CLIENTES_SEED: Cliente[] = [
-  { id: "c-clay", nombre: "Ladrillera Arcillas del Caribe", direccion: "Pasacaballos, Cartagena", contacto: "Ing. Daniel Ortega", cargo: "Ing. sistemas", correo: "sistemas@arcillas.example", telefono: "3000000000", sitio: "Hornilla" },
-  { id: "c-tango", nombre: "Constructora Horizonte Azul", direccion: "Bocagrande, Cartagena", contacto: "Arq. Laura Gómez", cargo: "Residente de obra", correo: "obra@horizonteazul.example", telefono: "3001112233", sitio: "Torre Norte" },
-  { id: "c-puerto", nombre: "Centro Logístico Bahía", direccion: "Mamonal Km 5, Cartagena", contacto: "Mario Rivas", cargo: "Jefe de seguridad", correo: "seguridad@logisticabahia.example", telefono: "3014445566", sitio: "Patio 2" },
-  { id: "c-conj", nombre: "Conjunto Residencial Los Robles", direccion: "Urb. Residencial Los Robles", contacto: "Sofía Castro", cargo: "Administradora", correo: "admin@losrobles.example", telefono: "3157778899", sitio: "Portería principal" },
+  { id: "c-clay", nombre: "Ladrillera Arcillas del Caribe", direccion: "Zona Industrial, Cartagena", contacto: "Ing. Daniel Ortega", cargo: "Ing. sistemas", correo: "sistemas@arcillasdelcaribe.example", telefono: "3000000000", sitio: "Área de hornos" },
+  { id: "c-tango", nombre: "Constructora Horizonte Azul", direccion: "Bocagrande, Cartagena", contacto: "Arq. Laura Méndez", cargo: "Residente de obra", correo: "obra@horizonteazul.example", telefono: "3001112233", sitio: "Hotel Brisas del Mar" },
+  { id: "c-puerto", nombre: "Centro Logístico Bahía", direccion: "Mamonal Km 5, Cartagena", contacto: "Jorge Salcedo", cargo: "Jefe de seguridad", correo: "seguridad@logisticabahia.example", telefono: "3014445566", sitio: "Patio 2" },
+  { id: "c-conj", nombre: "Conjunto Residencial Los Robles", direccion: "Barrio Los Robles, Cartagena", contacto: "Patricia Ríos", cargo: "Administradora", correo: "admin@losrobles.example", telefono: "3157778899", sitio: "Portería principal" },
 ];
 
 export const CONFIG_SEED: Config = {
@@ -96,7 +96,7 @@ function codigo(pref: string, n: number, fecha: string) {
   return `${pref}-${String(n).padStart(3, "0")}-${fecha.slice(2, 4)}`;
 }
 
-const DESCRIPCION_CLAY = `Se realiza intervención correctiva sobre el enlace de fibra óptica comprendido entre el nodo Molino 3 y el nodo Patio Ladrillo, debido a fallas recurrentes e intermitencias presentadas en la red de CCTV.
+const DESCRIPCION_CLAY = `Se realiza intervención correctiva sobre el enlace de fibra óptica comprendido entre el nodo Molienda y el nodo Patio de secado, debido a fallas recurrentes e intermitencias presentadas en la red de CCTV.
 
 Durante las labores de diagnóstico se identificó que un tramo de la fibra óptica se encontraba cristalizado y deteriorado, afectando la calidad de la transmisión de datos y generando inestabilidad en las comunicaciones del sistema de videovigilancia.
 
@@ -121,12 +121,22 @@ export function documentosSeed(): Documento[] {
   let nR = 0;
   let nP = 0;
 
-  const hist = (fecha: string, autor: Usuario, estado: Estado) => {
+  const hist = (fecha: string, autor: Usuario, estado: Estado, tipo: "reporte" | "permiso" | "gasto" = "reporte", clienteId = "") => {
     const h = [{ fecha: `${fecha}T08:10:00`, usuarioId: autor.id, accion: "Creó el documento" }];
     if (estado !== "borrador") h.push({ fecha: `${fecha}T09:30:00`, usuarioId: autor.id, accion: "Envió a revisión" });
     if (estado === "aprobado" || estado === "cerrado") h.push({ fecha: `${fecha}T11:00:00`, usuarioId: sup.id, accion: "Aprobó" });
     if (estado === "rechazado") h.push({ fecha: `${fecha}T11:00:00`, usuarioId: sup.id, accion: "Rechazó", detalle: "Falta detallar las recomendaciones" } as never);
-    if (estado === "cerrado") h.push({ fecha: `${fecha}T17:00:00`, usuarioId: "u-cli", accion: "Cerró / firmó" });
+    // Cierre según el formato: el cliente firma el reporte (en su portal si tiene usuario);
+    // el permiso lo cierra SST y los gastos los reembolsa SST/administración
+    if (estado === "cerrado") {
+      if (tipo === "reporte") {
+        h.push(clienteId === "c-clay"
+          ? { fecha: `${fecha}T17:00:00`, usuarioId: "u-cli", accion: "Firmó como cliente" }
+          : { fecha: `${fecha}T17:00:00`, usuarioId: "", accion: "Cerró con la firma del cliente (en sitio)" });
+      } else {
+        h.push({ fecha: `${fecha}T17:00:00`, usuarioId: sup.id, accion: tipo === "permiso" ? "Cerró el permiso" : "Marcó como reembolsado" });
+      }
+    }
     return h;
   };
 
@@ -142,17 +152,17 @@ export function documentosSeed(): Documento[] {
     clienteId: clay.id,
     creado: "2026-05-26T08:10:00",
     actualizado: "2026-05-26T17:00:00",
-    historial: hist("2026-05-26", tec1, "cerrado"),
+    historial: hist("2026-05-26", tec1, "cerrado", "reporte", clay.id),
     datos: {
       ...reporteVacio("2026-05-26"),
       tipoReporte: "Correctivo",
       cliente: clay.nombre,
-      direccion: "Pasacaballos",
-      personaContactada: "Ing. José",
+      direccion: "Zona Industrial",
+      personaContactada: "Ing. Daniel",
       correo: clay.correo,
       telefono: clay.telefono,
       cargo: "Ing. sistemas",
-      asunto: "Reparación fibra óptica nodo Molino 3 – Patio Ladrillo",
+      asunto: "Reparación fibra óptica nodo Molienda – Patio de secado",
       descripcion: DESCRIPCION_CLAY,
       recomendaciones: "Programar inspección semestral del tendido de fibra y proteger con tubería los tramos expuestos a calor de los hornos.",
       nombreTecnico: "Ing. Andrés Camacho",
@@ -174,13 +184,13 @@ export function documentosSeed(): Documento[] {
     clienteId: clay.id,
     creado: "2026-05-26T07:40:00",
     actualizado: "2026-05-26T11:00:00",
-    historial: hist("2026-05-26", tec1, "aprobado"),
+    historial: hist("2026-05-26", tec1, "aprobado", "permiso", clay.id),
     datos: {
       ...permisoVacio("2026-05-26"),
       hora: "09:00",
       ampm: "AM",
       cliente: clay.nombre,
-      sitioTrabajo: "Hornilla",
+      sitioTrabajo: "Área de hornos",
       puestoProyecto: "Mantenimiento CCTV",
       responsable: tec1.nombre,
       actividades: "Mantenimiento sistema CCTV",
@@ -193,7 +203,7 @@ export function documentosSeed(): Documento[] {
       ejecutores: [
         { nombre: "Andrés Camacho Ruiz", cedula: "1000000001", arlEps: "ARL Andina / EPS Vital", horaInicio: "09:00", horaFin: "16:00", firma: firmaDemo(3) },
         { nombre: "Julián Herrera Pacheco", cedula: "1000000002", arlEps: "ARL Andina / EPS Vital", horaInicio: "09:00", horaFin: "16:00", firma: firmaDemo(4) },
-        { nombre: "Kevin Mendoza Ortiz", cedula: "1000000004", arlEps: "ARL Andina / EPS Vital", horaInicio: "15:00", horaFin: "16:00", firma: firmaDemo(5) },
+        { nombre: "Kevin Mendoza Ortiz", cedula: "1000000003", arlEps: "ARL Andina / EPS Vital", horaInicio: "15:00", horaFin: "16:00", firma: firmaDemo(5) },
       ],
       autoriza: sup.nombre,
       firmaAutoriza: firmaDemo(6),
@@ -227,7 +237,7 @@ export function documentosSeed(): Documento[] {
       creado: `${e.fecha}T08:10:00`,
       actualizado: `${e.fecha}T11:00:00`,
       motivoRechazo: e.estado === "rechazado" ? "Falta detallar las recomendaciones y la firma del cliente." : undefined,
-      historial: hist(e.fecha, e.autor, e.estado),
+      historial: hist(e.fecha, e.autor, e.estado, "reporte", e.cliente.id),
       datos: {
         ...reporteVacio(e.fecha),
         tipoReporte: e.tipo,
@@ -266,7 +276,7 @@ export function documentosSeed(): Documento[] {
       clienteId: e.cliente.id,
       creado: `${e.fecha}T07:30:00`,
       actualizado: `${e.fecha}T11:00:00`,
-      historial: hist(e.fecha, e.autor, e.estado),
+      historial: hist(e.fecha, e.autor, e.estado, "permiso", e.cliente.id),
       datos: {
         ...permisoVacio(e.fecha),
         hora: "07:30",
@@ -300,8 +310,8 @@ export function documentosSeed(): Documento[] {
       `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400"><rect width="300" height="400" fill="#fff"/><rect x="20" y="20" width="260" height="40" fill="#e2e8f0"/><text x="150" y="46" font-family="Arial" font-size="16" text-anchor="middle">RECIBO No. ${n}</text>${[90, 120, 150, 180, 210, 240].map((y) => `<rect x="30" y="${y}" width="${150 + ((y * n) % 90)}" height="10" fill="#cbd5e1"/>`).join("")}<rect x="30" y="320" width="240" height="2" fill="#94a3b8"/><text x="270" y="350" font-family="Arial" font-size="18" text-anchor="end" font-weight="bold">TOTAL</text><text x="150" y="385" font-family="Arial" font-size="11" fill="#64748b" text-anchor="middle">Imagen ilustrativa</text></svg>`,
     )}`;
   const gastos: { autor: Usuario; cliente: Cliente; fecha: string; estado: Estado; items: [string, string, string, number][] }[] = [
-    { autor: tec1, cliente: clay, fecha: "2026-10-10", estado: "cerrado", items: [["Transporte", "Taxi Cartagena – Pasacaballos ida y vuelta", "TX-4821", 60000], ["Alimentación", "Almuerzo comisión de servicio", "FE-10233", 25000], ["Materiales", "Conectores y fusionadora (alquiler)", "FV-778", 180000]] },
-    { autor: tec2, cliente: tango, fecha: "2026-10-16", estado: "en_revision", items: [["Transporte", "Parqueadero obra Torre Norte", "P-2231", 12000], ["Materiales", "Canaleta y amarres", "FV-1290", 95000]] },
+    { autor: tec1, cliente: clay, fecha: "2026-10-10", estado: "cerrado", items: [["Transporte", "Taxi Cartagena – Zona Industrial ida y vuelta", "TX-4821", 60000], ["Alimentación", "Almuerzo comisión de servicio", "FE-10233", 25000], ["Materiales", "Conectores y fusionadora (alquiler)", "FV-778", 180000]] },
+    { autor: tec2, cliente: tango, fecha: "2026-10-16", estado: "en_revision", items: [["Transporte", "Parqueadero obra Hotel Brisas del Mar", "P-2231", 12000], ["Materiales", "Canaleta y amarres", "FV-1290", 95000]] },
   ];
   gastos.forEach((g, i) => {
     const n = i + 1;
@@ -315,7 +325,7 @@ export function documentosSeed(): Documento[] {
       clienteId: g.cliente.id,
       creado: `${g.fecha}T17:00:00`,
       actualizado: `${g.fecha}T18:00:00`,
-      historial: hist(g.fecha, g.autor, g.estado),
+      historial: hist(g.fecha, g.autor, g.estado, "gasto", g.cliente.id),
       datos: {
         fecha: g.fecha,
         centroCostos: `${g.cliente.nombre} · ${g.cliente.sitio}`,
@@ -339,8 +349,8 @@ export function documentosSeed(): Documento[] {
 export function notificacionesSeed(): Notificacion[] {
   return [
     { id: "n1", para: "supervisor", texto: "Andrés Camacho envió el permiso PT-005-26 a revisión", docId: "d-pt-3", fecha: "2026-10-20T07:45:00", leida: false },
-    { id: "n2", para: "supervisor", texto: "Andrés Camacho envió el reporte RT-010-26 a revisión", docId: "d-rt-7", fecha: "2026-10-17T15:20:00", leida: false },
-    { id: "n3", para: "u-tec1", texto: "Tu reporte RT-008-26 fue rechazado: falta detallar las recomendaciones", docId: "d-rt-5", fecha: "2026-09-25T11:00:00", leida: false },
+    { id: "n2", para: "supervisor", texto: "Andrés Camacho envió el reporte RT-009-26 a revisión", docId: "d-rt-7", fecha: "2026-10-17T15:20:00", leida: false },
+    { id: "n3", para: "u-tec1", texto: "Tu reporte RT-007-26 fue rechazado: falta detallar las recomendaciones", docId: "d-rt-5", fecha: "2026-09-25T11:00:00", leida: false },
     { id: "n4", para: "cliente", texto: "SOTEC compartió el reporte RT-001-26 para tu firma", docId: "d-rt-clay", fecha: "2026-05-26T12:00:00", leida: true },
   ];
 }
@@ -348,8 +358,8 @@ export function notificacionesSeed(): Notificacion[] {
 export function auditoriaSeed(): Auditoria[] {
   return [
     { id: "a1", fecha: "2026-10-20T07:45:00", usuarioId: "u-tec1", accion: "Envió a revisión", detalle: "PT-005-26" },
-    { id: "a2", fecha: "2026-10-17T15:20:00", usuarioId: "u-tec1", accion: "Envió a revisión", detalle: "RT-010-26" },
+    { id: "a2", fecha: "2026-10-17T15:20:00", usuarioId: "u-tec1", accion: "Envió a revisión", detalle: "RT-009-26" },
     { id: "a3", fecha: "2026-10-14T10:00:00", usuarioId: "u-sup", accion: "Aprobó", detalle: "PT-004-26" },
-    { id: "a4", fecha: "2026-09-25T11:00:00", usuarioId: "u-sup", accion: "Rechazó", detalle: "RT-008-26" },
+    { id: "a4", fecha: "2026-09-25T11:00:00", usuarioId: "u-sup", accion: "Rechazó", detalle: "RT-007-26" },
   ];
 }

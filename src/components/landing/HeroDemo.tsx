@@ -11,7 +11,7 @@ const GUION: { q: string; a: string; campo: string; valor: string }[] = [
   { q: "¿Para qué cliente es el reporte?", a: "Ladrillera Arcillas del Caribe", campo: "Cliente", valor: "Ladrillera Arcillas del Caribe" },
   { q: "¿Qué tipo de reporte es?", a: "Correctivo", campo: "Tipo reporte", valor: "Correctivo" },
   { q: "¿Cuál es el asunto?", a: "Reparación fibra óptica", campo: "Asunto", valor: "Reparación fibra óptica" },
-  { q: "Describe el trabajo realizado", a: "Se reemplazó el tramo de fibra cristalizado…", campo: "Descripción", valor: "Se reemplazó el tramo de fibra cristalizado entre Molino 3 y Patio Ladrillo. Enlace estable." },
+  { q: "Describe el trabajo realizado", a: "Se reemplazó el tramo de fibra cristalizado…", campo: "Descripción", valor: "Se reemplazó el tramo de fibra cristalizado entre Molienda y Patio de secado. Enlace estable." },
 ];
 
 export function HeroDemo() {

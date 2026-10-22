@@ -33,9 +33,12 @@ export function Encabezado({ tipo, codigoDoc }: { tipo: TipoDoc; codigoDoc?: str
 /** Imagen de firma o línea vacía; si `onFirmar` existe, invita a firmar. */
 export function Firma({ src, onFirmar, etiqueta }: { src?: string; onFirmar?: () => void; etiqueta: string }) {
   if (src) {
+    const imagen = <img src={src} alt={`Firma: ${etiqueta}`} className="mx-auto h-12 w-auto object-contain" />;
+    // Solo es botón cuando se puede volver a firmar; si no, es una imagen sin interacción
+    if (!onFirmar) return <div className="block h-12 w-full">{imagen}</div>;
     return (
-      <button type="button" disabled={!onFirmar} onClick={onFirmar} className="block h-12 w-full" title={onFirmar ? "Volver a firmar" : etiqueta}>
-        <img src={src} alt={`Firma: ${etiqueta}`} className="mx-auto h-12 w-auto object-contain" />
+      <button type="button" onClick={onFirmar} className="block h-12 w-full" title="Volver a firmar" aria-label={`Volver a firmar: ${etiqueta}`}>
+        {imagen}
       </button>
     );
   }
@@ -44,11 +47,12 @@ export function Firma({ src, onFirmar, etiqueta }: { src?: string; onFirmar?: ()
       <button
         type="button"
         onClick={onFirmar}
+        aria-label={`Firmar aquí: ${etiqueta}`}
         className="print:hidden mx-auto block h-12 w-full rounded border border-dashed border-sotec-greenDeep/60 bg-sotec-soft text-[11px] font-medium text-sotec-greenDeep hover:bg-sotec-green/30"
       >
         ✍ Firmar aquí
       </button>
     );
   }
-  return <div className="h-12" />;
+  return <div className="h-12" aria-hidden="true" />;
 }

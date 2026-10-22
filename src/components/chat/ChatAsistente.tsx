@@ -300,7 +300,13 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
                 )}
                 <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-sotec-green/60 bg-sotec-soft px-3 py-3 text-sm font-medium text-sotec-greenDeep hover:bg-sotec-green/20">
                   <Camera className="h-4 w-4" /> {procesando ? "Procesando…" : "Tomar o subir fotos"}
-                  <input type="file" accept="image/*" capture="environment" multiple className="sr-only" onChange={(e) => agregarFotos(e.target.files)} />
+                  <input type="file" accept="image/*" capture="environment" multiple className="sr-only"
+                    onChange={(e) => {
+                      // agregarFotos copia la lista antes de su primer await; se limpia el input para poder elegir el mismo archivo otra vez
+                      void agregarFotos(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
                 </label>
                 <div className="flex gap-2">
                   <Button size="sm" className="flex-1" disabled={procesando} onClick={() => avanzar(fotos, fotos.length ? `${fotos.length} foto(s) agregadas` : "Sin fotos")}>
@@ -362,6 +368,8 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
                       aria-label="Foto de la factura"
                       onChange={async (e) => {
                         const f = e.target.files?.[0];
+                        // Se limpia para que elegir de nuevo el mismo archivo vuelva a disparar «change»
+                        e.target.value = "";
                         if (!f) return;
                         setProcesando(true);
                         try {

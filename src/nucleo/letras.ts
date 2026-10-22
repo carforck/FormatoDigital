@@ -37,8 +37,13 @@ function hasta999999(n: number): string {
   return r ? `${miles} ${hasta999(r)}` : miles;
 }
 
+/** Mayor valor que se expresa en letras (999.999.999.999 = novecientos noventa y nueve mil… millones). */
+export const MAXIMO_EN_LETRAS = 999_999_999_999;
+export const FUERA_DE_RANGO = "VALOR DEMASIADO GRANDE PARA EXPRESAR EN LETRAS";
+
 export function enLetras(n: number): string {
   if (n === 0) return "CERO";
+  if (n > MAXIMO_EN_LETRAS) return FUERA_DE_RANGO;
   if (n < 1_000_000) return hasta999999(n);
   const mi = Math.floor(n / 1_000_000);
   const r = n % 1_000_000;
@@ -49,7 +54,10 @@ export function enLetras(n: number): string {
 export function pesosEnLetras(valor: number): string {
   if (!Number.isFinite(valor) || valor < 0) return "";
   const entero = Math.round(valor);
+  if (entero > MAXIMO_EN_LETRAS) return FUERA_DE_RANGO;
+  if (entero === 1) return "UN PESO M/CTE";
   const exactoEnMillones = entero >= 1_000_000 && entero % 1_000_000 === 0;
+  // Hasta 999.999 millones: MIL MILLONES, DOS MIL QUINIENTOS MILLONES… (escala larga)
   // Delante de "pesos" también va la forma corta: CIENTO UN PESOS, VEINTIÚN PESOS
   return `${apocopar(enLetras(entero))}${exactoEnMillones ? " DE" : ""} PESOS M/CTE`;
 }

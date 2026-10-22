@@ -28,7 +28,7 @@ export const PERFILES: { rol: Rol; titulo: string; persona: string; icon: typeof
   {
     rol: "cliente",
     titulo: "Portal del cliente",
-    persona: "Ing. José · Ladrillera Arcillas del Caribe",
+    persona: "Ing. Daniel · Ladrillera Arcillas del Caribe",
     icon: Building2,
     puede: ["Consulta los reportes de su empresa", "Firma el reporte en línea", "Descarga el PDF", "Sin acceso a lo interno"],
   },

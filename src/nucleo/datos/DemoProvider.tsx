@@ -16,7 +16,7 @@ import {
 import type { Auditoria, Cliente, Config, Documento, EnlaceFirma, Notificacion, Rol, TipoDoc, Usuario } from "@/nucleo/tipos";
 
 // Subir la versión al cambiar la semilla: los navegadores cargan los datos nuevos
-const KEY = "sotec-demo-v2";
+const KEY = "sotec-demo-v4";
 
 interface Estado {
   usuarioId: string | null;
@@ -28,19 +28,34 @@ interface Estado {
   config: Config;
   cuentas: CuentaCobro[];
   enlaces: EnlaceFirma[];
+  /** Último consecutivo usado por formato y año («reporte-2026»). Solo avanza: no se reutilizan números. */
+  consecutivos: Record<string, number>;
+}
+
+const anioDe = (iso: string) => iso.slice(0, 4);
+
+/** Reconstruye los contadores a partir de los documentos y cuentas existentes. */
+function contadoresDe(docs: Documento[], cuentas: CuentaCobro[]): Record<string, number> {
+  const c: Record<string, number> = {};
+  for (const d of docs) c[`${d.tipo}-${anioDe(d.creado)}`] = Math.max(c[`${d.tipo}-${anioDe(d.creado)}`] ?? 0, d.consecutivo);
+  for (const x of cuentas) c[`cobro-${anioDe(x.creado)}`] = Math.max(c[`cobro-${anioDe(x.creado)}`] ?? 0, x.consecutivo);
+  return c;
 }
 
 function inicial(): Estado {
+  const documentos = documentosSeed();
+  const cuentas = cuentasSeed();
   return {
     usuarioId: null,
     usuarios: USUARIOS_SEED,
     clientes: CLIENTES_SEED,
-    documentos: documentosSeed(),
+    documentos,
     notificaciones: notificacionesSeed(),
     auditoria: auditoriaSeed(),
     config: CONFIG_SEED,
-    cuentas: cuentasSeed(),
+    cuentas,
     enlaces: [],
+    consecutivos: contadoresDe(documentos, cuentas),
   };
 }
 
@@ -85,7 +100,8 @@ interface Api extends Estado {
   // Cuentas de cobro
   cuentasVisibles: CuentaCobro[];
   nuevoCodigoCuenta: () => { id: string; codigo: string; consecutivo: number };
-  guardarCuenta: (c: CuentaCobro) => void;
+  /** Devuelve un mensaje de error si no se puede guardar, o null si se guardó. */
+  guardarCuenta: (c: CuentaCobro) => string | null;
   cambiarEstadoCuenta: (id: string, estado: EstadoCuentaCobro) => void;
   /** Cuenta de cobro (no anulada) que ya incluye un reporte, si existe. */
   cuentaDeReporte: (docId: string) => CuentaCobro | undefined;
@@ -100,17 +116,31 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
 
   useEffect(() => {
+    const cargar = (raw: string | null) => {
+      if (!raw) return;
+      const guardado = JSON.parse(raw);
+      const base = inicial();
+      const docs = guardado.documentos ?? base.documentos;
+      const cuentas = guardado.cuentas ?? base.cuentas;
+      setS({ ...base, ...guardado, config: { ...base.config, ...guardado.config }, consecutivos: guardado.consecutivos ?? contadoresDe(docs, cuentas) });
+    };
     try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) {
-        const guardado = JSON.parse(raw);
-        const base = inicial();
-        setS({ ...base, ...guardado, config: { ...base.config, ...guardado.config } });
-      }
+      cargar(localStorage.getItem(KEY));
     } catch {
       /* sin almacenamiento: la demo funciona en memoria */
     }
     setListo(true);
+    // Otra pestaña guardó: se adopta su estado para no pisarlo con uno viejo
+    const sincronizar = (e: StorageEvent) => {
+      if (e.key !== KEY) return;
+      try {
+        cargar(e.newValue);
+      } catch {
+        /* ignorar */
+      }
+    };
+    window.addEventListener("storage", sincronizar);
+    return () => window.removeEventListener("storage", sincronizar);
   }, []);
 
   useEffect(() => {
@@ -139,11 +169,14 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   ];
 
   const transicion = useCallback(
-    (id: string, fn: (d: Documento, prev: Estado) => Partial<Estado> & { doc: Documento }) => {
+    (id: string, fn: (d: Documento, prev: Estado) => (Partial<Estado> & { doc: Documento }) | null) => {
       setS((prev) => {
         const d = prev.documentos.find((x) => x.id === id);
         if (!d) return prev;
-        const { doc, ...resto } = fn(d, prev);
+        const r = fn(d, prev);
+        // La acción no aplica al estado actual (doble clic, otra pestaña, rol): no se hace nada
+        if (!r) return prev;
+        const { doc, ...resto } = r;
         return { ...prev, ...resto, documentos: prev.documentos.map((x) => (x.id === id ? doc : x)) };
       });
     },
@@ -153,12 +186,27 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   const api = useMemo<Api>(() => {
     const nombre = (id: string | null) => s.usuarios.find((u) => u.id === id)?.nombre.split(" ").slice(0, 2).join(" ") ?? "Alguien";
     const evento = (prev: Estado, accion: string, detalle?: string) => ({ fecha: ahora(), usuarioId: prev.usuarioId ?? "", accion, detalle });
-    const vigente = (token: string): { enlace: EnlaceFirma; doc: Documento } | null => {
-      const enlace = s.enlaces.find((e) => e.token === token);
-      if (!enlace || enlace.usado || enlace.expira < ahora()) return null;
-      const doc = s.documentos.find((d) => d.id === enlace.docId);
-      return doc ? { enlace, doc } : null;
+    const rolDe = (prev: Estado) => prev.usuarios.find((x) => x.id === prev.usuarioId)?.rol;
+    const esRevisor = (prev: Estado) => {
+      const r = rolDe(prev);
+      return r === "admin" || r === "supervisor";
     };
+    /** Un enlace sirve si no se usó, no venció y el reporte está aprobado y sin firma del cliente. */
+    const enlaceValido = (st: Estado, token: string): { enlace: EnlaceFirma; doc: Documento } | null => {
+      const enlace = st.enlaces.find((e) => e.token === token);
+      if (!enlace || enlace.usado || enlace.expira < ahora()) return null;
+      const doc = st.documentos.find((d) => d.id === enlace.docId);
+      if (!doc || doc.tipo !== "reporte" || doc.estado !== "aprobado" || doc.datos.firmaCliente) return null;
+      return { enlace, doc };
+    };
+    const vigente = (token: string) => enlaceValido(s, token);
+    /** Notificaciones para los usuarios del portal de un cliente (no para todos los clientes). */
+    const aClientes = (prev: Estado, clienteId: string, texto: string, docId?: string): Notificacion[] =>
+      prev.usuarios
+        .filter((x) => x.rol === "cliente" && x.activo && x.clienteId === clienteId)
+        .map((x) => ({ id: uid("n"), para: x.id, texto, docId, fecha: ahora(), leida: false }));
+    const prefijo = (prev: Estado, tipo: TipoDoc) => ({ reporte: prev.config.prefijoReporte, permiso: prev.config.prefijoPermiso, gasto: prev.config.prefijoGasto })[tipo];
+    const codigo = (pref: string, n: number, anio: string) => `${pref}-${String(n).padStart(3, "0")}-${anio.slice(2)}`;
 
     return {
       ...s,
@@ -180,40 +228,66 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         setS((prev) => ({ ...prev, usuarioId: null }));
       },
 
+      // Vista previa del siguiente código; el definitivo se asigna al guardar (guardar)
       nuevoId(tipo) {
-        const pref = { reporte: s.config.prefijoReporte, permiso: s.config.prefijoPermiso, gasto: s.config.prefijoGasto }[tipo];
-        const yy = hoy().slice(2, 4);
-        const usados = s.documentos.filter((d) => d.tipo === tipo).map((d) => d.consecutivo);
-        const consecutivo = (usados.length ? Math.max(...usados) : 0) + 1;
-        return { id: uid("d"), consecutivo, codigo: `${pref}-${String(consecutivo).padStart(3, "0")}-${yy}` };
+        const anio = anioDe(hoy());
+        const consecutivo = (s.consecutivos[`${tipo}-${anio}`] ?? 0) + 1;
+        return { id: uid("d"), consecutivo, codigo: codigo(prefijo(s, tipo), consecutivo, anio) };
       },
 
       guardar(doc) {
         const actualizado = { ...doc, actualizado: ahora() };
         setS((prev) => {
-          const existe = prev.documentos.some((d) => d.id === doc.id);
-          if (existe) {
-            return { ...prev, documentos: prev.documentos.map((d) => (d.id === doc.id ? actualizado : d)) };
+          const existente = prev.documentos.find((d) => d.id === doc.id);
+          if (existente) {
+            // Solo el autor edita, y solo en borrador o rechazado; se conserva lo que no es contenido
+            const editable = existente.autorId === prev.usuarioId && (existente.estado === "borrador" || existente.estado === "rechazado");
+            if (!editable) return prev;
+            const merged = { ...existente, datos: doc.datos, clienteId: doc.clienteId, actualizado: ahora() } as Documento;
+            return { ...prev, documentos: prev.documentos.map((d) => (d.id === doc.id ? merged : d)) };
           }
+          // Documento nuevo: toma el consecutivo definitivo del año (no se reutiliza aunque se elimine)
+          const anio = anioDe(hoy());
+          const clave = `${doc.tipo}-${anio}`;
+          const n = (prev.consecutivos[clave] ?? 0) + 1;
+          const nuevo = {
+            ...actualizado,
+            consecutivo: n,
+            codigo: codigo(prefijo(prev, doc.tipo), n, anio),
+            autorId: prev.usuarioId ?? doc.autorId,
+            estado: "borrador",
+            historial: [evento(prev, "Creó el documento")],
+          } as Documento;
           return {
             ...prev,
-            documentos: [{ ...actualizado, historial: [evento(prev, "Creó el documento")] }, ...prev.documentos],
-            auditoria: registrar(prev, "Creó", doc.codigo),
+            consecutivos: { ...prev.consecutivos, [clave]: n },
+            documentos: [nuevo, ...prev.documentos],
+            auditoria: registrar(prev, "Creó", nuevo.codigo),
           };
         });
         return actualizado;
       },
 
       enviar(id) {
-        transicion(id, (d, prev) => ({
-          doc: { ...d, estado: "en_revision", motivoRechazo: undefined, historial: [...d.historial, evento(prev, "Envió a revisión")] },
-          notificaciones: notificar(prev, "supervisor", `${nombre(prev.usuarioId)} envió ${d.codigo} a revisión`, d.id),
-          auditoria: registrar(prev, "Envió a revisión", d.codigo),
-        }));
+        transicion(id, (d, prev) => {
+          if (d.autorId !== prev.usuarioId || (d.estado !== "borrador" && d.estado !== "rechazado")) return null;
+          const texto = `${nombre(prev.usuarioId)} envió ${d.codigo} a revisión`;
+          return {
+            doc: { ...d, estado: "en_revision", motivoRechazo: undefined, historial: [...d.historial, evento(prev, "Envió a revisión")] },
+            notificaciones: [
+              { id: uid("n"), para: "supervisor", texto, docId: d.id, fecha: ahora(), leida: false },
+              { id: uid("n"), para: "admin", texto, docId: d.id, fecha: ahora(), leida: false },
+              ...prev.notificaciones,
+            ],
+            auditoria: registrar(prev, "Envió a revisión", d.codigo),
+          };
+        });
       },
 
       aprobar(id, firmaAutoriza) {
         transicion(id, (d, prev) => {
+          // Solo un revisor, solo en revisión y nunca sobre un documento propio
+          if (d.estado !== "en_revision" || !esRevisor(prev) || d.autorId === prev.usuarioId) return null;
           const u = prev.usuarios.find((x) => x.id === prev.usuarioId);
           const datos =
             d.tipo === "permiso"
@@ -222,7 +296,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
                 ? { ...d.datos, voboNombre: u?.nombre || "", firmaVobo: firmaAutoriza || d.datos.firmaVobo }
                 : d.datos;
           let notifs = notificar(prev, d.autorId, `${d.codigo} fue aprobado por ${nombre(prev.usuarioId)}`, d.id);
-          if (d.tipo === "reporte") notifs = [{ id: uid("n"), para: "cliente", texto: `SOTEC compartió el reporte ${d.codigo} para tu firma`, docId: d.id, fecha: ahora(), leida: false }, ...notifs];
+          if (d.tipo === "reporte") notifs = [...aClientes(prev, d.clienteId, `${prev.config.empresa} compartió el reporte ${d.codigo} para tu firma`, d.id), ...notifs];
           return {
             doc: { ...d, datos, estado: "aprobado", historial: [...d.historial, evento(prev, "Aprobó")] } as Documento,
             notificaciones: notifs,
@@ -232,19 +306,29 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       },
 
       rechazar(id, motivo) {
-        transicion(id, (d, prev) => ({
-          doc: { ...d, estado: "rechazado", motivoRechazo: motivo, historial: [...d.historial, evento(prev, "Rechazó", motivo)] },
-          notificaciones: notificar(prev, d.autorId, `${d.codigo} fue rechazado: ${motivo}`, d.id),
-          auditoria: registrar(prev, "Rechazó", `${d.codigo} · ${motivo}`),
-        }));
+        transicion(id, (d, prev) => {
+          if (d.estado !== "en_revision" || !esRevisor(prev) || d.autorId === prev.usuarioId || !motivo.trim()) return null;
+          return {
+            doc: { ...d, estado: "rechazado", motivoRechazo: motivo, historial: [...d.historial, evento(prev, "Rechazó", motivo)] },
+            notificaciones: notificar(prev, d.autorId, `${d.codigo} fue rechazado: ${motivo}`, d.id),
+            auditoria: registrar(prev, "Rechazó", `${d.codigo} · ${motivo}`),
+          };
+        });
       },
 
       cerrar(id, cambios) {
-        transicion(id, (d, prev) => ({
+        transicion(id, (d, prev) => {
+          if (d.estado !== "aprobado") return null;
+          const u = prev.usuarios.find((x) => x.id === prev.usuarioId);
+          // Reporte: lo cierra la firma del cliente (su portal) o un revisor; permiso y gastos: un revisor
+          const puedeCerrar = esRevisor(prev) || (d.tipo === "reporte" && u?.rol === "cliente" && u.clienteId === d.clienteId);
+          if (!puedeCerrar) return null;
+          return {
           doc: { ...d, datos: { ...d.datos, ...cambios }, estado: "cerrado", historial: [...d.historial, evento(prev, d.tipo === "permiso" ? "Cerró el permiso" : d.tipo === "gasto" ? "Marcó como reembolsado" : "Firmó como cliente")] } as Documento,
           notificaciones: notificar(prev, d.autorId, `${d.codigo} quedó cerrado`, d.id),
           auditoria: registrar(prev, d.tipo === "permiso" ? "Cerró permiso" : d.tipo === "gasto" ? "Reembolsó gastos" : "Firma cliente", d.codigo),
-        }));
+          };
+        });
       },
 
       duplicar(id) {
@@ -264,7 +348,9 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       eliminar(id) {
         setS((prev) => {
           const d = prev.documentos.find((x) => x.id === id);
-          return { ...prev, documentos: prev.documentos.filter((x) => x.id !== id), auditoria: registrar(prev, "Eliminó", d?.codigo ?? id) };
+          // Solo borradores propios; el consecutivo no se libera
+          if (!d || d.estado !== "borrador" || d.autorId !== prev.usuarioId) return prev;
+          return { ...prev, documentos: prev.documentos.filter((x) => x.id !== id), auditoria: registrar(prev, "Eliminó", d.codigo) };
         });
       },
 
@@ -305,10 +391,13 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       },
 
       crearEnlaceFirma(docId, correo) {
+        const doc = s.documentos.find((x) => x.id === docId);
+        if (!doc || doc.tipo !== "reporte" || doc.estado !== "aprobado" || doc.datos.firmaCliente) return "";
         const token = Array.from(crypto.getRandomValues(new Uint8Array(18)), (b) => b.toString(16).padStart(2, "0")).join("");
         const expira = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 19);
         setS((prev) => {
           const d = prev.documentos.find((x) => x.id === docId);
+          if (!d || d.estado !== "aprobado") return prev;
           return {
             ...prev,
             enlaces: [{ token, docId, campo: "firmaCliente", correo, creado: ahora(), expira }, ...prev.enlaces],
@@ -323,11 +412,15 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
 
       firmarConEnlace(token, nombre, imagen) {
         const v = vigente(token);
-        if (!v || v.doc.tipo !== "reporte" || !nombre.trim() || !imagen.startsWith("data:image/")) return "invalido";
-        const cierra = v.doc.estado === "aprobado";
-        setS((prev) => ({
+        if (!v || !nombre.trim() || !imagen.startsWith("data:image/")) return "invalido";
+        const cierra = true;
+        setS((prev) => {
+          // Se vuelve a validar con el estado más reciente (doble clic, otra pestaña, otro enlace ya usado)
+          if (!enlaceValido(prev, token)) return prev;
+          return {
           ...prev,
-          enlaces: prev.enlaces.map((e) => (e.token === token ? { ...e, usado: ahora() } : e)),
+          // Al firmar se anulan todos los enlaces pendientes de ese documento
+          enlaces: prev.enlaces.map((e) => (e.docId === v.doc.id && !e.usado ? { ...e, usado: ahora() } : e)),
           documentos: prev.documentos.map((d) => {
             if (d.id !== v.doc.id || d.tipo !== "reporte") return d;
             const ev = { fecha: ahora(), usuarioId: "", accion: "Firmó por enlace", detalle: nombre.trim() };
@@ -343,7 +436,8 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
             ...prev.notificaciones,
           ],
           auditoria: [{ id: uid("a"), fecha: ahora(), usuarioId: "enlace", accion: "Firma por enlace", detalle: `${v.doc.codigo} · ${nombre.trim()}` }, ...prev.auditoria],
-        }));
+          };
+        });
         return cierra ? "cerrado" : "firmado";
       },
 
@@ -363,24 +457,39 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
 
       cuentasVisibles: usuario ? s.cuentas.filter((c) => puedeVerCuenta(usuario, c)) : [],
 
+      // Vista previa; el código definitivo se asigna al guardar la cuenta por primera vez
       nuevoCodigoCuenta() {
-        const yy = hoy().slice(2, 4);
-        const consecutivo = (s.cuentas.length ? Math.max(...s.cuentas.map((c) => c.consecutivo)) : 0) + 1;
-        return { id: uid("cc"), consecutivo, codigo: `${s.config.prefijoCobro}-${String(consecutivo).padStart(3, "0")}-${yy}` };
+        const anio = anioDe(hoy());
+        const consecutivo = (s.consecutivos[`cobro-${anio}`] ?? 0) + 1;
+        return { id: uid("cc"), consecutivo, codigo: codigo(s.config.prefijoCobro, consecutivo, anio) };
       },
 
       guardarCuenta(c) {
-        if (!usuario || !puede(usuario.rol, "cobros")) return;
+        if (!usuario || !puede(usuario.rol, "cobros")) return "Sin permiso para gestionar cuentas de cobro.";
+        // Un reporte solo se cobra una vez (en una cuenta activa)
+        const repetido = c.items.find((i) => i.documentoId && s.cuentas.some((x) => x.id !== c.id && x.estado !== "anulada" && x.items.some((j) => j.documentoId === i.documentoId)));
+        if (repetido) {
+          const cod = s.documentos.find((d) => d.id === repetido.documentoId)?.codigo ?? "";
+          return `El reporte ${cod} ya está en otra cuenta de cobro activa.`;
+        }
         setS((prev) => {
           const existe = prev.cuentas.find((x) => x.id === c.id);
           if (existe && existe.estado !== "borrador") return prev; // emitida: ya no cambia
-          const nueva = { ...c, actualizado: ahora(), historial: existe ? existe.historial : [evento(prev, "Creó la cuenta de cobro")] };
+          if (c.items.some((i) => i.documentoId && prev.cuentas.some((x) => x.id !== c.id && x.estado !== "anulada" && x.items.some((j) => j.documentoId === i.documentoId)))) return prev;
+          if (existe) {
+            return { ...prev, cuentas: prev.cuentas.map((x) => (x.id === c.id ? { ...c, codigo: existe.codigo, consecutivo: existe.consecutivo, estado: existe.estado, historial: existe.historial, actualizado: ahora() } : x)) };
+          }
+          const anio = anioDe(hoy());
+          const n = (prev.consecutivos[`cobro-${anio}`] ?? 0) + 1;
+          const nueva = { ...c, consecutivo: n, codigo: codigo(prev.config.prefijoCobro, n, anio), estado: "borrador" as const, actualizado: ahora(), historial: [evento(prev, "Creó la cuenta de cobro")] };
           return {
             ...prev,
-            cuentas: existe ? prev.cuentas.map((x) => (x.id === c.id ? nueva : x)) : [nueva, ...prev.cuentas],
-            auditoria: existe ? prev.auditoria : registrar(prev, "Creó cuenta de cobro", c.codigo),
+            consecutivos: { ...prev.consecutivos, [`cobro-${anio}`]: n },
+            cuentas: [nueva, ...prev.cuentas],
+            auditoria: registrar(prev, "Creó cuenta de cobro", nueva.codigo),
           };
         });
+        return null;
       },
 
       cambiarEstadoCuenta(id, estado) {
@@ -393,9 +502,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
             ...prev,
             cuentas: prev.cuentas.map((x) => (x.id === id ? { ...x, estado, actualizado: ahora(), historial: [...x.historial, evento(prev, etiqueta)] } : x)),
             notificaciones:
-              estado === "emitida"
-                ? [{ id: uid("n"), para: "cliente", texto: `${prev.config.empresa} emitió la cuenta de cobro ${c.codigo}`, fecha: ahora(), leida: false }, ...prev.notificaciones]
-                : prev.notificaciones,
+              estado === "emitida" ? [...aClientes(prev, c.clienteId, `${prev.config.empresa} emitió la cuenta de cobro ${c.codigo}`), ...prev.notificaciones] : prev.notificaciones,
             auditoria: registrar(prev, `Cuenta de cobro: ${etiqueta.toLowerCase()}`, c.codigo),
           };
         });

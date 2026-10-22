@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, FileText, HardHat } from "lucide-react";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
 import { EstadoBadge, fechaCorta } from "@/components/ui/badges";
 import { PageHeader } from "@/components/ui/corporativo";
@@ -10,6 +10,7 @@ import { rutaDoc } from "@/nucleo/rutas";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { faltantes } from "@/nucleo/validar";
 import { clienteDoc, tituloDoc } from "@/modulos/registro";
+import { IconoDoc } from "@/components/ui/icono-doc";
 
 export default function Revision() {
   const demo = useDemo();
@@ -22,7 +23,7 @@ export default function Revision() {
     return (
       <Link key={d.id} href={rutaDoc(d.id)} className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-sotec-greenDeep hover:shadow-md">
         <div className="flex items-center gap-2">
-          {d.tipo === "reporte" ? <FileText className="h-4 w-4 text-slate-500" /> : <HardHat className="h-4 w-4 text-slate-500" />}
+          <IconoDoc tipo={d.tipo} className="h-4 w-4 text-slate-500" />
           <span className="font-mono text-sm font-semibold">{d.codigo}</span>
           <span className="ml-auto">
             <EstadoBadge estado={d.estado} />

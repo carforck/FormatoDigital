@@ -42,6 +42,8 @@ export function nombreCorto(nombre: string): string {
   return nombre.replace(/^(Ing\.|Arq\.|Dr\.|Dra\.)\s+/i, "").split(" ")[0];
 }
 
+/** «Miércoles, 21 de octubre de 2026» (mayúscula solo al inicio, como en español). */
 export function fechaLarga(): string {
-  return new Date().toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const t = new Date().toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  return t.charAt(0).toUpperCase() + t.slice(1);
 }

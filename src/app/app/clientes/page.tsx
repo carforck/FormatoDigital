@@ -62,22 +62,28 @@ export default function Clientes() {
         </form>
       )}
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {demo.clientes.map((c) => {
           const n = demo.documentos.filter((d) => d.clienteId === c.id).length;
           return (
-            <button key={c.id} onClick={() => setForm(c)} className="flex gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-sotec-greenDeep hover:shadow-md">
+            <button key={c.id} onClick={() => setForm(c)} className="flex min-w-0 gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-sotec-greenDeep hover:shadow-md">
               <Avatar nombre={c.nombre} className="h-11 w-11 rounded-xl text-sm" />
               <span className="min-w-0 flex-1">
                 <span className="flex items-start justify-between gap-2">
-                  <span className="font-semibold text-slate-900">{c.nombre}</span>
+                  <span className="min-w-0 break-words font-semibold text-slate-900">{c.nombre}</span>
                   <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">{n} docs</span>
                 </span>
-                <span className="mt-0.5 block text-sm text-slate-600">
+                <span className="mt-0.5 block break-words text-sm text-slate-600">
                   {c.contacto} · {c.cargo}
                 </span>
                 <span className="mt-0.5 block break-words text-xs text-slate-500">
-                  {c.direccion} · {c.telefono} · {c.correo}
+                  {c.direccion} · {c.telefono}
+                  {c.correo && (
+                    <>
+                      {" · "}
+                      <span className="[overflow-wrap:anywhere]">{c.correo}</span>
+                    </>
+                  )}
                 </span>
               </span>
             </button>

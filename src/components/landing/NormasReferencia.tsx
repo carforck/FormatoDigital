@@ -1,4 +1,4 @@
-import { ClipboardList, FileCheck2, HardHat, Info, Landmark } from "lucide-react";
+import { ClipboardList, FileCheck2, HardHat, Landmark } from "lucide-react";
 
 import { Icono, Reveal } from "@/components/fx/Reveal";
 
@@ -40,10 +40,6 @@ export function NormasReferencia() {
             </Reveal>
           ))}
         </div>
-        <p className="mx-auto mt-6 flex max-w-3xl items-start justify-center gap-2 text-center text-xs text-slate-500">
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          FormatoDigital es una herramienta de apoyo a la gestión; no otorga certificación ni está avalada por ISO u organismos certificadores. Las normas se mencionan solo como referencia.
-        </p>
       </div>
     </section>
   );

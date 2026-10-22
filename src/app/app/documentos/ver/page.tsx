@@ -14,7 +14,7 @@ import { PlantillaReporte } from "@/modulos/reportes/PlantillaReporte";
 import { Button } from "@/components/ui/button";
 import { EstadoBadge } from "@/components/ui/badges";
 import { FORMATOS } from "@/nucleo/catalogos";
-import { puede, puedeEditarDoc, puedeVerDoc } from "@/nucleo/permisos";
+import { puede, puedeEditarDoc, puedeRevisarDoc, puedeVerDoc } from "@/nucleo/permisos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { rutaCuenta, urlPublica } from "@/nucleo/rutas";
 import type { DatosPermiso } from "@/nucleo/tipos";
@@ -48,7 +48,8 @@ function Detalle() {
   const f = FORMATOS[doc.tipo];
   const editable = puedeEditarDoc(u, doc);
   const pend = faltantes(doc);
-  const revisa = puede(u.rol, "revisar") && doc.estado === "en_revision";
+  // Nadie aprueba ni rechaza su propio documento (separación de funciones)
+  const revisa = puedeRevisarDoc(u, doc);
   const cierraPermiso = doc.tipo === "permiso" && doc.estado === "aprobado" && puede(u.rol, "cerrar_permiso");
   const firmaCliente = doc.tipo === "reporte" && doc.estado === "aprobado" && (u.rol === "cliente" || puede(u.rol, "revisar"));
   const nombre = (uid: string) => demo.usuarios.find((x) => x.id === uid)?.nombre ?? "Sistema";
@@ -57,7 +58,7 @@ function Detalle() {
   const correoCliente = doc.tipo === "reporte" ? doc.datos.correo || cliente?.correo || "" : cliente?.correo || "";
   const telCliente = doc.tipo === "reporte" ? doc.datos.telefono || cliente?.telefono || "" : cliente?.telefono || "";
   const interno = u.rol !== "cliente";
-  const pedirFirma = interno && doc.tipo === "reporte" && (doc.estado === "aprobado" || doc.estado === "en_revision") && !doc.datos.firmaCliente;
+  const pedirFirma = interno && doc.tipo === "reporte" && doc.estado === "aprobado" && !doc.datos.firmaCliente;
   const cuenta = doc.tipo === "reporte" ? demo.cuentaDeReporte(doc.id) : undefined;
   const puedeCobrar = doc.tipo === "reporte" && (doc.estado === "aprobado" || doc.estado === "cerrado") && !cuenta && puede(u.rol, "cobros");
   const empresa = demo.config.empresa;
@@ -135,7 +136,7 @@ function Detalle() {
               variant="outline"
               onClick={() => {
                 const token = demo.crearEnlaceFirma(doc.id, correoCliente);
-                setEnvio({ enlace: urlPublica("/firmar", `t=${token}`) });
+                if (token) setEnvio({ enlace: urlPublica("/firmar", `t=${token}`) });
               }}
             >
               <Link2 className="h-4 w-4" /> Pedir firma al cliente
@@ -224,7 +225,7 @@ function Detalle() {
             />
           )}
         </div>
-        <aside className="print:hidden h-fit rounded-xl border border-slate-200 bg-white p-4">
+        <aside className={u.rol === "cliente" ? "hidden" : "print:hidden h-fit rounded-xl border border-slate-200 bg-white p-4"}>
           <h2 className="text-sm font-semibold">Trazabilidad</h2>
           <ol className="mt-3 space-y-3 border-l border-slate-200 pl-4">
             {doc.historial.map((h, k) => (
@@ -272,7 +273,13 @@ function Detalle() {
       )}
 
       {rechazo !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Rechazar ${doc.codigo}`}
+          onKeyDown={(e) => e.key === "Escape" && setRechazo(null)}
+        >
           <div className="w-full max-w-md rounded-xl bg-white p-4">
             <p className="font-semibold">Rechazar {doc.codigo}</p>
             <p className="text-sm text-slate-500">El autor recibe el motivo y puede corregirlo.</p>

@@ -2,7 +2,7 @@
  * Prueba de punta a punta de la demo en un navegador real.
  *
  *   node tests/e2e/demo.cjs                       # contra http://localhost:3100
- *   BASE=https://carforck.github.io/FormatoDigital node tests/e2e/demo.cjs
+ *   BASE=https://formato-digital-nine.vercel.app node tests/e2e/demo.cjs
  *
  * Necesita Chrome/Chromium: CHROME=/ruta/al/chrome (por defecto busca el de Playwright).
  * Recorre: técnico crea y envía un reporte, validación del permiso, acceso

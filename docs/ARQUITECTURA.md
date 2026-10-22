@@ -67,10 +67,53 @@ El listado vive en `src/modulos/registro.ts` (`MODULOS`) y se muestra en
   En la demo abre `mailto:` o `wa.me`; con la plataforma conectada, el correo
   saldrá por Resend con el PDF adjunto.
 - **Valor en letras** (`src/nucleo/letras.ts`): pesos colombianos con las
-  concordancias UN/VEINTIÚN y «DE PESOS» en millones exactos.
+  concordancias UN/VEINTIÚN, «UN PESO», «DE PESOS» en millones exactos y
+  hasta 999.999.999.999 («MIL MILLONES»).
 - **Compresión de fotos** (`src/nucleo/imagenes.ts`): lado mayor de 1280 px
   en JPEG; una foto de 4 MB queda en ~100–200 KB. La usan el registro
   fotográfico y los soportes de gastos.
+- **Separación de funciones** (`src/nucleo/permisos.ts` y el proveedor de
+  datos, igual que la migración 0008): solo el autor edita, envía o borra su
+  borrador; nadie aprueba lo propio (`puedeRevisarDoc`); abrir `?id=` de un
+  documento ajeno o ya enviado muestra un bloqueo (`PaginaGenerador`).
+- **Idempotencia en la demo** (`src/nucleo/datos/DemoProvider.tsx`): cada
+  transición revalida el estado y se cancela si ya no aplica (doble clic,
+  dos pestañas); los consecutivos salen de contadores por tipo y año, así
+  que no se repiten al borrar o cancelar; las pestañas se sincronizan con el
+  evento `storage`; una factura no entra en dos cuentas de cobro activas.
+- **Generador** (`src/components/generador/`): guarda el avance en el
+  navegador y lo recupera, avisa al salir con cambios sin guardar y bloquea
+  el doble envío.
+- **Impresión:** cada `.doc-print` es una hoja (`break-before: page`). El
+  reporte cabe en una carta (`doc-ajustado`) y el permiso en un A4
+  (`doc-compacto`); las fotos van de 6 en 6 por hoja anexa con encabezado, y
+  filas, fotos y el bloque de aprobación no se parten. El pie dice «Hoja N ·
+  Formato/Soportes», no «Página X de Y», porque el total depende del papel.
+- **Ventanas modales** (`src/components/ui/useModal.ts`): Esc cierra, foco
+  inicial dentro, foco atrapado y devuelto al botón que la abrió.
+
+## Tablero e interfaz
+
+- **Tablero** (`src/app/app/page.tsx`, piezas en `src/components/tablero/`,
+  cálculos en `src/nucleo/indicadores.ts`): período (30 d, 90 d, 6 m, 12 m),
+  filtros por tipo, estado y cliente, y KPIs relativos con variación contra
+  el período anterior: documentos, aprobados al primer intento (pp), tiempo
+  promedio de aprobación, en revisión ahora y % con firma del cliente.
+  Gráficas con leyenda, tooltip y vista de tabla; colores de serie validados
+  para daltonismo en claro y oscuro (`--serie-a/b/c` en `globals.css`).
+- **Barra lateral** (`AppShell`): riel de 72 px que se abre al pasar el mouse
+  o con foco, y se puede fijar (`fd-sidebar` en `localStorage`).
+- **Modo oscuro:** claro / oscuro / sistema (`fd-tema`), con la clase `dark`
+  en la raíz del shell. Los formatos siempre se ven blancos, como el papel.
+
+## Datos de la demo
+
+Todos los nombres, cédulas, correos y empresas de la demo son **ficticios**
+(dominios `.example`, cédulas 1.000.000.00X); SOTEC es la única empresa real
+y aparece con su permiso. No se deben agregar datos reales de clientes ni de
+personas al código, a las pruebas ni a la semilla de la base de datos. El
+historial de git se reescribió para retirar los datos reales de versiones
+anteriores.
 
 ## Estructura del código
 
@@ -130,7 +173,8 @@ Migraciones en `supabase/migrations/`:
 | `0005_auth_perfiles.sql` | perfil automático al registrarse (trigger en `auth.users`); registrarse no da acceso: el admin asigna la organización y el rol en `miembros` |
 | `0006_endurecer_funciones.sql` | endurecimiento: revoca `EXECUTE` de las funciones de trigger; los consecutivos solo se reservan vía `crear_documento` / `crear_cuenta_cobro`, que pasan a `SECURITY DEFINER` con verificación de rol y pertenencia |
 | `0007_gastos_como_formato.sql` | gastos como formato FO-GSST-25 (prefijo LG) en `documentos`; se elimina la tabla provisional `gastos`; columna `formatos.visible_cliente` y política `documentos_ver` que oculta los formatos internos al cliente |
-| `seed.sql` | organización SOTEC, sus formatos y un cliente |
+| `0008_separacion_funciones.sql` | separación de funciones: solo el autor edita y envía su documento, nadie aprueba ni rechaza lo propio; los enlaces de firma solo se crean sobre reportes aprobados sin firma del cliente, y `firmar_con_enlace` invalida los demás enlaces del documento y nunca sobrescribe una firma |
+| `seed.sql` | organización SOTEC, sus formatos y un cliente ficticio |
 
 `supabase/instalar.sql` une migraciones y semilla para instalar un proyecto
 nuevo de una vez (SQL Editor → Run). Se regenera, no se edita a mano.
@@ -192,7 +236,7 @@ bash scripts/armar-instalador.sh                                # 3. regenera su
 | Comando | Qué prueba |
 |---|---|
 | `npm run test:db` | Migraciones, RLS y flujo en PostgreSQL desechable |
-| `npm run test:unit` | Valor en letras (`tests/unit/letras.test.ts`) |
+| `npm run test:unit` | Valor en letras, 22 casos (`tests/unit/letras.test.ts`) |
 | `npm run test:e2e` | Demo en el navegador (`tests/e2e/demo.cjs`): secciones `flujo`, `responsive`, `controles`, `magno` |
 
 - `SOLO=<sección> npm run test:e2e` corre una sola sección.
@@ -219,7 +263,13 @@ datos; los módulos y las pantallas no cambian.
 
 ## Marca
 
-- Logo vigente de SOTEC: `public/sotec-logo-v3.png`.
+- Logo vigente de SOTEC: `public/sotec-logo-v3.png` (fondo transparente) y
+  `public/sotec-logo-v3-oscuro.png` (lema aclarado para fondos oscuros).
+- Fotos de la landing: `public/landing/` (Pexels, licencia libre; créditos en
+  `docs/creditos-imagenes.md`).
+- La landing usa la frase «Lo que no se define, no se puede medir…» como
+  **atribuida** a Lord Kelvin, no como cita textual: esa redacción no aparece
+  en su conferencia de 1883.
 - Paleta (colores y su uso) y contenido de la landing:
   `docs/marca-y-landing.json`.
 

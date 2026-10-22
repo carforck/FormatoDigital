@@ -223,6 +223,8 @@ export function documentosSeed(): Documento[] {
     { asunto: "Cableado estructurado oficina obra", tipo: "Instalación", cliente: tango, autor: tec2, fecha: "2026-10-14", estado: "en_revision" },
     { asunto: "Mantenimiento preventivo CCTV hornos", tipo: "Preventivo", cliente: clay, autor: tec1, fecha: "2026-10-17", estado: "en_revision" },
     { asunto: "Ajuste de alarmas perimetrales", tipo: "Correctivo", cliente: conj, autor: tec1, fecha: "2026-10-19", estado: "borrador" },
+    // Aprobado y pendiente de la firma del cliente: lo que el portal del cliente muestra para firmar
+    { asunto: "Instalación de sensores de movimiento en bodega", tipo: "Instalación", cliente: clay, autor: tec2, fecha: "2026-10-20", estado: "aprobado" },
   ];
   extras.forEach((e, i) => {
     nR++;
@@ -351,6 +353,7 @@ export function notificacionesSeed(): Notificacion[] {
     { id: "n1", para: "supervisor", texto: "Andrés Camacho envió el permiso PT-005-26 a revisión", docId: "d-pt-3", fecha: "2026-10-20T07:45:00", leida: false },
     { id: "n2", para: "supervisor", texto: "Andrés Camacho envió el reporte RT-009-26 a revisión", docId: "d-rt-7", fecha: "2026-10-17T15:20:00", leida: false },
     { id: "n3", para: "u-tec1", texto: "Tu reporte RT-007-26 fue rechazado: falta detallar las recomendaciones", docId: "d-rt-5", fecha: "2026-09-25T11:00:00", leida: false },
+    { id: "n5", para: "u-cli", texto: "SOTEC aprobó el reporte RT-011-26 y está pendiente de tu firma", docId: "d-rt-9", fecha: "2026-10-20T11:05:00", leida: false },
     { id: "n4", para: "cliente", texto: "SOTEC compartió el reporte RT-001-26 para tu firma", docId: "d-rt-clay", fecha: "2026-05-26T12:00:00", leida: true },
   ];
 }

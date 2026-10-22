@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   FileText,
   FolderOpen,
+  Globe,
   HardHat,
   LayoutDashboard,
   LogOut,
@@ -324,6 +325,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <p className="text-sm font-medium text-white">Sistema de gestión SG-SST</p>
         </div>
         <div className={cn("scrollbar-thin flex-1 overflow-y-auto overflow-x-hidden", compacta ? "px-2.5" : "px-3")}>{nav}</div>
+        {/* Regreso a la landing desde cualquier módulo */}
+        <div className={cn("pb-2", compacta ? "px-2.5" : "px-3")}>
+          <Link
+            href="/"
+            title={compacta ? "Volver al sitio" : undefined}
+            aria-label={compacta ? "Volver al sitio" : undefined}
+            className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-white/70 transition hover:bg-white/[0.06] hover:text-white"
+          >
+            <Globe className="h-4 w-4 shrink-0 text-white/50" />
+            <span className={cn("flex-1 whitespace-nowrap transition-opacity", compacta && "opacity-0")}>Volver al sitio</span>
+          </Link>
+        </div>
         <div className={cn("border-t border-white/10", compacta ? "px-3.5 py-4" : "p-4")}>
           <div className="flex items-center gap-3">
             <Avatar nombre={usuario.nombre} className="bg-sotec-green text-sotec" />
@@ -451,7 +464,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       {u.id === usuario.id && <span className="text-[11px] font-semibold text-sotec-greenDeep">Actual</span>}
                     </button>
                   ))}
+                {usuario.rol === "cliente" && (
+                  <label className="mt-1 block border-t border-slate-100 px-2 pb-1 pt-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Empresa del portal</span>
+                    <select
+                      value={usuario.clienteId ?? ""}
+                      onChange={(e) => {
+                        demo.verPortalDe(e.target.value);
+                        setPerfil(false);
+                        router.push("/app");
+                      }}
+                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800"
+                    >
+                      {demo.clientes.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="mt-1 block text-[11px] leading-snug text-slate-500">El cliente solo ve los documentos aprobados de su empresa.</span>
+                  </label>
+                )}
                 <div className="my-1 border-t border-slate-100" />
+                <Link href="/" onClick={() => setPerfil(false)} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-slate-600 hover:bg-slate-50">
+                  <Globe className="h-4 w-4" /> Volver al sitio
+                </Link>
                 <button
                   onClick={() => {
                     demo.salir();

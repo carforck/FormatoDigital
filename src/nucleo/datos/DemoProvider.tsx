@@ -16,7 +16,7 @@ import {
 import type { Auditoria, Cliente, Config, Documento, EnlaceFirma, Notificacion, Rol, TipoDoc, Usuario } from "@/nucleo/tipos";
 
 // Subir la versión al cambiar la semilla: los navegadores cargan los datos nuevos
-const KEY = "sotec-demo-v4";
+const KEY = "sotec-demo-v5";
 
 interface Estado {
   usuarioId: string | null;
@@ -78,6 +78,8 @@ interface Api extends Estado {
   visibles: Documento[];
   misNotificaciones: Notificacion[];
   entrarComo: (rol: Rol, usuarioId?: string) => void;
+  /** Solo para la demo: el usuario cliente actual pasa a ver el portal de otra empresa. */
+  verPortalDe: (clienteId: string) => void;
   salir: () => void;
   guardar: (doc: Documento) => Documento;
   nuevoId: (tipo: TipoDoc) => { id: string; codigo: string; consecutivo: number };
@@ -222,6 +224,15 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
           const u = usuarioId ? prev.usuarios.find((x) => x.id === usuarioId) : prev.usuarios.find((x) => x.rol === rol && x.activo);
           if (!u) return prev;
           return { ...prev, usuarioId: u.id, auditoria: [{ id: uid("a"), fecha: ahora(), usuarioId: u.id, accion: "Ingresó a la demo", detalle: rol }, ...prev.auditoria] };
+        });
+      },
+      verPortalDe(clienteId) {
+        setS((prev) => {
+          const u = prev.usuarios.find((x) => x.id === prev.usuarioId);
+          const c = prev.clientes.find((x) => x.id === clienteId);
+          if (!u || u.rol !== "cliente" || !c || u.clienteId === c.id) return prev;
+          const cambiado = { ...u, clienteId: c.id, cargo: `${u.cargo.split(" · ")[0]} · ${c.nombre}` };
+          return { ...prev, usuarios: prev.usuarios.map((x) => (x.id === u.id ? cambiado : x)), auditoria: [{ id: uid("a"), fecha: ahora(), usuarioId: u.id, accion: "Cambió la empresa del portal", detalle: c.nombre }, ...prev.auditoria] };
         });
       },
       salir() {

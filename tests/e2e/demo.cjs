@@ -17,7 +17,7 @@ const puppeteer = require("puppeteer-core");
 
 const BASE = (process.env.BASE || "http://localhost:3100").replace(/\/$/, "");
 const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno"
-const CLAVE = "sotec-demo-v4";
+const CLAVE = "sotec-demo-v5";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function chrome() {
@@ -248,6 +248,36 @@ async function controles(b, errores) {
   await p.click('header button[aria-label*="Cambiar tema"]');
   await sleep(300);
   ok((await p.evaluate(() => localStorage.getItem("fd-tema"))) === "claro", "el ciclo vuelve a claro (oscuro → sistema → claro)");
+
+  // Regreso a la landing desde cualquier módulo
+  await p.goto(`${BASE}/app/revision`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  await p.evaluate(() => [...document.querySelectorAll("aside a")].find((a) => a.textContent.includes("Volver al sitio")).click());
+  await p.waitForFunction(() => location.pathname.replace(/\/$/, "") === "", { timeout: 15000 }).catch(() => {});
+  ok(await p.evaluate(() => location.pathname.replace(/\/$/, "") === ""), "«Volver al sitio» lleva de un módulo a la landing");
+
+  // Portal del cliente: ve el reporte aprobado por firmar y puede cambiar de empresa
+  await p.goto(`${BASE}/app`, { waitUntil: "networkidle0" });
+  await comoUsuario(p, "u-cli");
+  await p.reload({ waitUntil: "networkidle0" });
+  await sleep(700);
+  ok(await p.evaluate(() => [...document.querySelectorAll("main a")].some((a) => a.textContent.includes("RT-011-26") && a.textContent.includes("Firmar"))), "el cliente ve el reporte RT-011-26 pendiente de su firma");
+  await p.goto(`${BASE}/app/documentos/ver?id=d-rt-9`, { waitUntil: "networkidle0" });
+  await sleep(600);
+  ok(await p.evaluate(() => document.body.innerText.includes("Firmar como cliente")), "el cliente abre el reporte aprobado y puede firmarlo");
+  await p.click('header button[aria-haspopup="menu"]');
+  await sleep(300);
+  await p.select("header select", "c-tango");
+  await sleep(900);
+  const portal = await p.evaluate(
+    (k) => ({
+      docs: [...document.querySelectorAll("main a")].map((a) => a.textContent).join(" "),
+      cargo: JSON.parse(localStorage.getItem(k)).usuarios.find((u) => u.id === "u-cli").cargo,
+    }),
+    CLAVE,
+  );
+  ok(!portal.docs.includes("RT-011-26") && portal.cargo.includes("Horizonte Azul"), "el portal cambia a otra empresa y deja de ver los documentos de la anterior");
+  await comoUsuario(p, "u-tec1");
 
   await p.setViewport({ width: 390, height: 844, isMobile: true });
   await p.goto(`${BASE}/app`, { waitUntil: "networkidle0" });

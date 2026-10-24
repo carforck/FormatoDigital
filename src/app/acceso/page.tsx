@@ -10,6 +10,7 @@ import {
   Building2,
   Check,
   ChevronRight,
+  FileCheck2,
   Eye,
   EyeOff,
   Loader2,
@@ -132,7 +133,12 @@ export default function Acceso() {
         </div>
 
         <div className="relative flex h-full flex-col justify-between gap-10 overflow-y-auto px-10 py-10 xl:px-14">
-          <img src={asset("/sotec-logo-v3-oscuro.png")} alt="SOTEC" className="h-16 w-auto self-start" />
+          <p className="flex items-center gap-2.5 font-semibold text-2xl self-start">
+            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-sotec-green text-sotec">
+              <FileCheck2 className="h-5 w-5" />
+            </span>
+            <span>Control<span className="text-sotec-green">One</span></span>
+          </p>
 
           <div>
             {/* El ancho sigue la altura disponible para que todo el panel quepa sin desplazar; en pantallas muy bajas se oculta */}
@@ -172,7 +178,12 @@ export default function Acceso() {
         <div className="relative overflow-hidden bg-sotec px-4 pb-7 pt-5 text-white sm:px-8 lg:hidden">
           <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-sotec-green/15 blur-3xl" />
           <div className="relative flex items-center justify-between gap-3">
-            <img src={asset("/sotec-logo-v3-oscuro.png")} alt="SOTEC" className="h-10 w-auto" />
+            <p className="flex items-center gap-2.5 font-semibold text-lg">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sotec-green text-sotec">
+                <FileCheck2 className="h-4 w-4" />
+              </span>
+              <span>Control<span className="text-sotec-green">One</span></span>
+            </p>
             <Link
               href="/"
               className={cn("inline-flex items-center gap-1 rounded text-sm text-white/80 hover:text-white", ANILLO, "focus-visible:ring-sotec-green focus-visible:ring-offset-sotec")}

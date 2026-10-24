@@ -96,7 +96,7 @@ export default function Acceso() {
   const entrar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!correo.trim() || !clave) {
-      setError("Escribe tu correo y tu contraseña.");
+      setError("Escribe tu correo o usuario y tu contraseña.");
       return;
     }
     setError(null);
@@ -233,19 +233,20 @@ export default function Acceso() {
 
               <form onSubmit={entrar} noValidate className="mt-5">
                 <label className="block text-sm font-medium text-slate-700" htmlFor="correo">
-                  Correo corporativo
+                  Correo o usuario
                 </label>
                 <input
                   id="correo"
-                  type="email"
+                  type="text"
                   autoComplete="username"
-                  inputMode="email"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   value={correo}
                   onChange={(e) => setCorreo(e.target.value)}
                   aria-invalid={error ? true : undefined}
                   aria-describedby={error ? "error-acceso" : undefined}
                   className={cn(campo, "mt-1.5")}
-                  placeholder="tucorreo@empresa.com"
+                  placeholder="tucorreo@empresa.com o usuario"
                 />
                 <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="clave">
                   Contraseña

@@ -82,11 +82,18 @@ export async function sesionActual(): Promise<Sesion | null> {
   };
 }
 
+/** Dominio de los usuarios internos sin correo propio: «admin» entra como admin@sotecse.com. */
+const DOMINIO_USUARIOS = "sotecse.com";
+const aCorreo = (usuario: string) => {
+  const u = usuario.trim().toLowerCase();
+  return u.includes("@") ? u : `${u}@${DOMINIO_USUARIOS}`;
+};
+
 export async function iniciarSesion(correo: string, clave: string): Promise<string | null> {
   const sb = supabase();
   if (!sb) return "El acceso de la empresa no está configurado en este despliegue.";
-  const { error } = await sb.auth.signInWithPassword({ email: correo.trim().toLowerCase(), password: clave });
-  if (error) return error.message === "Invalid login credentials" ? "Correo o contraseña incorrectos." : "No se pudo iniciar sesión. Intenta de nuevo.";
+  const { error } = await sb.auth.signInWithPassword({ email: aCorreo(correo), password: clave });
+  if (error) return error.message === "Invalid login credentials" ? "Usuario o contraseña incorrectos." : "No se pudo iniciar sesión. Intenta de nuevo.";
   if (!(await sesionActual())) {
     await sb.auth.signOut();
     return "Tu usuario no tiene acceso al espacio de la empresa. Pide al administrador que te asigne un rol.";

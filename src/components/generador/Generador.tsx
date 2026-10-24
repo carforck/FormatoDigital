@@ -15,6 +15,7 @@ import { FirmaPad } from "@/components/docs/FirmaPad";
 import { Button } from "@/components/ui/button";
 import { Volver, salirAlDetalle, useOrigen } from "@/components/ui/volver";
 import type { Paso } from "@/components/chat/ChatAsistente";
+import { etiquetaServicio, type ServicioCatalogo } from "@/modulos/cotizaciones/catalogo";
 import { equiposAtendidos, puedeEditarEquipos } from "@/modulos/equipos/logica";
 import { SelectorEquipos } from "@/modulos/equipos/SelectorEquipos";
 import type { EquipoMinimo } from "@/modulos/equipos/tipos";
@@ -26,6 +27,7 @@ import { rutaDoc } from "@/nucleo/rutas";
 import type { Cliente, Documento, Proyecto, TipoDoc } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 import { avance, faltantes } from "@/nucleo/validar";
+import { puede } from "@/nucleo/permisos";
 
 interface Props {
   tipo: TipoDoc;
@@ -66,8 +68,8 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   const recuperado = useRef(false);
   // Los módulos están tipados por formato; el generador los trata de forma uniforme.
   const mod = modulo as unknown as {
-    pasos: (c: { datos: unknown; clientes: typeof demo.clientes; usuarioNombre: string; hoy: string }) => Paso[];
-    aplicar: (id: string, v: ValorPaso, d: unknown) => { cambio: Record<string, unknown>; mensaje?: string };
+    pasos: (c: { datos: unknown; clientes: typeof demo.clientes; usuarioNombre: string; hoy: string; serviciosPropios?: ServicioCatalogo[] }) => Paso[];
+    aplicar: (id: string, v: ValorPaso, d: unknown, extras?: { serviciosPropios?: ServicioCatalogo[] }) => { cambio: Record<string, unknown>; mensaje?: string };
     alElegirCliente: (c: Cliente) => { cambio: Record<string, unknown>; mensaje: string };
     vacio: (hoy: string, u: typeof usuario) => Documento["datos"];
   };
@@ -163,6 +165,14 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   function elegirCliente(c: Cliente | undefined, texto = ""): string | undefined {
     if (!c) {
       setDoc((d) => ({ ...d, clienteId: "", proyectoId: undefined, equiposIds: undefined, datos: { ...d.datos, [info.campoCliente]: texto } }) as Documento);
+      // Cliente nuevo escrito en el chat: quien gestiona clientes lo deja en el directorio para la próxima vez
+      const nombre = texto.trim();
+      if (nombre && puede(usuario.rol, "clientes") && !demo.clientes.some((x) => x.nombre.toLowerCase() === nombre.toLowerCase())) {
+        const nuevo: Cliente = { id: `c-${Date.now()}`, nombre, nit: "", direccion: "", contacto: "", cargo: "", correo: "", telefono: "", sitio: "" };
+        demo.guardarCliente(nuevo);
+        setDoc((d) => ({ ...d, clienteId: nuevo.id }) as Documento);
+        return `Agregué «${nombre}» a tu directorio de clientes. Completa sus datos (NIT, dirección, contacto) en Clientes para autollenarlos la próxima vez.`;
+      }
       return;
     }
     const r = mod.alElegirCliente(c);
@@ -197,19 +207,31 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
       const n = (doc.equiposIds ?? []).length;
       return n ? `Quedan ${n} equipo(s) en «Equipos atendidos»: el reporte aparecerá en el historial de cada uno.` : undefined;
     }
-    const r = mod.aplicar(id, v, doc.datos);
+    const r = mod.aplicar(id, v, doc.datos, { serviciosPropios: demo.config.serviciosPropios });
     editar(r.cambio);
     return r.mensaje;
   }
 
   // Pasos del módulo + la pregunta del proyecto justo después del cliente
-  const pasosModulo = mod.pasos({ datos: doc.datos, clientes: demo.clientesActivos, usuarioNombre: usuario.nombre, hoy: hoy() });
+  // Las listas suman lo que el equipo agregó con «＋ Agregar otro» (Configuración · opciones por «formato.paso»)
+  const propias = demo.config.opcionesPropias ?? {};
+  const pasosModulo = mod
+    .pasos({ datos: doc.datos, clientes: demo.clientesActivos, usuarioNombre: usuario.nombre, hoy: hoy(), serviciosPropios: demo.config.serviciosPropios })
+    .map((p) => {
+      const extra = propias[`${tipo}.${p.id}`];
+      if (!extra?.length || !p.opciones || (p.tipo !== "select" && p.tipo !== "multi")) return p;
+      // Lo agregado va antes de «Otro» (si la lista lo tiene) y sin repetir
+      const base = p.opciones.filter((o) => o !== "Otro");
+      const nuevas = extra.filter((x) => !base.some((o) => o.toLowerCase() === x.toLowerCase()));
+      return { ...p, opciones: [...base, ...nuevas, ...(p.opciones.includes("Otro") ? ["Otro"] : [])] };
+    });
   const pasoProyecto: Paso = {
     id: "proyecto",
     tipo: "select",
     opcional: true,
     resaltar: "proyecto",
     pregunta: "¿A qué proyecto u obra pertenece?",
+    agregar: false,
     ayuda: proyectosElegibles.length ? "Al elegirlo, el documento aparece en el proyecto y se llenan los campos de obra del formato." : "Este cliente no tiene proyectos abiertos; puedes seguir sin proyecto.",
     opciones: [...proyectosElegibles.map(etiquetaProyecto), SIN_PROYECTO],
   };
@@ -369,6 +391,8 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
                   : `Hola, ${usuario.nombre.split(" ")[0]}. Te guío para diligenciar ${f.el} ${f.corto.toLowerCase()} (${f.codigo}). Lo que respondas aparece al instante en el formato.${proyecto ? `\n\nQueda en el proyecto ${etiquetaProyecto(proyecto)}${clienteSel ? ` de ${clienteSel.nombre}` : ""}.` : ""}`
             }
             acciones={acciones}
+            onAgregarOpcion={(pasoId, valor) => demo.agregarOpcion(`${tipo}.${pasoId}`, valor)}
+            onAgregarServicio={(sv) => etiquetaServicio(demo.agregarServicio(sv))}
           />
         </div>
 

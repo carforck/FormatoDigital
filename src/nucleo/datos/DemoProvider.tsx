@@ -28,6 +28,7 @@ import { SIGUIENTES, type CuentaCobro, type EstadoCuentaCobro } from "@/modulos/
 import { puedeVerEquipo } from "@/modulos/equipos/logica";
 import * as reglasEquipos from "@/modulos/equipos/reglas";
 import type { ApiEquipos, Equipo } from "@/modulos/equipos/tipos";
+import { CATALOGO_SERVICIOS, IVA_GENERAL, type ServicioCatalogo } from "@/modulos/cotizaciones/catalogo";
 import { infoDoc, prefijoDe } from "@/modulos/registro";
 import { puede, puedeCrearTipo, puedeUsarTipo, puedeVerCuenta, puedeVerDoc, puedeVerProyecto } from "@/nucleo/permisos";
 import {
@@ -86,6 +87,13 @@ interface Estado {
 const anioDe = (iso: string) => iso.slice(0, 4);
 
 /** Reconstruye los contadores a partir de los documentos y cuentas existentes (semilla y datos guardados sin `consecutivos`). */
+/** Une dos tablas de contadores quedándose con el mayor de cada clave. */
+function maximos(a: Record<string, number>, b: Record<string, number>): Record<string, number> {
+  const r = { ...a };
+  for (const [k, v] of Object.entries(b)) r[k] = Math.max(r[k] ?? 0, v);
+  return r;
+}
+
 function contadoresDe(docs: Documento[], cuentas: CuentaCobro[], proyectos: Proyecto[] = []): Record<string, number> {
   const c: Record<string, number> = {};
   for (const p of proyectos) c[`proyecto-${anioDe(p.creado)}`] = Math.max(c[`proyecto-${anioDe(p.creado)}`] ?? 0, p.consecutivo);
@@ -147,6 +155,8 @@ function desdeEspacio(e: Espacio, ses: Sesion): Estado {
     ...base,
     ...g,
     config: { ...base.config, ...(g.config ?? {}) },
+    // Los consecutivos solo avanzan: si faltan o quedaron atrás, se reconstruyen desde lo ya emitido (no se reutilizan números)
+    consecutivos: maximos(g.consecutivos ?? {}, contadoresDe(g.documentos ?? [], g.cuentas ?? [], g.proyectos ?? [])),
     usuarios: yo ? usuarios.map((u) => (u.id === yo.id ? { ...u, rol: ses.usuario.rol, email: ses.usuario.email, activo: true } : u)) : [ses.usuario, ...usuarios],
     usuarioId: ses.usuario.id,
   };
@@ -236,6 +246,14 @@ interface Api extends Estado, ApiEquipos {
   /** Clientes que se pueden elegir en los formularios (activos). */
   clientesActivos: Cliente[];
   actualizarConfig: (c: Config) => void;
+  /** «＋ Agregar otro» del asistente: guarda la opción para toda la empresa (clave «formato.paso»). */
+  agregarOpcion: (clave: string, valor: string) => void;
+  /** Quita una opción agregada (Configuración, solo administración). */
+  quitarOpcion: (clave: string, valor: string) => void;
+  /** Agrega un servicio o producto al catálogo de la cotización; devuelve el servicio creado (o el existente con esa descripción). */
+  agregarServicio: (s: { descripcion: string; unidad: string; precioReferencia: number; detalle?: string }) => ServicioCatalogo;
+  /** Quita un servicio agregado al catálogo (Configuración, solo administración). */
+  quitarServicio: (clave: string) => void;
   /** Restablece la demo a la semilla conservando la sesión (no hace nada en modo empresa). */
   reiniciar: () => void;
   // Firma remota y envíos
@@ -897,7 +915,67 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
       },
 
       actualizarConfig(c) {
-        setS((prev) => ({ ...prev, config: c, auditoria: registrar(prev, "Cambió configuración", "Formatos y consecutivos") }));
+        // Lo agregado desde el asistente se conserva aunque el formulario de Configuración tenga una copia vieja
+        setS((prev) => ({
+          ...prev,
+          config: { ...c, opcionesPropias: prev.config.opcionesPropias, serviciosPropios: prev.config.serviciosPropios },
+          auditoria: registrar(prev, "Cambió configuración", "Formatos y consecutivos"),
+        }));
+      },
+
+      // Opciones y servicios agregados desde el asistente: quedan en la configuración de la empresa para todo el equipo
+      agregarOpcion(clave, valor) {
+        const v = valor.trim();
+        if (!v || !usuario) return;
+        setS((prev) => {
+          const actuales = prev.config.opcionesPropias?.[clave] ?? [];
+          if (actuales.some((x) => x.toLowerCase() === v.toLowerCase())) return prev;
+          return {
+            ...prev,
+            config: { ...prev.config, opcionesPropias: { ...prev.config.opcionesPropias, [clave]: [...actuales, v] } },
+            auditoria: registrar(prev, "Agregó una opción", `${clave}: ${v}`),
+          };
+        });
+      },
+      quitarOpcion(clave, valor) {
+        if (!usuario || !puede(usuario.rol, "config")) return;
+        setS((prev) => {
+          const restantes = (prev.config.opcionesPropias?.[clave] ?? []).filter((x) => x !== valor);
+          const opcionesPropias = { ...prev.config.opcionesPropias, [clave]: restantes };
+          if (!restantes.length) delete opcionesPropias[clave];
+          return { ...prev, config: { ...prev.config, opcionesPropias }, auditoria: registrar(prev, "Quitó una opción", `${clave}: ${valor}`) };
+        });
+      },
+      agregarServicio(m) {
+        const descripcion = m.descripcion.trim();
+        const existente = [...CATALOGO_SERVICIOS, ...(s.config.serviciosPropios ?? [])].find((x) => x.descripcion.toLowerCase() === descripcion.toLowerCase());
+        if (existente) return existente;
+        const nuevo: ServicioCatalogo = {
+          clave: uid("srv"),
+          descripcion,
+          detalle: m.detalle?.trim() || undefined,
+          unidad: m.unidad.trim() || "Unidades",
+          precioReferencia: Math.max(0, Math.round(m.precioReferencia)),
+          ivaPct: IVA_GENERAL,
+        };
+        setS((prev) => ({
+          ...prev,
+          config: { ...prev.config, serviciosPropios: [...(prev.config.serviciosPropios ?? []), nuevo] },
+          auditoria: registrar(prev, "Agregó un servicio al catálogo", `${nuevo.descripcion} · $ ${nuevo.precioReferencia.toLocaleString("es-CO")}`),
+        }));
+        return nuevo;
+      },
+      quitarServicio(clave) {
+        if (!usuario || !puede(usuario.rol, "config")) return;
+        setS((prev) => {
+          const sv = prev.config.serviciosPropios?.find((x) => x.clave === clave);
+          if (!sv) return prev;
+          return {
+            ...prev,
+            config: { ...prev.config, serviciosPropios: prev.config.serviciosPropios!.filter((x) => x.clave !== clave) },
+            auditoria: registrar(prev, "Quitó un servicio del catálogo", sv.descripcion),
+          };
+        });
       },
 
       crearEnlaceFirma(docId, correo) {

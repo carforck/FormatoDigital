@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { MODULOS, TIPOS_DOC, formatoDe, prefijoDe } from "@/modulos/registro";
 import { CONFIG_SEED } from "@/nucleo/datos/seed";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
+import { OpcionesAgregadas } from "@/components/config/OpcionesAgregadas";
 
 /** Formulario local (copia de demo.config) que se aplica con demo.actualizarConfig al guardar. */
 export default function Config() {
@@ -161,6 +162,8 @@ export default function Config() {
           ))}
         </ul>
       </section>
+
+      <OpcionesAgregadas />
 
       {demo.modo === "demo" && (
         <section className="rounded-xl border border-rose-200 bg-rose-50 p-4">

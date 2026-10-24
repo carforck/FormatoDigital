@@ -9,6 +9,7 @@ import type { DatosPermiso } from "@/modulos/permisos/tipos";
 import type { DatosReporte } from "@/modulos/reportes/tipos";
 
 import type { DatosCotizacion } from "@/modulos/cotizaciones/tipos";
+import type { ServicioCatalogo } from "@/modulos/cotizaciones/catalogo";
 
 // Los tipos propios de cada formato viven en su módulo; se reexportan aquí por comodidad.
 export type { DatosReporte, FotoReporte } from "@/modulos/reportes/tipos";
@@ -173,6 +174,10 @@ export interface Config {
   tipoCuenta: string;
   numeroCuenta: string;
   titularCuenta: string;
+  /** Opciones agregadas desde el asistente con «＋ Agregar otro», por «formato.paso» (p. ej. «permiso.epp»). */
+  opcionesPropias?: Record<string, string[]>;
+  /** Servicios o productos agregados al catálogo de la cotización desde el asistente. */
+  serviciosPropios?: ServicioCatalogo[];
 }
 
 /** Enlace de firma remota: el cliente firma sin cuenta. */

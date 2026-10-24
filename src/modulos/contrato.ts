@@ -4,6 +4,7 @@
  * El registro (`registro.ts`) completa los miembros opcionales con valores por
  * defecto; el resto de la aplicación solo habla con este contrato.
  */
+import type { ServicioCatalogo } from "@/modulos/cotizaciones/catalogo";
 import type { ComponentType } from "react";
 
 import type { Paso, ValorPaso } from "@/components/chat/ChatAsistente";
@@ -17,6 +18,13 @@ export interface ContextoAsistente<D> {
   clientes: Cliente[];
   usuarioNombre: string;
   hoy: string;
+  /** Servicios agregados al catálogo de la cotización desde el asistente (Configuración de la empresa). */
+  serviciosPropios?: ServicioCatalogo[];
+}
+
+/** Datos de la empresa que necesita `aplicar` además del documento (catálogos agregados por el equipo). */
+export interface ExtrasAplicar {
+  serviciosPropios?: ServicioCatalogo[];
 }
 
 /** Control documental del formato (encabezado, listados, títulos). */
@@ -106,7 +114,7 @@ export interface ModuloDocumento<D> {
   /** Preguntas del asistente conversacional, en orden. */
   pasos: (ctx: ContextoAsistente<D>) => Paso[];
   /** Aplica una respuesta del asistente; devuelve el cambio y, opcional, un mensaje para el chat. */
-  aplicar: (id: string, valor: ValorPaso, datos: D) => { cambio: Partial<D>; mensaje?: string };
+  aplicar: (id: string, valor: ValorPaso, datos: D, extras?: ExtrasAplicar) => { cambio: Partial<D>; mensaje?: string };
   /** Autollenado al elegir un cliente del directorio. */
   alElegirCliente: (c: Cliente) => { cambio: Partial<D>; mensaje: string };
   /** Pendientes antes de enviar a revisión (vacío = listo). */

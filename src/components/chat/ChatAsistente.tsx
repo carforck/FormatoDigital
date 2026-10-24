@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { comprimirImagen } from "@/nucleo/imagenes";
 import type { Ejecutor, FotoReporte, ItemGasto } from "@/nucleo/tipos";
 import { TIPOS_GASTO } from "@/modulos/gastos/catalogo";
+import { UNIDADES } from "@/modulos/cotizaciones/catalogo";
 
 /** Control que muestra el asistente para responder el paso. */
 export type TipoPaso = "texto" | "textarea" | "fecha" | "hora" | "email" | "tel" | "select" | "multi" | "firma" | "ejecutores" | "verificacion" | "fotos" | "gastos" | "componente";
@@ -39,6 +40,21 @@ export interface Paso {
   validar?: (v: string) => string | null;
   /** Paso «componente»: control propio (p. ej. el selector de equipos) que llama a `avanzar` al terminar. */
   render?: (avanzar: (v: ValorPaso, eco: string) => void) => React.ReactNode;
+  /**
+   * «＋ Agregar otro» en listas (select y multi): por defecto se ofrece y lo nuevo se guarda
+   * para toda la empresa. `false` lo quita (p. ej. proyecto o confirmar); «servicio» pide
+   * descripción, unidad y precio (catálogo de la cotización).
+   */
+  agregar?: false | "servicio";
+  /** Texto de ayuda del formulario de «Agregar otro». */
+  ayudaAgregar?: string;
+}
+
+/** Servicio o producto nuevo para el catálogo de la cotización. */
+export interface ServicioNuevo {
+  descripcion: string;
+  unidad: string;
+  precioReferencia: number;
 }
 
 /** Respuesta de un paso: texto, lista (multi / verificación) o colecciones (ejecutores, fotos, gastos). */
@@ -57,6 +73,10 @@ interface Props {
   bienvenida: string;
   retomando?: boolean;
   acciones: React.ReactNode;
+  /** Guarda una opción nueva de una lista para toda la empresa. Sin esta función no se ofrece «Agregar otro». */
+  onAgregarOpcion?: (pasoId: string, valor: string) => void;
+  /** Agrega un servicio al catálogo y devuelve su etiqueta (la opción que queda marcada). */
+  onAgregarServicio?: (s: ServicioNuevo) => string;
 }
 
 interface Msg {
@@ -74,7 +94,7 @@ const m = (rol: Msg["rol"], texto: string): Msg => ({ id: ++seq, rol, texto });
  * (documento existente o recuperado) y solo muestra las acciones y el atajo
  * «Volver a una pregunta». Las respuestas largas se recortan en el eco (140).
  */
-export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFirmar, firmado, ejecutoresIniciales = [], bienvenida, retomando, acciones }: Props) {
+export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFirmar, firmado, ejecutoresIniciales = [], bienvenida, retomando, acciones, onAgregarOpcion, onAgregarServicio }: Props) {
   const [i, setI] = useState(retomando ? pasos.length : 0);
   const [hist, setHist] = useState<Msg[]>(() =>
     retomando ? [m("bot", bienvenida)] : [m("bot", bienvenida), m("bot", pasos[0].pregunta)],
@@ -88,6 +108,10 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
   const [gastos, setGastos] = useState<ItemGasto[]>([]);
   const [gasto, setGasto] = useState<ItemGasto>(gastoNuevo);
   const [procesando, setProcesando] = useState(false);
+  // «＋ Agregar otro»: formulario abierto, texto nuevo y datos del servicio nuevo (cotización)
+  const [otroAbierto, setOtroAbierto] = useState(false);
+  const [otro, setOtro] = useState("");
+  const [servicio, setServicio] = useState({ unidad: "Unidades", precio: "" });
 
   async function agregarFotos(lista: FileList | null) {
     if (!lista?.length) return;
@@ -114,6 +138,9 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
   useEffect(() => {
     onPaso?.(paso ?? null);
     if (paso?.inicial) setMulti(paso.inicial());
+    setOtroAbierto(false);
+    setOtro("");
+    setServicio({ unidad: "Unidades", precio: "" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i]);
 
@@ -146,6 +173,68 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
     if (!v && !paso.opcional) return;
     avanzar(v, v);
   }
+
+  /** Lista con «＋ Agregar otro»: select avanza con lo nuevo; multi lo deja marcado. */
+  const agregaAqui =
+    paso && (paso.tipo === "select" || paso.tipo === "multi") && paso.agregar !== false && (paso.agregar === "servicio" ? Boolean(onAgregarServicio) : Boolean(onAgregarOpcion));
+
+  function agregarOtro(e: React.FormEvent) {
+    e.preventDefault();
+    if (!paso) return;
+    const v = otro.trim().replace(/\s+/g, " ");
+    if (!v) return;
+    let opcion = v;
+    if (paso.agregar === "servicio") {
+      const precio = Number(servicio.precio.replace(/\D/g, ""));
+      opcion = onAgregarServicio!({ descripcion: v, unidad: servicio.unidad, precioReferencia: precio });
+    } else {
+      // Si ya existe con otras mayúsculas se usa la existente (no se duplica)
+      opcion = paso.opciones?.find((x) => x.toLowerCase() === v.toLowerCase()) ?? v;
+      onAgregarOpcion!(paso.id, opcion);
+    }
+    setOtroAbierto(false);
+    setOtro("");
+    setServicio({ unidad: "Unidades", precio: "" });
+    if (paso.tipo === "select") avanzar(opcion, opcion);
+    else setMulti((p) => (p.includes(opcion) ? p : [...p, opcion]));
+  }
+
+  const bloqueAgregar = agregaAqui ? (
+    otroAbierto ? (
+      <form onSubmit={agregarOtro} className="space-y-2 rounded-lg border border-dashed border-sotec-greenDeep/50 bg-sotec-soft/50 p-2.5">
+        <p className="text-[11px] text-slate-600">{paso?.ayudaAgregar ?? "Lo que agregues queda disponible en esta lista para todo el equipo."}</p>
+        <Input autoFocus value={otro} onChange={(e) => setOtro(e.target.value)} placeholder={paso?.agregar === "servicio" ? "Servicio o producto (p. ej. Cámara domo 4 MP)" : "Escribe la nueva opción"} aria-label="Nueva opción" />
+        {paso?.agregar === "servicio" && (
+          <div className="grid grid-cols-2 gap-2">
+            <select value={servicio.unidad} onChange={(e) => setServicio({ ...servicio, unidad: e.target.value })} aria-label="Unidad" className="h-10 rounded-md border border-slate-200 bg-white px-2 text-sm">
+              {UNIDADES.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+            <Input inputMode="numeric" value={servicio.precio} onChange={(e) => setServicio({ ...servicio, precio: e.target.value })} placeholder="Precio sin IVA" aria-label="Precio de referencia sin IVA" />
+          </div>
+        )}
+        <div className="flex gap-2">
+          <Button type="submit" size="sm" className="flex-1" disabled={!otro.trim() || (paso?.agregar === "servicio" && !servicio.precio.replace(/\D/g, ""))}>
+            <Plus className="h-4 w-4" /> Agregar
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setOtroAbierto(false)}>
+            Cancelar
+          </Button>
+        </div>
+      </form>
+    ) : (
+      <button
+        type="button"
+        onClick={() => setOtroAbierto(true)}
+        className="flex items-center gap-1 rounded-full border border-dashed border-sotec-greenDeep/60 px-2.5 py-1 text-[11px] font-semibold text-sotec-greenDeep transition hover:bg-sotec-soft"
+      >
+        <Plus className="h-3 w-3" /> {paso?.agregar === "servicio" ? "Agregar servicio o producto" : "Agregar otro"}
+      </button>
+    )
+  ) : null;
 
   function irA(idx: number) {
     setI(idx);
@@ -193,6 +282,7 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
                     {op}
                   </Button>
                 ))}
+                {bloqueAgregar && <div className={otroAbierto ? "w-full" : ""}>{bloqueAgregar}</div>}
               </div>
             )}
 
@@ -217,6 +307,7 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
                     );
                   })}
                 </div>
+                {bloqueAgregar}
                 <Button className="w-full" onClick={() => avanzar(multi, multi.length ? `${multi.length} seleccionados: ${multi.slice(0, 3).join(", ")}${multi.length > 3 ? "…" : ""}` : "Ninguno")}>
                   Continuar con {multi.length}
                 </Button>

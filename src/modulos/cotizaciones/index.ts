@@ -73,7 +73,7 @@ export const moduloCotizaciones: ModuloDocumento<DatosCotizacion> = {
     mensaje: `Asunto tomado del proyecto ${p.codigo}.`,
   }),
 
-  pasos: ({ datos, clientes, hoy }) => [
+  pasos: ({ datos, clientes, hoy, serviciosPropios }) => [
     { id: "cliente", tipo: "texto", resaltar: "cliente", pregunta: "¿Para qué cliente es la cotización?", sugerencias: clientes.map((c) => c.nombre), ayuda: "Elige uno del directorio para autocompletar contacto, correo y dirección." },
     {
       id: "asunto",
@@ -89,8 +89,10 @@ export const moduloCotizaciones: ModuloDocumento<DatosCotizacion> = {
       resaltar: "items",
       pregunta: "Elige los servicios del catálogo (precios de referencia sin IVA).",
       ayuda: "En el siguiente paso ajustas cantidades y precios. Si no aplica ninguno, continúa con 0.",
-      opciones: CATALOGO_SERVICIOS.map(etiquetaServicio),
-      inicial: () => CATALOGO_SERVICIOS.filter((s) => datos.items.some((i) => i.descripcion === s.descripcion)).map(etiquetaServicio),
+      ayudaAgregar: "¿No está en el catálogo? Agrega el servicio o producto con su precio y queda disponible para todo el equipo.",
+      agregar: "servicio",
+      opciones: [...CATALOGO_SERVICIOS, ...(serviciosPropios ?? [])].map(etiquetaServicio),
+      inicial: () => [...CATALOGO_SERVICIOS, ...(serviciosPropios ?? [])].filter((s) => datos.items.some((i) => i.descripcion === s.descripcion)).map(etiquetaServicio),
     },
     {
       id: "items",
@@ -111,12 +113,12 @@ export const moduloCotizaciones: ModuloDocumento<DatosCotizacion> = {
     { id: "tiempoEntrega", tipo: "texto", resaltar: "tiempoEntrega", pregunta: "¿Tiempo de entrega o ejecución?", sugerencias: SUGERENCIAS_TIEMPO_ENTREGA },
     { id: "garantia", tipo: "texto", resaltar: "garantia", opcional: true, pregunta: "¿Garantía?", sugerencias: SUGERENCIAS_GARANTIA },
     { id: "observaciones", tipo: "textarea", resaltar: "observaciones", opcional: true, pregunta: "¿Observaciones para el cliente?", sugerencias: ["No incluye obras civiles ni resanes.", "Trabajos en horario diurno; en horario nocturno se cotiza aparte."] },
-    { id: "confirmar", tipo: "select", resaltar: "total", pregunta: "¿Revisamos el total?", opciones: ["Ver resumen"] },
+    { id: "confirmar", tipo: "select", resaltar: "total", pregunta: "¿Revisamos el total?", opciones: ["Ver resumen"], agregar: false },
   ],
 
-  aplicar: (id, v, datos) => {
+  aplicar: (id, v, datos, extras) => {
     if (id === "servicios") {
-      const elegidos = CATALOGO_SERVICIOS.filter((s) => (v as string[]).includes(etiquetaServicio(s)));
+      const elegidos = [...CATALOGO_SERVICIOS, ...(extras?.serviciosPropios ?? [])].filter((s) => (v as string[]).includes(etiquetaServicio(s)));
       const nuevos = elegidos.filter((s) => !datos.items.some((i) => i.descripcion === s.descripcion)).map((s) => itemDeCatalogo(s));
       const items = [...datos.items, ...nuevos];
       return { cambio: { items }, mensaje: nuevos.length ? `Agregué ${nuevos.length} ítem(s) con cantidad 1. ${resumenTotal({ items })}` : undefined };

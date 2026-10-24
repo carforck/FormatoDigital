@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useRef, useState } from "react";
 import { Cctv, Check, CheckCircle2, Copy, FolderKanban, Link2, Lock, PenLine, Printer, Receipt, Send, SendHorizonal, Trash2, X } from "lucide-react";
 
-import { EnviarDocumento } from "@/components/EnviarDocumento";
+import { EnviarDocumento } from "@/components/docs/EnviarDocumento";
 import { Volver, marcarEdicion, useAvisoDeRegreso, useOrigen } from "@/components/ui/volver";
 import { fondoQueCierra, useModal } from "@/components/ui/useModal";
 

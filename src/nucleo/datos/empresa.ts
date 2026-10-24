@@ -1,29 +1,27 @@
 "use client";
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+/**
+ * Modo empresa (fase 1): acceso con usuario y contraseña de Supabase Auth y
+ * estado completo de la app por organización en `public.espacios`
+ * (supabase/migrations/0012_espacio_empresa.sql), con concurrencia optimista
+ * por versión. El modo demo sigue en localStorage. Quien orquesta la carga, el
+ * guardado y la sincronización es `DemoProvider` (`./DemoProvider.tsx`).
+ *
+ * Reglas del espacio: cada guardado envía la versión que leyó; la fila solo se
+ * actualiza si nadie más guardó entre tanto (`version` sube de a uno, lo exige
+ * también la base de datos). Si otro equipo ganó, se responde "conflicto" y el
+ * proveedor recarga el estado remoto.
+ */
 
 import type { Rol, Usuario } from "@/nucleo/tipos";
 
-/**
- * Modo empresa (fase 1): la app guarda su estado completo por organización en
- * `public.espacios` (supabase/migrations/0012_espacio_empresa.sql) con
- * concurrencia optimista por versión. El modo demo sigue en localStorage.
- */
+import { supabase } from "./supabase";
 
+/** «demo»: datos ficticios en localStorage · «empresa»: espacio real en Supabase. */
 export type Modo = "demo" | "empresa";
-export const KEY_MODO = "fd-modo";
+const KEY_MODO = "fd-modo";
 
-let cliente: SupabaseClient | null = null;
-
-/** Cliente del navegador; null si faltan las variables de Supabase. */
-export function supabase(): SupabaseClient | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const llave = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!url || !llave) return null;
-  cliente ??= createClient(url, llave, { auth: { persistSession: true, autoRefreshToken: true } });
-  return cliente;
-}
-
+/** Modo elegido en /acceso; se recuerda en el navegador. */
 export function leerModo(): Modo {
   try {
     return localStorage.getItem(KEY_MODO) === "empresa" ? "empresa" : "demo";
@@ -32,6 +30,7 @@ export function leerModo(): Modo {
   }
 }
 
+/** Recuerda el modo para la próxima visita. */
 export function guardarModo(m: Modo) {
   try {
     localStorage.setItem(KEY_MODO, m);
@@ -40,12 +39,14 @@ export function guardarModo(m: Modo) {
   }
 }
 
+/** Sesión del modo empresa: la organización y el usuario (con su rol) salen de `miembros` y `perfiles`. */
 export interface Sesion {
   organizacionId: string;
   organizacion: string;
   usuario: Usuario;
 }
 
+/** Fila de `espacios`: el estado completo de la app (JSON) y su versión. */
 export interface Espacio {
   estado: Record<string, unknown>;
   version: number;
@@ -89,6 +90,11 @@ const aCorreo = (usuario: string) => {
   return u.includes("@") ? u : `${u}@${DOMINIO_USUARIOS}`;
 };
 
+/**
+ * Inicia sesión con usuario o correo y contraseña. Un usuario sin «@» se completa
+ * con el dominio de la empresa. Devuelve null si entró o el mensaje de error
+ * para mostrar; si la cuenta no tiene rol interno activo, cierra la sesión.
+ */
 export async function iniciarSesion(correo: string, clave: string): Promise<string | null> {
   const sb = supabase();
   if (!sb) return "El acceso de la empresa no está configurado en este despliegue.";
@@ -101,16 +107,19 @@ export async function iniciarSesion(correo: string, clave: string): Promise<stri
   return null;
 }
 
+/** Cierra la sesión de Supabase (no borra el respaldo local del espacio). */
 export async function cerrarSesion() {
   await supabase()?.auth.signOut();
 }
 
+/** Lee el espacio de la organización; null si no existe o no se pudo leer (RLS, red). */
 export async function leerEspacio(organizacionId: string): Promise<Espacio | null> {
   const { data, error } = await supabase()!.from("espacios").select("estado, version").eq("organizacion_id", organizacionId).maybeSingle();
   if (error || !data) return null;
   return { estado: (data.estado ?? {}) as Record<string, unknown>, version: Number(data.version) };
 }
 
+/** Solo la versión (consulta liviana para saber si otro equipo guardó). */
 export async function versionEspacio(organizacionId: string): Promise<number | null> {
   const { data, error } = await supabase()!.from("espacios").select("version").eq("organizacion_id", organizacionId).maybeSingle();
   return error || !data ? null : Number(data.version);
@@ -126,28 +135,4 @@ export async function guardarEspacio(organizacionId: string, estado: unknown, ve
     .select("version");
   if (error) return "error";
   return data?.length ? Number(data[0].version) : "conflicto";
-}
-
-export interface UsuarioEmpresa {
-  id: string;
-  email: string;
-  nombre: string;
-  cargo: string;
-  rol: Exclude<Rol, "cliente">;
-  activo: boolean;
-}
-
-/** Llama a /api/usuarios con la sesión actual; lanza Error con el mensaje del servidor. */
-export async function apiUsuarios<T>(metodo: "GET" | "POST" | "PATCH" | "DELETE", cuerpo?: unknown, id?: string): Promise<T> {
-  const { data } = (await supabase()?.auth.getSession()) ?? { data: { session: null } };
-  const token = data.session?.access_token;
-  if (!token) throw new Error("Sesión vencida. Vuelve a iniciar sesión.");
-  const r = await fetch(`/api/usuarios${id ? `?id=${encodeURIComponent(id)}` : ""}`, {
-    method: metodo,
-    headers: { Authorization: `Bearer ${token}`, ...(cuerpo ? { "Content-Type": "application/json" } : {}) },
-    body: cuerpo ? JSON.stringify(cuerpo) : undefined,
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error ?? "No se pudo completar la operación.");
-  return j as T;
 }

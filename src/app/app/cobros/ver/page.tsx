@@ -5,7 +5,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Ban, CheckCircle2, FolderKanban, PenLine, Printer, Send, Stamp } from "lucide-react";
 
-import { EnviarDocumento } from "@/components/EnviarDocumento";
+import { EnviarDocumento } from "@/components/docs/EnviarDocumento";
 import { Volver, marcarEdicion, useOrigen } from "@/components/ui/volver";
 import { Button } from "@/components/ui/button";
 import { EstadoCuentaBadge } from "@/components/ui/estado-cuenta";

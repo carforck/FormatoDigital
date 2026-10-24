@@ -8,13 +8,10 @@ import { Avatar } from "@/components/ui/corporativo";
 import { Input } from "@/components/ui/input";
 import { ETIQUETA_ROL } from "@/nucleo/catalogos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
-import { apiUsuarios, type UsuarioEmpresa } from "@/nucleo/datos/empresa";
+import { actualizarUsuario, crearUsuario, eliminarUsuario, listarUsuarios } from "@/nucleo/datos/usuarios-api";
+import { CLAVE_MINIMA, ROLES_INTERNOS as ROLES, type NuevoUsuario, type RolInterno, type UsuarioEmpresa } from "@/nucleo/datos/usuarios-contrato";
 
-/** Roles con acceso al espacio de la empresa (el portal del cliente aún no usa este modo). */
-const ROLES = ["tecnico", "supervisor", "admin"] as const;
-type RolInterno = (typeof ROLES)[number];
-
-const VACIO = { nombre: "", email: "", cargo: "", rol: "tecnico" as RolInterno, clave: "" };
+const VACIO: NuevoUsuario = { nombre: "", email: "", cargo: "", rol: "tecnico", clave: "" };
 
 /**
  * Usuarios con login del modo empresa (solo admin): crear con contraseña, editar
@@ -34,7 +31,7 @@ export function PanelUsuariosEmpresa() {
 
   const cargar = useCallback(async () => {
     try {
-      const r = await apiUsuarios<{ usuarios: UsuarioEmpresa[]; yo: string }>("GET");
+      const r = await listarUsuarios();
       setUsuarios(r.usuarios);
       setYo(r.yo);
       setError(null);
@@ -71,7 +68,7 @@ export function PanelUsuariosEmpresa() {
   const crear = (e: React.FormEvent) => {
     e.preventDefault();
     void ejecutar(async () => {
-      const r = await apiUsuarios<{ usuario: UsuarioEmpresa }>("POST", nuevo);
+      const r = await crearUsuario(nuevo);
       reflejar(r.usuario);
       setNuevo(VACIO);
       return `Usuario creado: ${r.usuario.email} ya puede iniciar sesión.`;
@@ -83,7 +80,7 @@ export function PanelUsuariosEmpresa() {
     const u = editando;
     if (!u) return;
     void ejecutar(async () => {
-      await apiUsuarios("PATCH", { id: u.id, nombre: u.nombre, cargo: u.cargo, rol: u.rol });
+      await actualizarUsuario({ id: u.id, nombre: u.nombre, cargo: u.cargo, rol: u.rol });
       reflejar(u);
       setEditando(null);
       return "Cambios guardados.";
@@ -92,7 +89,7 @@ export function PanelUsuariosEmpresa() {
 
   const cambiarActivo = (u: UsuarioEmpresa) =>
     ejecutar(async () => {
-      await apiUsuarios("PATCH", { id: u.id, activo: !u.activo });
+      await actualizarUsuario({ id: u.id, activo: !u.activo });
       reflejar({ ...u, activo: !u.activo });
       return u.activo ? `${u.nombre} ya no puede iniciar sesión.` : `${u.nombre} puede volver a iniciar sesión.`;
     });
@@ -102,7 +99,7 @@ export function PanelUsuariosEmpresa() {
     const c = claveDe;
     if (!c) return;
     void ejecutar(async () => {
-      await apiUsuarios("PATCH", { id: c.id, clave: c.clave });
+      await actualizarUsuario({ id: c.id, clave: c.clave });
       setClaveDe(null);
       return "Contraseña actualizada.";
     });
@@ -111,7 +108,7 @@ export function PanelUsuariosEmpresa() {
   const eliminar = (u: UsuarioEmpresa) => {
     if (!confirm(`¿Eliminar a ${u.nombre} (${u.email})? Ya no podrá iniciar sesión. Sus documentos se conservan.`)) return;
     void ejecutar(async () => {
-      await apiUsuarios("DELETE", undefined, u.id);
+      await eliminarUsuario(u.id);
       // En los formatos queda como persona inactiva para conservar el historial
       reflejar({ ...u, activo: false });
       return `${u.nombre} fue eliminado.`;
@@ -232,8 +229,8 @@ export function PanelUsuariosEmpresa() {
         <form onSubmit={cambiarClave} className="flex flex-wrap items-end gap-2 rounded-xl border border-sotec-green/40 bg-sotec-soft p-4">
           <p className="w-full text-sm font-semibold text-slate-900">Nueva contraseña para {usuarios?.find((u) => u.id === claveDe.id)?.email}</p>
           <label className="min-w-[220px] flex-1 text-sm">
-            <span className="text-xs text-slate-500">Contraseña (mínimo 8 caracteres)</span>
-            <Input required minLength={8} type="text" autoComplete="new-password" value={claveDe.clave} onChange={(e) => setClaveDe({ ...claveDe, clave: e.target.value })} />
+            <span className="text-xs text-slate-500">Contraseña (mínimo {CLAVE_MINIMA} caracteres)</span>
+            <Input required minLength={CLAVE_MINIMA} type="text" autoComplete="new-password" value={claveDe.clave} onChange={(e) => setClaveDe({ ...claveDe, clave: e.target.value })} />
           </label>
           <Button type="submit" disabled={ocupado}>
             Cambiar contraseña
@@ -259,8 +256,8 @@ export function PanelUsuariosEmpresa() {
           <Input value={nuevo.cargo} onChange={(e) => setNuevo({ ...nuevo, cargo: e.target.value })} />
         </label>
         <label className="min-w-[160px] flex-1 text-sm">
-          <span className="text-xs text-slate-500">Contraseña (mín. 8)</span>
-          <Input required minLength={8} type="text" autoComplete="new-password" value={nuevo.clave} onChange={(e) => setNuevo({ ...nuevo, clave: e.target.value })} />
+          <span className="text-xs text-slate-500">Contraseña (mín. {CLAVE_MINIMA})</span>
+          <Input required minLength={CLAVE_MINIMA} type="text" autoComplete="new-password" value={nuevo.clave} onChange={(e) => setNuevo({ ...nuevo, clave: e.target.value })} />
         </label>
         <select value={nuevo.rol} onChange={(e) => setNuevo({ ...nuevo, rol: e.target.value as RolInterno })} className={campo} aria-label="Rol">
           {ROLES.map((r) => (

@@ -23,6 +23,13 @@ export default function Usuarios() {
     <div className="space-y-6">
       <PageHeader etiqueta="Administración" titulo="Usuarios y roles" descripcion="Asigna el rol de cada persona; el menú y los permisos cambian al instante." />
 
+      {demo.modo === "empresa" && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Las personas de esta lista aparecen en los formatos (técnicos, firmas, responsables). Para que alguien pueda <strong>iniciar sesión</strong> con su
+          correo, solicita su acceso al soporte de ControlOne.
+        </p>
+      )}
+
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">

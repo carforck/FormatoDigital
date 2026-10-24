@@ -143,6 +143,7 @@ function useFueraDe<T extends HTMLElement>(abierto: boolean, cerrar: () => void)
 export function AppShell({ children }: { children: React.ReactNode }) {
   const demo = useDemo();
   const { usuario, listo } = demo;
+  const empresa = demo.modo === "empresa";
   const path = usePathname().replace(/\/$/, "") || "/";
   const router = useRouter();
   const [menu, setMenu] = useState(false);
@@ -329,17 +330,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={cn("min-h-screen", oscuro ? "dark bg-[#0F1311] text-slate-100" : "bg-[#F5F7F3]")}>
-      {/* Franja de demostración discreta */}
-      <div className="print:hidden flex h-7 items-center justify-center gap-2 bg-[#141414] px-3 text-[11px] text-white/60">
-        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-sotec-green" />
-        <span className="truncate">
-          Entorno de demostración · datos ficticios
-          <span className="hidden sm:inline"> guardados solo en este navegador</span>
-        </span>
-        <Link href="/" className="shrink-0 font-medium text-sotec-green hover:underline">
-          Ver presentación
-        </Link>
-      </div>
+      {/* Franja superior: demo (datos ficticios) o espacio de la empresa con el estado del guardado */}
+      {empresa ? (
+        <div className="print:hidden flex h-7 items-center justify-center gap-2 bg-[#141414] px-3 text-[11px] text-white/60">
+          <span
+            className={cn(
+              "h-1.5 w-1.5 rounded-full",
+              demo.sincronizacion === "guardado" ? "bg-sotec-green" : demo.sincronizacion === "guardando" ? "animate-pulse bg-amber-400" : "bg-rose-500",
+            )}
+          />
+          <span className="truncate">
+            {demo.organizacion || "Empresa"} · ControlOne
+            <span aria-live="polite">
+              {" · "}
+              {demo.sincronizacion === "guardado" ? "Todo guardado" : demo.sincronizacion === "guardando" ? "Guardando…" : "Sin conexión, reintentando"}
+            </span>
+          </span>
+        </div>
+      ) : (
+        <div className="print:hidden flex h-7 items-center justify-center gap-2 bg-[#141414] px-3 text-[11px] text-white/60">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-sotec-green" />
+          <span className="truncate">
+            Entorno de demostración · datos ficticios
+            <span className="hidden sm:inline"> guardados solo en este navegador</span>
+          </span>
+          <Link href="/" className="shrink-0 font-medium text-sotec-green hover:underline">
+            Ver presentación
+          </Link>
+        </div>
+      )}
+      {demo.errorGuardado && (
+        <div role="alert" className="print:hidden border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs text-amber-900">
+          {demo.errorGuardado}
+        </div>
+      )}
 
       {/* Barra lateral */}
       <aside
@@ -406,13 +430,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 router.push("/acceso");
               }}
               className="rounded-md p-1.5 text-white/50 hover:bg-white/10 hover:text-white"
-              aria-label="Salir"
-              title="Salir de la demo"
+              aria-label={empresa ? "Cerrar sesión" : "Salir"}
+              title={empresa ? "Cerrar sesión" : "Salir de la demo"}
             >
               <LogOut className="h-4 w-4" />
             </button>
           </div>
-          <p className={cn("mt-3 whitespace-nowrap text-[10px] text-white/30", compacta && "opacity-0")}>FormatoDigital · v0.1 demo</p>
+          <p className={cn("mt-3 whitespace-nowrap text-[10px] text-white/30", compacta && "opacity-0")}>ControlOne by SOTEC · v0.2{empresa ? "" : " demo"}</p>
         </div>
       </aside>
       {menu && <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px] lg:hidden" onClick={() => setMenu(false)} />}
@@ -502,9 +526,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </button>
             {perfil && (
               <div role="menu" className="absolute right-0 z-50 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
-                <p className="px-2 pb-1 pt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Ver la demo como</p>
+                {empresa ? (
+                  <div className="px-2 pb-2 pt-1">
+                    <p className="truncate text-sm font-medium text-slate-900">{usuario.nombre}</p>
+                    <p className="truncate text-xs text-slate-500">{usuario.email}</p>
+                  </div>
+                ) : (
+                  <p className="px-2 pb-1 pt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Ver la demo como</p>
+                )}
                 {demo.usuarios
-                  .filter((u) => u.activo)
+                  .filter((u) => u.activo && !empresa)
                   .map((u) => (
                     <button
                       key={u.id}
@@ -552,7 +583,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   }}
                   className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-slate-600 hover:bg-slate-50"
                 >
-                  <LogOut className="h-4 w-4" /> Salir de la demo
+                  <LogOut className="h-4 w-4" /> {empresa ? "Cerrar sesión" : "Salir de la demo"}
                 </button>
               </div>
             )}

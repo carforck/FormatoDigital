@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { SIGUIENTES, type CuentaCobro, type EstadoCuentaCobro } from "@/modulos/cobros/tipos";
 import { puedeVerEquipo } from "@/modulos/equipos/logica";
@@ -20,6 +20,19 @@ import {
   proyectosSeed,
 } from "@/nucleo/datos/seed";
 import type { Auditoria, Cliente, Config, Documento, EnlaceFirma, EstadoProyecto, Notificacion, Proyecto, Rol, TipoDoc, Usuario } from "@/nucleo/tipos";
+import {
+  cerrarSesion,
+  guardarEspacio,
+  guardarModo,
+  iniciarSesion,
+  leerEspacio,
+  leerModo,
+  sesionActual,
+  versionEspacio,
+  type Espacio,
+  type Modo,
+  type Sesion,
+} from "@/nucleo/datos/empresa";
 
 // Subir la versión al cambiar la semilla: los navegadores cargan los datos nuevos
 const KEY = "sotec-demo-v8";
@@ -72,6 +85,48 @@ function inicial(): Estado {
   };
 }
 
+/** Espacio vacío de una empresa real: sin datos de ejemplo; la configuración parte de la de SOTEC. */
+function inicialEmpresa(): Estado {
+  return {
+    usuarioId: null,
+    usuarios: [],
+    clientes: [],
+    documentos: [],
+    notificaciones: [],
+    auditoria: [],
+    config: CONFIG_SEED,
+    cuentas: [],
+    proyectos: [],
+    equipos: [],
+    enlaces: [],
+    consecutivos: {},
+  };
+}
+
+/** Estado de la empresa a partir del espacio guardado y la sesión (el usuario y su rol salen de Supabase). */
+function desdeEspacio(e: Espacio, ses: Sesion): Estado {
+  const base = inicialEmpresa();
+  const g = e.estado as Partial<Estado>;
+  const usuarios = g.usuarios ?? [];
+  const yo = usuarios.find((u) => u.id === ses.usuario.id);
+  return {
+    ...base,
+    ...g,
+    config: { ...base.config, ...(g.config ?? {}) },
+    usuarios: yo ? usuarios.map((u) => (u.id === yo.id ? { ...u, rol: ses.usuario.rol, email: ses.usuario.email, activo: true } : u)) : [ses.usuario, ...usuarios],
+    usuarioId: ses.usuario.id,
+  };
+}
+
+/** Lo que se comparte: todo menos el usuario de esta sesión. */
+const compartido = (st: Estado) => JSON.stringify({ ...st, usuarioId: null });
+const KEY_RESPALDO = "fd-empresa-respaldo";
+const KEY_ENTRAR_DEMO = "fd-entrar-demo";
+/** Marca que se acaba de iniciar sesión: /acceso lleva al aplicativo cuando el espacio termina de cargar. */
+export const KEY_TRAS_LOGIN = "fd-tras-login";
+
+export type Sincronizacion = "guardado" | "guardando" | "sin-conexion";
+
 export function ahora(): string {
   // Hora local sin zona, suficiente para la demo
   const d = new Date();
@@ -87,6 +142,13 @@ function uid(p: string) {
 
 interface Api extends Estado, ApiEquipos {
   listo: boolean;
+  /** demo: datos ficticios en el navegador; empresa: espacio real en Supabase. */
+  modo: Modo;
+  /** Nombre de la organización en modo empresa. */
+  organizacion: string | null;
+  sincronizacion: Sincronizacion;
+  /** Login del espacio de la empresa; devuelve el error o null. */
+  entrarEmpresa: (correo: string, clave: string) => Promise<string | null>;
   usuario: Usuario | null;
   visibles: Documento[];
   misNotificaciones: Notificacion[];
@@ -139,12 +201,140 @@ interface Api extends Estado, ApiEquipos {
 
 const Ctx = createContext<Api | null>(null);
 
+/** Elige el modo guardado en el navegador y monta el proveedor de ese modo (al cambiar de modo se monta de cero). */
 export function DemoProvider({ children }: { children: React.ReactNode }) {
-  const [s, setS] = useState<Estado>(inicial);
+  const [modo, setModo] = useState<Modo | null>(null);
+  // Cada cambio (también entrar de nuevo al mismo modo) vuelve a montar y cargar los datos
+  const [montaje, setMontaje] = useState(0);
+  useEffect(() => setModo(leerModo()), []);
+  const cambiarModo = useCallback((m: Modo) => {
+    guardarModo(m);
+    setModo(m);
+    setMontaje((n) => n + 1);
+  }, []);
+  return (
+    <DatosProvider key={`${modo ?? "cargando"}-${montaje}`} modo={modo} cambiarModo={cambiarModo}>
+      {children}
+    </DatosProvider>
+  );
+}
+
+function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactNode; modo: Modo | null; cambiarModo: (m: Modo) => void }) {
+  const [s, setS] = useState<Estado>(() => (modo === "empresa" ? inicialEmpresa() : inicial()));
   const [listo, setListo] = useState(false);
   const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
+  const [organizacion, setOrganizacion] = useState<string | null>(null);
+  const [sincronizacion, setSincronizacion] = useState<Sincronizacion>("guardado");
+  // Modo empresa: organización, versión leída y último estado compartido que quedó guardado
+  const orgId = useRef<string | null>(null);
+  const version = useRef(0);
+  const ultimo = useRef<string | null>(null);
+  const guardando = useRef(false);
+  const sesion = useRef<Sesion | null>(null);
+
+  /** Adopta el espacio de la empresa (al cargar, al detectar cambios de otro equipo o tras un conflicto). */
+  const adoptar = useCallback((e: Espacio, ses: Sesion) => {
+    const st = desdeEspacio(e, ses);
+    version.current = e.version;
+    // Si el espacio ya trae a este usuario no hay nada que guardar; si no (primer ingreso), se guarda con él
+    const conocido = ((e.estado as Partial<Estado>).usuarios ?? []).some((u) => u.id === ses.usuario.id);
+    ultimo.current = conocido ? compartido(st) : null;
+    setS(st);
+  }, []);
+
+  // Modo empresa: sesión, espacio y sincronización con los demás equipos
+  useEffect(() => {
+    if (modo !== "empresa") return;
+    let vivo = true;
+    (async () => {
+      const ses = await sesionActual();
+      if (!vivo) return;
+      if (!ses) {
+        setListo(true);
+        return;
+      }
+      const e = await leerEspacio(ses.organizacionId);
+      if (!vivo) return;
+      if (!e) {
+        setErrorGuardado("No se pudo abrir el espacio de la empresa. Revisa la conexión e intenta de nuevo.");
+        setSincronizacion("sin-conexion");
+        setListo(true);
+        return;
+      }
+      sesion.current = ses;
+      orgId.current = ses.organizacionId;
+      setOrganizacion(ses.organizacion);
+      adoptar(e, ses);
+      setListo(true);
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [modo, adoptar]);
+
+  // Modo empresa: guarda los cambios (agrupados) si nadie más guardó antes
+  useEffect(() => {
+    if (modo !== "empresa" || !listo || !orgId.current || !s.usuarioId) return;
+    const json = compartido(s);
+    if (json === ultimo.current) return;
+    setSincronizacion("guardando");
+    const t = setTimeout(async () => {
+      if (guardando.current || !orgId.current || !sesion.current) return;
+      guardando.current = true;
+      try {
+        localStorage.setItem(KEY_RESPALDO, json);
+      } catch {
+        /* el respaldo local es opcional */
+      }
+      const r = await guardarEspacio(orgId.current, JSON.parse(json), version.current);
+      guardando.current = false;
+      if (typeof r === "number") {
+        version.current = r;
+        ultimo.current = json;
+        setSincronizacion("guardado");
+        setErrorGuardado(null);
+      } else if (r === "conflicto") {
+        const e = await leerEspacio(orgId.current);
+        if (e) adoptar(e, sesion.current);
+        setSincronizacion("guardado");
+        setErrorGuardado("Otra persona guardó cambios al mismo tiempo y se cargaron los datos más recientes. Revisa tu último cambio y vuelve a hacerlo si no aparece.");
+      } else {
+        setSincronizacion("sin-conexion");
+        setErrorGuardado("Sin conexión con el servidor: los cambios no se han guardado. Se reintentará automáticamente.");
+      }
+    }, 700);
+    return () => clearTimeout(t);
+  }, [s, modo, listo, adoptar]);
+
+  // Modo empresa: trae lo que guardaron otros equipos (cada 15 s y al volver a la pestaña); reintenta si quedó sin guardar
+  useEffect(() => {
+    if (modo !== "empresa" || !listo) return;
+    const revisar = async () => {
+      if (!orgId.current || !sesion.current || guardando.current) return;
+      const v = await versionEspacio(orgId.current);
+      if (v === null) {
+        setSincronizacion("sin-conexion");
+        return;
+      }
+      if (v > version.current) {
+        const e = await leerEspacio(orgId.current);
+        if (e && sesion.current) adoptar(e, sesion.current);
+      } else {
+        // Sin cambios ajenos: si algo quedó sin guardar (sin conexión), se fuerza otro intento
+        setS((prev) => ({ ...prev }));
+      }
+    };
+    const id = setInterval(revisar, 15000);
+    const alVolver = () => document.visibilityState === "visible" && revisar();
+    document.addEventListener("visibilitychange", alVolver);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", alVolver);
+    };
+  }, [modo, listo, adoptar]);
 
   useEffect(() => {
+    if (modo !== "demo") return;
     const cargar = (raw: string | null) => {
       if (!raw) return;
       const guardado = JSON.parse(raw);
@@ -159,6 +349,20 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     } catch {
       /* sin almacenamiento: la demo funciona en memoria */
     }
+    // Se eligió un perfil de la demo estando en el modo empresa: se entra al montar la demo
+    try {
+      const p = sessionStorage.getItem(KEY_ENTRAR_DEMO);
+      sessionStorage.removeItem(KEY_ENTRAR_DEMO);
+      if (p) {
+        const { rol, usuarioId } = JSON.parse(p) as { rol: Rol; usuarioId?: string };
+        setS((prev) => {
+          const u = usuarioId ? prev.usuarios.find((x) => x.id === usuarioId) : prev.usuarios.find((x) => x.rol === rol && x.activo);
+          return u ? { ...prev, usuarioId: u.id } : prev;
+        });
+      }
+    } catch {
+      /* ignorar */
+    }
     setListo(true);
     // Otra pestaña guardó: se adopta su estado para no pisarlo con uno viejo
     const sincronizar = (e: StorageEvent) => {
@@ -171,17 +375,17 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     };
     window.addEventListener("storage", sincronizar);
     return () => window.removeEventListener("storage", sincronizar);
-  }, []);
+  }, [modo]);
 
   useEffect(() => {
-    if (!listo) return;
+    if (!listo || modo !== "demo") return;
     try {
       localStorage.setItem(KEY, JSON.stringify(s));
       setErrorGuardado(null);
     } catch {
       setErrorGuardado("El navegador no tiene espacio para guardar más datos de la demo (las fotos ocupan espacio). Quita algunas fotos o restablece la demo en Configuración.");
     }
-  }, [s, listo]);
+  }, [s, listo, modo]);
 
   const usuario = s.usuarios.find((u) => u.id === s.usuarioId) ?? null;
 
@@ -283,7 +487,32 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
           })
         : [],
 
+      modo: modo ?? "demo",
+      organizacion,
+      sincronizacion,
+      async entrarEmpresa(correo, clave) {
+        const error = await iniciarSesion(correo, clave);
+        if (!error) {
+          try {
+            sessionStorage.setItem(KEY_TRAS_LOGIN, "1");
+          } catch {
+            /* ignorar */
+          }
+          cambiarModo("empresa");
+        }
+        return error;
+      },
       entrarComo(rol, usuarioId) {
+        // Los perfiles de prueba son de la demo: si se está en el modo empresa se cambia de modo y se entra al montarla
+        if (modo !== "demo") {
+          try {
+            sessionStorage.setItem(KEY_ENTRAR_DEMO, JSON.stringify({ rol, usuarioId }));
+          } catch {
+            /* ignorar */
+          }
+          cambiarModo("demo");
+          return;
+        }
         setS((prev) => {
           const u = usuarioId ? prev.usuarios.find((x) => x.id === usuarioId) : prev.usuarios.find((x) => x.rol === rol && x.activo);
           if (!u) return prev;
@@ -300,6 +529,11 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         });
       },
       salir() {
+        if (modo === "empresa") {
+          void cerrarSesion();
+          sesion.current = null;
+          orgId.current = null;
+        }
         setS((prev) => ({ ...prev, usuarioId: null }));
       },
 
@@ -714,10 +948,12 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       },
 
       reiniciar() {
+        // Solo la demo se restablece; el espacio de la empresa nunca se borra desde aquí
+        if (modo !== "demo") return;
         setS((prev) => ({ ...inicial(), usuarioId: prev.usuarioId }));
       },
     };
-  }, [s, listo, usuario, registrar, transicion, errorGuardado]);
+  }, [s, listo, usuario, registrar, transicion, errorGuardado, modo, organizacion, sincronizacion, cambiarModo]);
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 }

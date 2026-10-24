@@ -154,22 +154,24 @@ export default function Config() {
         </ul>
       </section>
 
-      <section className="rounded-xl border border-rose-200 bg-rose-50 p-4">
-        <h2 className="font-semibold text-rose-900">Restablecer la demo</h2>
-        <p className="text-sm text-rose-800">Vuelve a los datos de ejemplo iniciales. Útil antes de cada presentación.</p>
-        <Button
-          variant="outline"
-          className="mt-3"
-          onClick={() => {
-            if (confirm("¿Restablecer todos los datos de la demo?")) {
-              demo.reiniciar();
-              setC(CONFIG_SEED);
-            }
-          }}
-        >
-          <RotateCcw className="h-4 w-4" /> Restablecer datos
-        </Button>
-      </section>
+      {demo.modo === "demo" && (
+        <section className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+          <h2 className="font-semibold text-rose-900">Restablecer la demo</h2>
+          <p className="text-sm text-rose-800">Vuelve a los datos de ejemplo iniciales. Útil antes de cada presentación.</p>
+          <Button
+            variant="outline"
+            className="mt-3"
+            onClick={() => {
+              if (confirm("¿Restablecer todos los datos de la demo?")) {
+                demo.reiniciar();
+                setC(CONFIG_SEED);
+              }
+            }}
+          >
+            <RotateCcw className="h-4 w-4" /> Restablecer datos
+          </Button>
+        </section>
+      )}
     </div>
   );
 }

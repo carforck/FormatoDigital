@@ -120,3 +120,27 @@ export async function guardarEspacio(organizacionId: string, estado: unknown, ve
   if (error) return "error";
   return data?.length ? Number(data[0].version) : "conflicto";
 }
+
+export interface UsuarioEmpresa {
+  id: string;
+  email: string;
+  nombre: string;
+  cargo: string;
+  rol: Exclude<Rol, "cliente">;
+  activo: boolean;
+}
+
+/** Llama a /api/usuarios con la sesión actual; lanza Error con el mensaje del servidor. */
+export async function apiUsuarios<T>(metodo: "GET" | "POST" | "PATCH" | "DELETE", cuerpo?: unknown, id?: string): Promise<T> {
+  const { data } = (await supabase()?.auth.getSession()) ?? { data: { session: null } };
+  const token = data.session?.access_token;
+  if (!token) throw new Error("Sesión vencida. Vuelve a iniciar sesión.");
+  const r = await fetch(`/api/usuarios${id ? `?id=${encodeURIComponent(id)}` : ""}`, {
+    method: metodo,
+    headers: { Authorization: `Bearer ${token}`, ...(cuerpo ? { "Content-Type": "application/json" } : {}) },
+    body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error ?? "No se pudo completar la operación.");
+  return j as T;
+}

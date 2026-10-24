@@ -1,3 +1,7 @@
+/**
+ * Layout de /imprimir: sin AppShell (página limpia para imprimir o guardar en PDF)
+ * y fuera de los buscadores (robots noindex).
+ */
 import type { Metadata } from "next";
 
 // El título definitivo (nombre del PDF) lo pone la página con el consecutivo del documento

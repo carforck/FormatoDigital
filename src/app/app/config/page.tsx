@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Ruta /app/config: datos de la empresa, prefijos de consecutivos, vigencia de permisos,
+ * datos bancarios e IVA de las cuentas de cobro y reglas del flujo; lista los módulos y
+ * formatos de @/modulos/registro. Solo la administración (permiso `config`). En modo demo
+ * permite restablecer los datos de ejemplo.
+ */
 import { useState } from "react";
 import { RotateCcw, Save } from "lucide-react";
 
@@ -10,6 +16,7 @@ import { MODULOS, TIPOS_DOC, formatoDe, prefijoDe } from "@/modulos/registro";
 import { CONFIG_SEED } from "@/nucleo/datos/seed";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 
+/** Formulario local (copia de demo.config) que se aplica con demo.actualizarConfig al guardar. */
 export default function Config() {
   const demo = useDemo();
   const [c, setC] = useState(demo.config);
@@ -32,6 +39,7 @@ export default function Config() {
         {/* Un prefijo por formato registrado (los módulos nuevos aparecen solos) */}
         {TIPOS_DOC.map((t) => {
           const valor = prefijoDe(c, t);
+          // Reporte, permiso y gasto tienen campo propio en Config (legado); los demás tipos van en `prefijos`
           const cambiar = (v: string) => {
             const p = v.toUpperCase();
             if (t === "reporte") return setC({ ...c, prefijoReporte: p });

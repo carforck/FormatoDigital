@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Ruta /app/cobros: listado de cuentas de cobro con indicadores (por cobrar, pagado,
+ * borradores). Acceso con `ver_cobros`: la administración ve y crea todas (`cobros`);
+ * el cliente solo consulta las emitidas a su empresa (demo.cuentasVisibles, filtradas
+ * con puedeVerCuenta de @/nucleo/permisos).
+ */
 import Link from "next/link";
 import { marcarEdicion } from "@/components/ui/volver";
 import { CircleDollarSign, Clock, Plus, Receipt } from "lucide-react";
@@ -14,6 +20,7 @@ import { cop } from "@/nucleo/letras";
 import { puede } from "@/nucleo/permisos";
 import { rutaCuenta } from "@/nucleo/rutas";
 
+/** Listado de cuentas de cobro, de la más reciente (mayor consecutivo) a la más antigua. */
 export default function Cobros() {
   const demo = useDemo();
   const u = demo.usuario!;

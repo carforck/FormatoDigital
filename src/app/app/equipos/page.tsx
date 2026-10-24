@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * Ruta /app/equipos: inventario de equipos de los clientes agrupado por sistema, con el
+ * resumen de reportes de cada equipo. El personal interno primero elige el cliente; el
+ * cliente ve solo los de su empresa (puedeVerEquipo de @/modulos/equipos/logica).
+ * Query params (filtros compartibles): ?cliente=<id> y ?sistema=<clave>.
+ * Registrar equipos requiere `equipos` (técnico, SST, administración). Datos: useEquipos()
+ * (alias de useDemo()).
+ */
 import Link from "next/link";
 import { marcarEdicion } from "@/components/ui/volver";
 import { Suspense, useState } from "react";
@@ -16,6 +24,7 @@ import type { Equipo } from "@/modulos/equipos/tipos";
 import { useEquipos } from "@/modulos/equipos/useEquipos";
 
 
+/** Listado con filtros en la URL (cliente, sistema) y búsqueda y «ver retirados» locales. */
 function Equipos() {
   const demo = useEquipos();
   const u = demo.usuario!;
@@ -29,6 +38,7 @@ function Equipos() {
   // El cliente ve solo su empresa; el equipo interno elige el cliente (queda en la URL para compartir o volver)
   const clienteId = interno ? params.get("cliente") ?? "" : u.clienteId ?? "";
   const sistema = params.get("sistema") ?? "";
+  /** Actualiza los query params con replace (sin nueva entrada de historial ni salto de scroll). */
   const ir = (cambios: Record<string, string>) => {
     const sp = new URLSearchParams(params.toString());
     for (const [k, v] of Object.entries(cambios)) (v ? sp.set(k, v) : sp.delete(k));
@@ -194,6 +204,7 @@ function Equipos() {
   );
 }
 
+/** Tarjeta de un equipo: estado, tipo/marca/modelo, ubicación y número de reportes con la fecha del último. */
 function TarjetaEquipo({ e, href, resumen, cliente }: { e: Equipo; href: string; resumen?: { n: number; ultimo: string }; cliente?: string }) {
   const detalle = [e.tipo, [e.marca, e.modelo].filter(Boolean).join(" ")].filter(Boolean).join(" · ");
   return (
@@ -224,6 +235,7 @@ function TarjetaEquipo({ e, href, resumen, cliente }: { e: Equipo; href: string;
   );
 }
 
+/** Suspense requerido por useSearchParams. */
 export default function Page() {
   return (
     <Suspense>

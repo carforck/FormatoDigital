@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Ruta /app/proyectos/editar: formulario de proyecto. Con ?id= edita uno existente;
+ * sin él crea uno nuevo (?cliente= lo precarga con su sitio habitual). Permiso
+ * `proyectos` (Coordinador SST y administración; AppShell bloquea al resto). Guarda con
+ * demo.guardarProyecto de useDemo().
+ */
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -142,6 +148,7 @@ function Editar() {
   );
 }
 
+/** Suspense requerido por useSearchParams. */
 export default function Page() {
   return (
     <Suspense>

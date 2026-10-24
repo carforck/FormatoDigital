@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Ruta /app/mapa: mapa del sistema con tres pestañas (módulos y flujo, base de datos,
+ * roles y permisos), enlazables por hash (#modulos, #db, #roles). Solo la administración
+ * (permiso `mapa`). Lee @/modulos/registro, @/nucleo/permisos y el esquema generado
+ * en @/components/mapa/esquema.json.
+ */
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { Database, Network, ShieldCheck } from "lucide-react";
@@ -9,6 +15,7 @@ import { COMANDO_ESQUEMA, ESQUEMA } from "@/components/mapa/esquema";
 import MatrizRoles from "@/components/mapa/MatrizRoles";
 import { cn } from "@/lib/utils";
 
+/** Marcador de posición mientras se descarga el diagrama (carga diferida). */
 function Cargando() {
   return (
     <div className="flex h-[64svh] min-h-[420px] items-center justify-center rounded-xl border border-slate-200 bg-white text-sm text-slate-500 lg:h-[72vh]">
@@ -28,6 +35,7 @@ const VISTAS = [
 ] as const;
 type Vista = (typeof VISTAS)[number]["id"];
 
+/** Pestañas accesibles (role="tablist", flechas izquierda/derecha) sincronizadas con el hash de la URL. */
 export default function MapaSistema() {
   const [vista, setVista] = useState<Vista>("modulos");
 

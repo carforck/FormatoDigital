@@ -1,8 +1,15 @@
+/**
+ * Estilos globales (importados por src/app/layout.tsx): variables de tema estilo shadcn
+ * (HSL), reglas de impresión de los documentos (.doc-print, .doc-zona, /imprimir con
+ * .fd-impresion), animaciones de íconos, modo oscuro del aplicativo (.dark, lo pone
+ * AppShell) y colores de las series de las gráficas (--serie-a … --serie-e).
+ */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  /* Tokens de color del tema claro (HSL sin hsl(); Tailwind los envuelve en tailwind.config) */
   :root {
     --background: 0 0% 100%;
     --foreground: 0 0% 10%;
@@ -127,6 +134,7 @@
   --serie-d: #D9963A;
   --serie-e: #3FB0AC;
 }
+/* Series de las gráficas en tema claro (el modo oscuro las redefine arriba en .dark) */
 :root { --serie-a: #4F6FD0; --serie-b: #4E9A2A; --serie-c: #9A6BD8; --serie-d: #B9741C; --serie-e: #1F8C88; }
 
 /* Superficies */

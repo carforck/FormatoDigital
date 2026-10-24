@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Ruta /app/cobros/nueva: crear o editar (solo en borrador, ?id=) una cuenta de cobro, con
+ * vista previa en vivo. Precarga con ?proyecto=, ?cliente= y ?reporte= (un reporte cobrable);
+ * ?desde= define el regreso. Solo la administración (permiso `cobros`; AppShell bloquea al
+ * resto). Guarda y emite con demo.guardarCuenta / demo.cambiarEstadoCuenta de useDemo().
+ */
 import { Suspense, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -16,6 +22,11 @@ import { ahora, hoy, useDemo } from "@/nucleo/datos/DemoProvider";
 import { cop } from "@/nucleo/letras";
 import { rutaCuenta } from "@/nucleo/rutas";
 
+/**
+ * Formulario de la cuenta. Un reporte solo se puede cobrar una vez: aprobado o cerrado, del
+ * cliente (y proyecto) elegido y sin otra cuenta activa. Cambiar cliente o proyecto quita
+ * los ítems ligados a reportes; los ítems libres se conservan.
+ */
 function Nueva() {
   const demo = useDemo();
   const router = useRouter();
@@ -77,6 +88,7 @@ function Nueva() {
   const incluido = (docId: string) => cuenta.items.some((i) => i.documentoId === docId);
   const { total } = totales(cuenta);
 
+  /** Valida, guarda y opcionalmente emite (emitir exige ítems con descripción, cantidad y valor > 0). */
   function guardar(emitir: boolean) {
     if (!cuenta.clienteId) return setAviso("Elige el cliente.");
     if (!cuenta.concepto.trim()) return setAviso("Escribe el concepto.");
@@ -264,6 +276,7 @@ function Nueva() {
   );
 }
 
+/** Suspense requerido por useSearchParams. */
 export default function Page() {
   return (
     <Suspense>

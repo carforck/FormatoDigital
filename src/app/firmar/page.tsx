@@ -1,6 +1,12 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+/**
+ * Ruta pública /firmar?t=<token>: el cliente firma un reporte técnico sin iniciar sesión,
+ * desde el enlace enviado por correo o WhatsApp. Valida el token con demo.enlaceVigente y
+ * registra la firma con demo.firmarConEnlace (@/nucleo/datos/DemoProvider). En la demo el
+ * enlace solo funciona en el navegador donde se generó.
+ */
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Lock, PenLine, ShieldAlert } from "lucide-react";
@@ -118,6 +124,7 @@ function Firmar() {
   );
 }
 
+/** useSearchParams exige un límite de Suspense en el prerenderizado estático. */
 export default function Page() {
   return (
     <Suspense>

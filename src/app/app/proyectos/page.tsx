@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Ruta /app/proyectos: listado de proyectos (obras) con búsqueda y filtros, conteo de
+ * documentos por tipo, cotizado/cobrado y presupuesto. Todos los perfiles entran; cada
+ * uno ve solo demo.proyectosVisibles (puedeVerProyecto) y los módulos que puede usar.
+ * Crear proyecto requiere el permiso `proyectos` (Coordinador SST y administración).
+ */
 import Link from "next/link";
 import { marcarEdicion } from "@/components/ui/volver";
 import { useState } from "react";
@@ -19,6 +25,7 @@ import { resumenProyecto } from "@/nucleo/proyectos";
 import { rutaProyecto } from "@/nucleo/rutas";
 import type { EstadoProyecto } from "@/nucleo/tipos";
 
+/** Tarjetas ordenadas por estado (activo, en pausa, cerrado) y, dentro de cada uno, por inicio más reciente. */
 export default function Proyectos() {
   const demo = useDemo();
   const u = demo.usuario!;
@@ -104,6 +111,7 @@ export default function Proyectos() {
       ) : (
         <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {lista.map((p) => {
+            // Totales calculados solo con lo que el perfil puede ver (visibles y cuentasVisibles)
             const r = resumenProyecto(p, demo.visibles, demo.cuentasVisibles);
             return (
               <li key={p.id} className="min-w-0">

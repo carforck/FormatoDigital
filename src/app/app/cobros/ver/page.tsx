@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Ruta /app/cobros/ver?id=<cuenta>: detalle de una cuenta de cobro con su plantilla,
+ * soportes (reportes facturados) y trazabilidad. ?desde= define a dónde regresa «Volver».
+ * La administración (`cobros`) edita, emite, envía, marca pagada o anula; el cliente solo
+ * consulta las emitidas a su empresa (puedeVerCuenta de @/nucleo/permisos).
+ */
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -17,6 +23,10 @@ import { cop } from "@/nucleo/letras";
 import { puede, puedeVerCuenta } from "@/nucleo/permisos";
 import { rutaDoc, rutaProyecto } from "@/nucleo/rutas";
 
+/**
+ * Contenido del detalle. Ciclo de estados: borrador → emitida → enviada → pagada, o
+ * anulada (libera sus reportes para cobrarse en otra cuenta).
+ */
 function Ver() {
   const id = useSearchParams().get("id") ?? "";
   const router = useRouter();
@@ -161,6 +171,7 @@ function Ver() {
   );
 }
 
+/** Suspense requerido por useSearchParams. */
 export default function Page() {
   return (
     <Suspense>

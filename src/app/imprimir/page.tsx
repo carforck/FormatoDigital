@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Ruta /imprimir: hoja limpia para imprimir o guardar en PDF un documento, una cuenta de
+ * cobro o el borrador del generador (se abre con abrirImpresion de @/nucleo/impresion).
+ * Cualquier perfil con sesión, sujeto a puedeVerDoc / puedeVerCuenta. Otros params:
+ * ?volver= (regreso, solo rutas /app), ?n= (evita reimprimir al recargar), ?auto=0 (no imprime solo).
+ */
 import Link from "next/link";
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -155,6 +161,7 @@ function Imprimir() {
     window.print();
   };
 
+  /** «Volver»: si se abrió desde el aplicativo en esta pestaña usa «atrás»; si no, reemplaza por ?volver=. */
   const regresar = () => {
     let origen: string | null = null;
     try {
@@ -219,6 +226,7 @@ function Imprimir() {
   );
 }
 
+/** Suspense requerido por useSearchParams. */
 export default function Page() {
   return (
     <Suspense>

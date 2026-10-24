@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Ruta /app/documentos/ver?id=<doc>: detalle de un documento con su plantilla y todas las
+ * acciones del flujo (editar, enviar, aprobar/rechazar, firmar, cerrar, duplicar, pedir
+ * firma por enlace, enviar, cobrar, PDF). Cada acción se habilita según @/nucleo/permisos y
+ * el `flujo` del módulo (@/modulos/registro). Params: ?desde= (regreso), ?ok=guardado|enviado.
+ */
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useRef, useState } from "react";
@@ -22,6 +28,10 @@ import type { DatosPermiso } from "@/nucleo/tipos";
 import { faltantes } from "@/nucleo/validar";
 import { clienteDoc, empresaDe, infoDoc, rutaNuevo } from "@/modulos/registro";
 
+/**
+ * Contenido del detalle. Reglas clave: solo el autor edita (borrador o rechazado); nadie
+ * revisa lo propio; el cierre depende del formato (formulario, firma del cliente o revisor).
+ */
 function Detalle() {
   const params = useSearchParams();
   const id = params.get("id") ?? "";
@@ -369,6 +379,7 @@ function DialogoRechazo({ codigo, motivo, setMotivo, onRechazar }: { codigo: str
   );
 }
 
+/** Suspense requerido por useSearchParams. */
 export default function Page() {
   return (
     <Suspense>

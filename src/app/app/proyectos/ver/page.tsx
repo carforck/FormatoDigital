@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Ruta /app/proyectos/ver?id=<proyecto>: ficha del proyecto con indicadores (documentos,
+ * cotizado, gastos, cobrado), accesos para crear documentos o cuentas ya ligados al
+ * proyecto y pestañas por tipo. Visible según puedeVerProyecto; editar, pausar, cerrar y
+ * eliminar requieren `proyectos`. Todo se calcula con lo visible para el perfil (resumenProyecto).
+ */
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -20,8 +26,10 @@ import { resumenProyecto } from "@/nucleo/proyectos";
 import { rutaCuenta, rutaDoc } from "@/nucleo/rutas";
 import type { TipoDoc } from "@/nucleo/tipos";
 
+/** Pestaña activa: todos, un tipo de documento o las cuentas de cobro. */
 type Pestana = "todos" | TipoDoc | "cobros";
 
+/** Contenido de la ficha (bloquea el acceso si el perfil no puede ver el proyecto). */
 function Detalle() {
   const id = useSearchParams().get("id") ?? "";
   const demo = useDemo();
@@ -318,6 +326,7 @@ function Detalle() {
   );
 }
 
+/** Suspense requerido por useSearchParams. */
 export default function Page() {
   return (
     <Suspense>

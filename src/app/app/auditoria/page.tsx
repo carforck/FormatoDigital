@@ -1,8 +1,14 @@
 "use client";
 
+/**
+ * Ruta /app/auditoria: registro de quién hizo qué y cuándo (demo.auditoria de useDemo()).
+ * Solo la administración (permiso `auditoria`; AppShell bloquea al resto).
+ * Celular: línea de tiempo; escritorio: tabla.
+ */
 import { Avatar, PageHeader } from "@/components/ui/corporativo";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 
+/** Listado de solo lectura de los eventos de auditoría. */
 export default function Auditoria() {
   const demo = useDemo();
   const nombre = (id: string) => demo.usuarios.find((u) => u.id === id)?.nombre ?? id;

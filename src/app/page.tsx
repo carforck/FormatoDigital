@@ -1,4 +1,10 @@
 /* eslint-disable @next/next/no-img-element */
+/**
+ * Ruta pública /: landing comercial de ControlOne by SOTEC (hero, caso SOTEC, funciones,
+ * roles, impacto, calculadora de ROI, planes, FAQ y contacto). Componente de servidor:
+ * la interactividad vive en los componentes cliente de @/components/landing y
+ * @/components/fx. Los CTA llevan a /acceso.
+ */
 import Link from "next/link";
 import {
   ArrowRight,
@@ -24,6 +30,7 @@ import { FuncionesBento } from "@/components/landing/FuncionesBento";
 import { LottieDigitaliza } from "@/components/landing/LottieDigitaliza";
 import { PapelVsDigital } from "@/components/landing/PapelVsDigital";
 
+/** Formatos de ejemplo de la sección «Formatos que digitalizamos» (dos filas en carrusel, una invertida). */
 const FORMATOS_TIPICOS = [
   "Permisos de trabajo",
   "Análisis de trabajo seguro (ATS)",
@@ -41,6 +48,7 @@ const FORMATOS_TIPICOS = [
   "Inspección preoperacional de vehículos",
 ];
 
+/** Página de presentación; los anclajes (#formatos, #impacto, #planes…) los usa la navegación superior. */
 export default function Landing() {
   return (
     <div className="bg-white text-slate-900">

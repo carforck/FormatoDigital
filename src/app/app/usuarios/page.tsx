@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Ruta /app/usuarios: gestión de usuarios y roles (solo la administración, permiso
+ * `usuarios`). En modo empresa delega en PanelUsuariosEmpresa (cuentas reales vía
+ * /api/usuarios); en modo demo edita rol, empresa cliente y activación en local con
+ * demo.actualizarUsuario. Siempre muestra la matriz de permisos de @/nucleo/permisos.
+ */
 import { useState } from "react";
 import { Check, Minus, Plus } from "lucide-react";
 
@@ -14,6 +20,10 @@ import type { Rol } from "@/nucleo/tipos";
 
 const ROLES = Object.keys(ETIQUETA_ROL) as Rol[];
 
+/**
+ * El propio usuario no puede cambiarse el rol ni desactivarse (evita quedarse sin acceso).
+ * Un usuario con rol Cliente siempre queda ligado a una empresa cliente.
+ */
 export default function Usuarios() {
   const demo = useDemo();
   const [nuevo, setNuevo] = useState({ nombre: "", email: "", cargo: "", rol: "tecnico" as Rol, clienteId: "" });

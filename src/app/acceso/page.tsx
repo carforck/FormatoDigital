@@ -1,6 +1,12 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+/**
+ * Ruta pública /acceso: dos entradas. (1) Iniciar sesión en el espacio de la empresa
+ * (modo empresa, datos reales: demo.entrarEmpresa). (2) Demo corporativa sin credenciales:
+ * elegir un perfil de @/nucleo/perfiles (demo.entrarComo) y caer en su pantalla inicial.
+ * Si ya hay sesión abierta ofrece «Continuar como…».
+ */
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -26,6 +32,7 @@ import { ETIQUETA_ROL } from "@/nucleo/catalogos";
 import { cn } from "@/lib/utils";
 import { LottieControl } from "@/components/acceso/LottieControl";
 
+/** Beneficios del panel de marca: [título, descripción]. */
 const BENEFICIOS = [
   ["Un solo lugar para toda la empresa", "Reportes, permisos de trabajo, aprobaciones, proyectos, equipos y cuentas de cobro."],
   ["Tu equipo, sincronizado", "Lo que guarda un técnico en campo lo ve la coordinación en la oficina, al instante."],
@@ -41,6 +48,7 @@ const RESUMEN_ROL: Record<string, string> = {
   cliente: "Consulta y firma los reportes de su empresa",
 };
 
+/** Anillo de foco visible (accesibilidad con teclado) compartido por enlaces y botones. */
 const ANILLO = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sotec-greenDeep focus-visible:ring-offset-2";
 
 /** Enlace para retomar una sesión abierta sin volver a entrar. */
@@ -61,6 +69,10 @@ function Continuar({ nombre, rol }: { nombre: string; rol: string }) {
   );
 }
 
+/**
+ * El inicio de sesión cambia al modo empresa y deja KEY_TRAS_LOGIN en sessionStorage; el
+ * efecto espera a que el espacio cargue (demo.listo) para entrar a /app o mostrar el error.
+ */
 export default function Acceso() {
   const demo = useDemo();
   const router = useRouter();
@@ -322,6 +334,7 @@ export default function Acceso() {
                       type="button"
                       onClick={() => {
                         demo.entrarComo(p.rol);
+                        // Cada perfil arranca donde más luce: técnico en el generador, SST en la bandeja de revisión
                         router.push(p.rol === "tecnico" ? "/app/nuevo/reporte" : p.rol === "supervisor" ? "/app/revision" : "/app");
                       }}
                       className={cn(

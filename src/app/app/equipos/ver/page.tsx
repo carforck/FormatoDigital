@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Ruta /app/equipos/ver: ficha de un equipo (?id=<equipo>) con su historial de reportes, o
+ * formulario de alta (?nuevo=1, con ?cliente= y ?sistema= precargados). ?desde= define el
+ * regreso y ?ok=creado muestra el aviso tras registrar. Ver: puedeVerEquipo; registrar y
+ * editar: puedeEditarEquipos (`equipos`); eliminar sin reportes: admin y SST. Datos: useEquipos().
+ */
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -17,8 +23,10 @@ import { formatoDe, tituloDoc } from "@/modulos/registro";
 import { puede } from "@/nucleo/permisos";
 import { rutaDoc, rutaProyecto } from "@/nucleo/rutas";
 
+/** Clases comunes de los campos del formulario. */
 const campo = "h-10 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800";
 
+/** Una sola página con dos modos: formulario (crear/editar, `vigente`) o ficha de lectura. */
 function Ficha() {
   const params = useSearchParams();
   const router = useRouter();
@@ -29,6 +37,7 @@ function Ficha() {
   const edita = puedeEditarEquipos(u.rol);
   const existente = demo.equipos.find((e) => e.id === id);
 
+  /** Equipo en blanco para el alta; el id, las fechas y el historial los asigna guardarEquipo. */
   const vacio = (): Equipo => {
     const sis = params.get("sistema") ?? "";
     return {
@@ -111,6 +120,7 @@ function Ficha() {
     setAviso("Cambios guardados.");
   }
 
+  /** Cambia el estado del equipo; retirar pide confirmación (se conserva el historial). */
   function estado(est: EstadoEquipo) {
     if (!existente) return;
     if (est === "retirado" && !confirm(`¿Retirar «${existente.nombre}»? Deja de ofrecerse en los reportes nuevos; su historial se conserva y puedes reactivarlo.`)) return;
@@ -119,6 +129,7 @@ function Ficha() {
     setAviso(err ? null : `Estado: ${ETIQUETA_ESTADO_EQUIPO[est]}.`);
   }
 
+  /** Elimina el equipo (solo sin reportes) y regresa al listado. */
   function eliminar() {
     if (!existente || !confirm(`¿Eliminar «${existente.nombre}» del inventario? Esta acción no se puede deshacer.`)) return;
     const err = demo.eliminarEquipo(existente.id);
@@ -408,6 +419,7 @@ function Ficha() {
   );
 }
 
+/** Suspense requerido por useSearchParams. */
 export default function Page() {
   return (
     <Suspense>

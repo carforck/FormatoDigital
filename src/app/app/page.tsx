@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Ruta /app: tablero de inicio, distinto según el rol. Filtros (período o mes, formato,
+ * estado, cliente, proyecto, técnico) que aplican a indicadores con variación contra el
+ * período anterior, gráficas, productividad por técnico (solo quien ve al equipo), finanzas
+ * (cartera: administración; gastos: revisores) y la bandeja de pendientes del perfil.
+ * Datos: demo.visibles / cuentasVisibles de useDemo(); cálculos en @/nucleo/indicadores.
+ */
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowRight, CalendarDays, CheckCircle2, Clock, FileSignature, FileText, FilterX, FolderKanban, Gauge, HardHat, Hourglass, PenLine, Receipt, RotateCcw, Timer, UserRound, Wallet } from "lucide-react";
@@ -36,12 +43,16 @@ import { puede, puedeCrearTipo } from "@/nucleo/permisos";
 import { rutaDoc } from "@/nucleo/rutas";
 import type { Documento, Estado, TipoDoc } from "@/nucleo/tipos";
 
+/** Proporción 0–1 como porcentaje entero; «—» si no hay datos. */
 const pct = (n: number | null) => (n === null ? "—" : `${Math.round(n * 100)} %`);
 /** Colores de la dona por estado (mismos tonos de los badges). */
 const COLOR_ESTADO: Record<Estado, string> = { borrador: "#94A3B8", en_revision: "#D9963A", aprobado: "var(--serie-a)", cerrado: "var(--serie-b)", rechazado: "#E11D48" };
+/** Horas decimales como «X h MM min»; «—» si no hay datos. */
 const duracion = (h: number | null) => (h === null ? "—" : `${Math.floor(h)} h ${String(Math.round((h % 1) * 60)).padStart(2, "0")} min`);
+/** Horas legibles: en horas por debajo de un día, en días desde 24 h. */
 const horas = (h: number | null) => (h === null ? "—" : h < 24 ? `${h.toLocaleString("es-CO", { maximumFractionDigits: 1 })} h` : `${(h / 24).toLocaleString("es-CO", { maximumFractionDigits: 1 })} días`);
 
+/** Tablero del perfil activo; todos los filtros son estado local (no van en la URL). */
 export default function Tablero() {
   const demo = useDemo();
   const u = demo.usuario!;

@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Ruta /app/documentos: listado de los documentos visibles para el perfil
+ * (demo.visibles, filtrados con puedeVerDoc de @/nucleo/permisos) con búsqueda y filtros
+ * por formato, estado, cliente y proyecto. Query params: ?q= (búsqueda inicial) y
+ * ?proyecto=<id> o ?proyecto=ninguno (sin proyecto). Todos los perfiles.
+ */
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -17,6 +23,7 @@ import { TIPOS_DOC, clienteDoc, formatoDe, rutaNuevo, tituloDoc } from "@/modulo
 import { puedeCrearTipo } from "@/nucleo/permisos";
 import { IconoDoc } from "@/components/ui/icono-doc";
 
+/** Suspense requerido por useSearchParams. */
 export default function Page() {
   return (
     <Suspense>
@@ -25,11 +32,16 @@ export default function Page() {
   );
 }
 
+/**
+ * Remonta el listado cuando cambian ?q= o ?proyecto=: los filtros son estado local que
+ * solo se inicializa desde la URL, así un enlace nuevo los reinicia.
+ */
 function ConClave() {
   const p = useSearchParams();
   return <Documentos key={`${p.get("q") ?? ""}-${p.get("proyecto") ?? ""}`} />;
 }
 
+/** Tabla (tarjetas en celular) con filtros locales; la búsqueda incluye todo el contenido del documento. */
 function Documentos() {
   const demo = useDemo();
   const params = useSearchParams();

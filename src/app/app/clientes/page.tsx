@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Ruta /app/clientes: directorio de clientes que el asistente usa para autocompletar los
+ * formatos. Crear, editar, desactivar/reactivar y eliminar (demo.guardarCliente,
+ * cambiarActivoCliente, eliminarCliente de useDemo()). Permiso `clientes`: Coordinador SST
+ * (supervisor) y administración.
+ */
 import { useState } from "react";
 import { Plus, Power, Trash2 } from "lucide-react";
 
@@ -11,7 +17,9 @@ import { useDemo } from "@/nucleo/datos/DemoProvider";
 import type { Cliente } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 
+/** Cliente en blanco para el formulario de alta (el id se genera al abrir). */
 const VACIO: Cliente = { id: "", nombre: "", nit: "", direccion: "", contacto: "", cargo: "", correo: "", telefono: "", sitio: "" };
+/** Campos editables del formulario con su etiqueta (`activo` se maneja con el botón Desactivar/Reactivar). */
 const CAMPOS: [Exclude<keyof Cliente, "activo">, string][] = [
   ["nombre", "Razón social"],
   ["nit", "NIT o C.C."],
@@ -23,6 +31,10 @@ const CAMPOS: [Exclude<keyof Cliente, "activo">, string][] = [
   ["sitio", "Sitio de trabajo habitual"],
 ];
 
+/**
+ * Tarjetas de clientes y formulario en línea. Desactivar conserva el historial; eliminar
+ * puede fallar (p. ej. si tiene documentos o proyectos) y el motivo se muestra en `aviso`.
+ */
 export default function Clientes() {
   const demo = useDemo();
   const [form, setForm] = useState<Cliente | null>(null);

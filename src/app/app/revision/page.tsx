@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Ruta /app/revision: bandeja del revisor. Muestra los documentos en revisión (más
+ * antiguos primero) y los aprobados que cierra SST. Para perfiles con permiso `revisar`
+ * (supervisor/Coordinador SST y administración). Cada tarjeta abre el detalle con
+ * ?desde=revision para volver aquí. Datos: demo.visibles de useDemo().
+ */
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
@@ -11,6 +17,7 @@ import { faltantes } from "@/nucleo/validar";
 import { clienteDoc, formatoDe, infoDoc, tituloDoc } from "@/modulos/registro";
 import { IconoDoc } from "@/components/ui/icono-doc";
 
+/** Bandeja de revisión y de cierre pendiente. */
 export default function Revision() {
   const demo = useDemo();
   const cola = demo.visibles.filter((d) => d.estado === "en_revision").sort((a, b) => a.creado.localeCompare(b.creado));
@@ -18,6 +25,7 @@ export default function Revision() {
   const porCerrar = demo.visibles.filter((d) => d.estado === "aprobado" && infoDoc(d.tipo).flujo.cierre !== "cliente");
   const autor = (id: string) => demo.usuarios.find((u) => u.id === id)?.nombre ?? "—";
 
+  /** Tarjeta de un documento con el resultado de la validación automática (faltantes) y el llamado a la acción. */
   const tarjeta = (d: (typeof cola)[number], cta: string) => {
     const p = faltantes(d);
     return (

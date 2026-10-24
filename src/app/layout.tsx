@@ -1,9 +1,15 @@
+/**
+ * Layout raíz de toda la app (landing, /acceso, /app/**, /firmar, /imprimir): fuente
+ * Geist, estilos globales, metadatos SEO/Open Graph y el DemoProvider
+ * (@/nucleo/datos/DemoProvider), que da a todas las páginas los datos y la sesión vía useDemo().
+ */
 import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import "./globals.css";
 
 import { DemoProvider } from "@/nucleo/datos/DemoProvider";
 
+/** URL pública del sitio; base para resolver las URLs relativas de los metadatos (og:image, etc.). */
 const SITIO = process.env.NEXT_PUBLIC_SITE_URL ?? "https://controlone.sotecse.com";
 const TITULO = "ControlOne by SOTEC · Toda tu empresa, un solo control";
 const DESCRIPCION =

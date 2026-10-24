@@ -1,7 +1,8 @@
 /**
  * Layout raíz de toda la app (landing, /acceso, /app/**, /firmar, /imprimir, /offline): fuente
  * Geist, estilos globales, metadatos SEO/Open Graph, los de la app instalable (manifiesto en
- * ./manifest.ts, íconos de public/iconos y `appleWebApp` para iOS) y el DemoProvider (@/nucleo/datos/DemoProvider), que da a todas las
+ * ./manifest.ts, íconos de public/iconos y `appleWebApp` para iOS), el registro del service
+ * worker (RegistroPWA) y el DemoProvider (@/nucleo/datos/DemoProvider), que da a todas las
  * páginas los datos y la sesión vía useDemo().
  */
 import type { Metadata, Viewport } from "next";
@@ -9,6 +10,7 @@ import { GeistSans } from "geist/font/sans";
 import "./globals.css";
 
 import { DemoProvider } from "@/nucleo/datos/DemoProvider";
+import { RegistroPWA } from "@/components/pwa/RegistroPWA";
 
 /** URL pública del sitio; base para resolver las URLs relativas de los metadatos (og:image, etc.). */
 const SITIO = process.env.NEXT_PUBLIC_SITE_URL ?? "https://controlone.sotecse.com";
@@ -52,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es-CO" className={GeistSans.variable}>
       <body className="min-h-screen font-sans">
+        <RegistroPWA />
         <DemoProvider>{children}</DemoProvider>
       </body>
     </html>

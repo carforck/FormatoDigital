@@ -369,6 +369,13 @@ versión optimista (`src/nucleo/datos/empresa.ts`) y lo sincroniza entre equipos
 la demo sigue en `localStorage`. Los permisos por rol se aplican en la app; la
 fase 2 pasa cada módulo a sus tablas con RLS y retira `espacios`.
 
+**Sin conexión (app instalable):** el service worker (`public/sw.js`) guarda las
+páginas de la app y el modo empresa deja en el equipo la sesión y la última copia
+del espacio; sin red se trabaja sobre esa copia y al volver la conexión se envía
+con la misma versión optimista (si otro guardó entre tanto, gana el servidor con
+aviso). El caché nunca toca `/api/*` ni Supabase. Detalle, límites y
+actualizaciones: [`README.md`](../README.md#app-instalable-y-sin-conexión-pwa).
+
 La lista de migraciones (0001 … 0012) con su contenido está en el
 [`README.md`](../README.md#backend-supabase).
 

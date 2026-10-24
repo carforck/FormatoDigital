@@ -10,7 +10,8 @@
  *   pestañas se sincronizan con el evento `storage`.
  * - «empresa»: el estado completo por organización en `public.espacios`
  *   (`./empresa.ts`) con versión optimista: guardado agrupado, respaldo local,
- *   sondeo de cambios de otros equipos y estado de sincronización.
+ *   sondeo de cambios de otros equipos y estado de sincronización. Sin conexión
+ *   trabaja con la copia local del espacio y sincroniza al volver la red.
  *
  * Reglas: cada acción revalida contra el estado más reciente dentro de `setS`
  * y no hace nada si ya no aplica (doble clic, otra pestaña, rol); los
@@ -43,12 +44,17 @@ import {
 import type { Auditoria, Cliente, Config, Documento, EnlaceFirma, EstadoProyecto, Notificacion, Proyecto, Rol, TipoDoc, Usuario } from "@/nucleo/tipos";
 import {
   cerrarSesion,
+  espacioLocal,
+  guardarConflicto,
+  guardarEspacioLocal,
   guardarEspacio,
   guardarModo,
   iniciarSesion,
   leerEspacio,
   leerModo,
   sesionActual,
+  sesionGuardada,
+  SIN_CONEXION,
   versionEspacio,
   type Espacio,
   type Modo,
@@ -148,8 +154,6 @@ function desdeEspacio(e: Espacio, ses: Sesion): Estado {
 
 /** Lo que se comparte: todo menos el usuario de esta sesión. También sirve para saber si hay cambios sin guardar. */
 const compartido = (st: Estado) => JSON.stringify({ ...st, usuarioId: null });
-/** Copia local del último estado que se intentó guardar en modo empresa (por si falla la red). */
-const KEY_RESPALDO = "fd-empresa-respaldo";
 /** Perfil de la demo elegido estando en modo empresa: se aplica al montar la demo (sessionStorage). */
 const KEY_ENTRAR_DEMO = "fd-entrar-demo";
 /** Marca que se acaba de iniciar sesión: /acceso lleva al aplicativo cuando el espacio termina de cargar. */
@@ -290,6 +294,9 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
 /** Proveedor de un modo concreto: carga, guarda y sincroniza el estado y arma la API del contexto. */
 function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactNode; modo: Modo | null; cambiarModo: (m: Modo) => void }) {
   const [s, setS] = useState<Estado>(() => (modo === "empresa" ? inicialEmpresa() : inicial()));
+  // Último estado, para leerlo desde el sondeo sin reiniciar sus temporizadores
+  const sRef = useRef(s);
+  sRef.current = s;
   const [listo, setListo] = useState(false);
   const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
   const [organizacion, setOrganizacion] = useState<string | null>(null);
@@ -301,14 +308,24 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
   const ultimo = useRef<string | null>(null);
   const guardando = useRef(false);
   const sesion = useRef<Sesion | null>(null);
+  // Sin conexión: `pendiente` = hay cambios que solo están en este equipo; `sinVerificar` = se
+  // entró con la sesión guardada (sin red) y hay que confirmarla con Supabase antes de guardar
+  const pendiente = useRef(false);
+  const sinVerificar = useRef(false);
 
-  /** Adopta el espacio de la empresa (al cargar, al detectar cambios de otro equipo o tras un conflicto). */
-  const adoptar = useCallback((e: Espacio, ses: Sesion) => {
+  /**
+   * Adopta el espacio de la empresa (al cargar, al detectar cambios de otro equipo o tras un
+   * conflicto) y deja la copia local al día. `conCambios`: el estado trae cambios hechos sin
+   * conexión que aún no están en el servidor (se envían con el guardado normal).
+   */
+  const adoptar = useCallback((e: Espacio, ses: Sesion, conCambios = false) => {
     const st = desdeEspacio(e, ses);
     version.current = e.version;
     // Si el espacio ya trae a este usuario no hay nada que guardar; si no (primer ingreso), se guarda con él
     const conocido = ((e.estado as Partial<Estado>).usuarios ?? []).some((u) => u.id === ses.usuario.id);
-    ultimo.current = conocido ? compartido(st) : null;
+    ultimo.current = conocido && !conCambios ? compartido(st) : null;
+    pendiente.current = conCambios;
+    if (!conCambios) guardarEspacioLocal({ organizacionId: ses.organizacionId, usuarioId: ses.usuario.id, version: e.version, pendiente: false }, compartido(st));
     setS(st);
   }, []);
 
@@ -317,15 +334,18 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
     if (modo !== "empresa") return;
     let vivo = true;
     (async () => {
-      const ses = await sesionActual();
+      // Sin red se usa la sesión guardada en el último ingreso en línea (si no se cerró sesión)
+      const enLinea = await sesionActual();
+      const ses = enLinea === SIN_CONEXION ? sesionGuardada() : enLinea;
       if (!vivo) return;
       if (!ses) {
         setListo(true);
         return;
       }
-      const e = await leerEspacio(ses.organizacionId);
+      const copia = espacioLocal(ses.organizacionId, ses.usuario.id);
+      const e = enLinea === SIN_CONEXION ? null : await leerEspacio(ses.organizacionId);
       if (!vivo) return;
-      if (!e) {
+      if (!e && !copia) {
         setErrorGuardado("No se pudo abrir el espacio de la empresa. Revisa la conexión e intenta de nuevo.");
         setSincronizacion("sin-conexion");
         setListo(true);
@@ -334,7 +354,22 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
       sesion.current = ses;
       orgId.current = ses.organizacionId;
       setOrganizacion(ses.organizacion);
-      adoptar(e, ses);
+      if (!e && copia) {
+        // Sin conexión: se trabaja con la copia de este equipo; lo pendiente se envía al volver la red
+        sinVerificar.current = enLinea === SIN_CONEXION;
+        adoptar(copia, ses, copia.pendiente);
+        setSincronizacion("sin-conexion");
+      } else if (e && copia?.pendiente && copia.version === e.version) {
+        // Quedaron cambios sin conexión y nadie más guardó: se conservan y se envían ya
+        adoptar({ estado: copia.estado, version: e.version }, ses, true);
+      } else if (e) {
+        adoptar(e, ses);
+        // Quedaron cambios sin conexión pero otro equipo guardó entre tanto: gana lo más reciente (como un conflicto)
+        if (copia?.pendiente) {
+          guardarConflicto(JSON.stringify(copia.estado));
+          setErrorGuardado("Mientras trabajabas sin conexión otra persona guardó cambios y se cargaron los datos más recientes. Revisa tus últimos cambios y vuelve a hacerlos si no aparecen.");
+        }
+      }
       setListo(true);
     })();
     return () => {
@@ -343,47 +378,71 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
   }, [modo, adoptar]);
 
   // Modo empresa: guarda los cambios (agrupados 700 ms) si nadie más guardó antes.
-  // Primero deja el respaldo local; luego envía la versión leída. Si otro equipo ganó
-  // («conflicto») se adopta lo remoto y el último cambio local se pierde (se avisa).
-  // Sin conexión queda pendiente y el sondeo de abajo lo reintenta.
+  // Primero deja la copia local (marcada como pendiente); luego envía la versión leída. Si
+  // otro equipo ganó («conflicto») se adopta lo remoto y el último cambio local se pierde
+  // (se avisa). Sin conexión el cambio queda en este equipo y se envía al volver la red
+  // (evento `online` y sondeo de abajo).
   useEffect(() => {
     if (modo !== "empresa" || !listo || !orgId.current || !s.usuarioId) return;
     const json = compartido(s);
     if (json === ultimo.current) return;
-    setSincronizacion("guardando");
+    setSincronizacion(navigator.onLine && !sinVerificar.current ? "guardando" : "sin-conexion");
     const t = setTimeout(async () => {
       if (guardando.current || !orgId.current || !sesion.current) return;
-      guardando.current = true;
-      try {
-        localStorage.setItem(KEY_RESPALDO, json);
-      } catch {
-        /* el respaldo local es opcional */
+      const ses = sesion.current;
+      pendiente.current = true;
+      const enEquipo = guardarEspacioLocal({ organizacionId: ses.organizacionId, usuarioId: ses.usuario.id, version: version.current, pendiente: true }, json);
+      if (!navigator.onLine || sinVerificar.current) {
+        setSincronizacion("sin-conexion");
+        setErrorGuardado(enEquipo ? null : "Sin conexión y sin espacio en este equipo para guardar los cambios (las fotos ocupan espacio). No cierres la app hasta recuperar la conexión.");
+        return;
       }
+      guardando.current = true;
       const r = await guardarEspacio(orgId.current, JSON.parse(json), version.current);
       guardando.current = false;
       if (typeof r === "number") {
         version.current = r;
         ultimo.current = json;
+        pendiente.current = false;
+        guardarEspacioLocal({ organizacionId: ses.organizacionId, usuarioId: ses.usuario.id, version: r, pendiente: false }, json);
         setSincronizacion("guardado");
         setErrorGuardado(null);
       } else if (r === "conflicto") {
+        guardarConflicto(json);
         const e = await leerEspacio(orgId.current);
-        if (e) adoptar(e, sesion.current);
+        if (e) adoptar(e, ses);
         setSincronizacion("guardado");
         setErrorGuardado("Otra persona guardó cambios al mismo tiempo y se cargaron los datos más recientes. Revisa tu último cambio y vuelve a hacerlo si no aparece.");
       } else {
         setSincronizacion("sin-conexion");
-        setErrorGuardado("Sin conexión con el servidor: los cambios no se han guardado. Se reintentará automáticamente.");
+        // Sin red el aviso de la franja basta; si hay red, el servidor falló y se avisa aparte
+        setErrorGuardado(navigator.onLine ? "No se pudo guardar en el servidor: tus cambios quedaron en este equipo y se reintentará automáticamente." : null);
       }
     }, 700);
     return () => clearTimeout(t);
   }, [s, modo, listo, adoptar]);
 
-  // Modo empresa: trae lo que guardaron otros equipos (cada 15 s y al volver a la pestaña); reintenta si quedó sin guardar
+  // Modo empresa: trae lo que guardaron otros equipos (cada 15 s, al volver a la pestaña y al
+  // volver la conexión); reintenta si quedó sin guardar
   useEffect(() => {
     if (modo !== "empresa" || !listo) return;
     const revisar = async () => {
       if (!orgId.current || !sesion.current || guardando.current) return;
+      if (!navigator.onLine) {
+        setSincronizacion("sin-conexion");
+        return;
+      }
+      // Se entró sin conexión: primero se confirma la sesión con Supabase
+      if (sinVerificar.current) {
+        const ses = await sesionActual();
+        if (ses === SIN_CONEXION) return;
+        if (!ses || ses.organizacionId !== orgId.current || ses.usuario.id !== sesion.current.usuario.id) {
+          setErrorGuardado("Tu sesión venció. Inicia sesión de nuevo para sincronizar: tus cambios siguen guardados en este equipo.");
+          return;
+        }
+        sesion.current = ses;
+        sinVerificar.current = false;
+      }
       const v = await versionEspacio(orgId.current);
       if (v === null) {
         setSincronizacion("sin-conexion");
@@ -391,18 +450,31 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
       }
       if (v > version.current) {
         const e = await leerEspacio(orgId.current);
-        if (e && sesion.current) adoptar(e, sesion.current);
+        if (e && sesion.current) {
+          // Había cambios de este equipo sin enviar: gana lo más reciente del servidor (como un conflicto)
+          if (pendiente.current) {
+            guardarConflicto(compartido(sRef.current));
+            setErrorGuardado("Mientras estabas sin conexión otra persona guardó cambios y se cargaron los datos más recientes. Revisa tus últimos cambios y vuelve a hacerlos si no aparecen.");
+          }
+          adoptar(e, sesion.current);
+        }
       } else {
         // Sin cambios ajenos: si algo quedó sin guardar (sin conexión), se fuerza otro intento
+        if (!pendiente.current) setSincronizacion("guardado");
         setS((prev) => ({ ...prev }));
       }
     };
     const id = setInterval(revisar, 15000);
     const alVolver = () => document.visibilityState === "visible" && revisar();
+    const alPerderRed = () => setSincronizacion("sin-conexion");
     document.addEventListener("visibilitychange", alVolver);
+    window.addEventListener("online", revisar);
+    window.addEventListener("offline", alPerderRed);
     return () => {
       clearInterval(id);
       document.removeEventListener("visibilitychange", alVolver);
+      window.removeEventListener("online", revisar);
+      window.removeEventListener("offline", alPerderRed);
     };
   }, [modo, listo, adoptar]);
 

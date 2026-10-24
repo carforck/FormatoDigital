@@ -23,6 +23,7 @@ import { PERFILES } from "@/nucleo/perfiles";
 import { KEY_TRAS_LOGIN, useDemo } from "@/nucleo/datos/DemoProvider";
 import { ETIQUETA_ROL } from "@/nucleo/catalogos";
 import { cn } from "@/lib/utils";
+import { LottieControl } from "@/components/acceso/LottieControl";
 
 const BENEFICIOS = [
   ["Un solo lugar para toda la empresa", "Reportes, permisos de trabajo, aprobaciones, proyectos, equipos y cuentas de cobro."],
@@ -134,6 +135,11 @@ export default function Acceso() {
           <img src={asset("/sotec-logo-v3-oscuro.png")} alt="SOTEC" className="h-16 w-auto self-start" />
 
           <div>
+            {/* El ancho sigue la altura disponible para que todo el panel quepa sin desplazar; en pantallas muy bajas se oculta */}
+            <LottieControl
+              className="-ml-4 mb-4 [@media(max-height:760px)]:hidden"
+              style={{ maxWidth: "min(28rem, calc((100vh - 660px) * 1.73))" }}
+            />
             <p className="inline-flex items-center gap-2 rounded-full border border-sotec-green/40 bg-white/5 px-3 py-1 text-xs font-medium text-sotec-green">
               <ShieldCheck className="h-3.5 w-3.5" /> ControlOne by SOTEC
             </p>

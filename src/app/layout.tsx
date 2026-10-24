@@ -21,9 +21,9 @@ export const metadata: Metadata = {
     siteName: "ControlOne by SOTEC",
     title: TITULO,
     description: DESCRIPCION,
-    images: [{ url: "/og.jpg", width: 1200, height: 630, type: "image/jpeg", alt: "ControlOne by SOTEC: toda tu empresa, un solo control" }],
+    images: [{ url: "/og.jpg?v=2", width: 1200, height: 630, type: "image/jpeg", alt: "ControlOne by SOTEC: toda tu empresa, un solo control" }],
   },
-  twitter: { card: "summary_large_image", title: TITULO, description: DESCRIPCION, images: ["/og.jpg"] },
+  twitter: { card: "summary_large_image", title: TITULO, description: DESCRIPCION, images: ["/og.jpg?v=2"] },
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#1F1F1F" };

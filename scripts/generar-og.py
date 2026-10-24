@@ -7,7 +7,7 @@ para que pese menos de 300 KB (WhatsApp ignora imágenes más pesadas).
 """
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 
 RAIZ = Path(__file__).resolve().parent.parent
 FUENTES = RAIZ / "node_modules/geist/dist/fonts/geist-sans"
@@ -39,40 +39,25 @@ lienzo.paste(foto, (W - 720, 0), fundido)
 d = ImageDraw.Draw(lienzo)
 d.rectangle((0, 0, 12, H), fill=VERDE)
 
-# Marca
+# Marca: «Control» + «One» en verde, como en la landing
 d.rounded_rectangle((72, 64, 112, 104), radius=10, fill=VERDE)
-d.text((92, 84), "F", font=fuente("Bold", 26), fill=GRAFITO, anchor="mm")
-d.text((126, 84), "FormatoDigital", font=fuente("SemiBold", 30), fill=BLANCO, anchor="lm")
+marca = fuente("SemiBold", 30)
+d.text((126, 84), "Control", font=marca, fill=BLANCO, anchor="lm")
+d.text((126 + d.textlength("Control", font=marca), 84), "One", font=marca, fill=VERDE, anchor="lm")
 
-# Titular, con «cualquier formato» en verde
-t = fuente("Bold", 64)
-lineas = [[("Digitalizamos y", BLANCO)], [("optimizamos ", BLANCO), ("cualquier", VERDE)], [("formato", VERDE), (" de tu", BLANCO)], [("sistema de gestión.", BLANCO)]]
-y = 170
+# Titular, con «un solo control» en verde
+t = fuente("Bold", 72)
+lineas = [[("Toda tu empresa,", BLANCO)], [("un solo control.", VERDE)]]
+y = 200
 for linea in lineas:
     x = 72
     for texto, color in linea:
         d.text((x, y), texto, font=t, fill=color)
         x += d.textlength(texto, font=t)
-    y += 76
+    y += 86
 
-d.text((72, y + 22), "Reportes, permisos de trabajo, gastos y cuentas de cobro:", font=fuente("Regular", 26), fill=(205, 205, 205))
-d.text((72, y + 58), "con firma, fotos y aprobación desde el celular.", font=fuente("Regular", 26), fill=(205, 205, 205))
-
-# Caso de cliente: logo de SOTEC (variante para fondo oscuro) en una tarjeta
-logo = Image.open(RAIZ / "public/sotec-logo-v3-oscuro.png").convert("RGBA")
-logo = logo.crop(logo.getbbox())
-logo.thumbnail((210, 96), Image.LANCZOS)
-etiqueta = fuente("SemiBold", 16)
-ancho = max(logo.width, round(d.textlength("CASO DE CLIENTE", font=etiqueta))) + 48
-alto = logo.height + 76
-x0, y0, x1, y1 = W - 64 - ancho, H - 56 - alto, W - 64, H - 56
-sombra = Image.new("L", (W, H), 0)
-ImageDraw.Draw(sombra).rounded_rectangle((x0, y0 + 6, x1, y1 + 6), radius=22, fill=160)
-lienzo.paste((0, 0, 0), (0, 0), sombra.filter(ImageFilter.GaussianBlur(14)))
-d = ImageDraw.Draw(lienzo)
-d.rounded_rectangle((x0, y0, x1, y1), radius=22, fill=(20, 20, 20), outline=(72, 72, 72), width=2)
-d.text(((x0 + x1) // 2, y0 + 30), "CASO DE CLIENTE", font=etiqueta, fill=VERDE, anchor="mm")
-lienzo.paste(logo, ((x0 + x1 - logo.width) // 2, y0 + 52), logo)
+d.text((72, y + 30), "Formatos, reportes, aprobaciones, firmas, proyectos,", font=fuente("Regular", 28), fill=(205, 205, 205))
+d.text((72, y + 70), "equipos y cuentas de cobro en una sola plataforma.", font=fuente("Regular", 28), fill=(205, 205, 205))
 
 salida = RAIZ / "public/og.jpg"
 lienzo.save(salida, "JPEG", quality=86, optimize=True, progressive=True)

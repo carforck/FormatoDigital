@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, ChevronDown, FileText, HardHat } from "lucide-react";
 
-import { Contador, Icono, Tilt } from "@/components/fx/Reveal";
+import { Icono, Tilt } from "@/components/fx/Reveal";
 import { PlantillaPermiso } from "@/modulos/permisos/PlantillaPermiso";
 import { PlantillaReporte } from "@/modulos/reportes/PlantillaReporte";
 import { PERFILES } from "@/nucleo/perfiles";
@@ -117,62 +117,6 @@ export function AccesoRoles() {
           </span>
         </button>
       ))}
-    </div>
-  );
-}
-
-const cop = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
-
-/** Calculadora de ahorro: formatos al mes × minutos ahorrados × costo hora. */
-export function Calculadora() {
-  const [formatos, setFormatos] = useState(120);
-  const [minPapel, setMinPapel] = useState(50);
-  const [costoHora, setCostoHora] = useState(25000);
-  const MIN_DIGITAL = 9;
-
-  const r = useMemo(() => {
-    const horasMes = (formatos * Math.max(0, minPapel - MIN_DIGITAL)) / 60;
-    return { horasMes, ahorroAnual: horasMes * 12 * costoHora, hojas: formatos * 12 * 2 };
-  }, [formatos, minPapel, costoHora]);
-
-  const slider = (label: string, v: number, set: (n: number) => void, min: number, max: number, step: number, fmt: (n: number) => string) => (
-    <label className="block">
-      <span className="flex justify-between text-sm">
-        <span className="text-slate-600">{label}</span>
-        <strong className="tabular-nums">{fmt(v)}</strong>
-      </span>
-      <input type="range" min={min} max={max} step={step} value={v} onChange={(e) => set(Number(e.target.value))} className="mt-2 w-full accent-[#3F7A12]" />
-    </label>
-  );
-
-  return (
-    <div className="grid gap-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:grid-cols-2 md:p-8">
-      <div className="space-y-6">
-        {slider("Formatos diligenciados al mes", formatos, setFormatos, 10, 2000, 10, (n) => `${n}`)}
-        {slider("Minutos por formato en papel (llenar, firmar, escanear, archivar)", minPapel, setMinPapel, 15, 90, 5, (n) => `${n} min`)}
-        {slider("Costo hora del personal", costoHora, setCostoHora, 10000, 120000, 5000, cop)}
-        <p className="text-xs text-slate-500">Supuesto: con el asistente cada formato toma ~{MIN_DIGITAL} minutos.</p>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-3 md:grid-cols-1">
-        <div className="rounded-2xl bg-sotec p-5 text-white">
-          <p className="text-sm text-white/70">Horas liberadas al mes</p>
-          <p className="text-4xl font-semibold text-sotec-green">
-            <Contador valor={r.horasMes} duracion={700} formato={(n) => Math.round(n).toLocaleString("es-CO")} />
-          </p>
-        </div>
-        <div className="rounded-2xl bg-sotec-soft p-5">
-          <p className="text-sm text-slate-600">Ahorro estimado al año</p>
-          <p className="text-3xl font-semibold text-sotec-greenDeep">
-            <Contador valor={r.ahorroAnual} duracion={700} formato={cop} />
-          </p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 p-5">
-          <p className="text-sm text-slate-600">Hojas de papel evitadas al año</p>
-          <p className="text-3xl font-semibold">
-            <Contador valor={r.hojas} duracion={700} formato={(n) => Math.round(n).toLocaleString("es-CO")} />
-          </p>
-        </div>
-      </div>
     </div>
   );
 }

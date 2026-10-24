@@ -13,11 +13,6 @@ export function importeItem(i: Pick<ItemCotizacion, "cantidad" | "precioUnitario
   return Math.round(Math.max(0, num(i.cantidad)) * Math.max(0, num(i.precioUnitario)));
 }
 
-/** IVA de una sola línea (informativo; el total usa `ivaPorTarifa`). */
-export function ivaItem(i: Pick<ItemCotizacion, "cantidad" | "precioUnitario" | "ivaPct">): number {
-  return Math.round((importeItem(i) * Math.max(0, num(i.ivaPct))) / 100);
-}
-
 export interface TarifaIva {
   /** % de la tarifa (19, 5, 0). */
   pct: number;

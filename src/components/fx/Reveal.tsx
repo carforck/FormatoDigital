@@ -93,25 +93,6 @@ export function Contador({ valor, prefijo = "", sufijo = "", duracion = 1600, de
   );
 }
 
-/** Contenedor que pasa la posición del mouse a sus hijos como --mx/--my (foco de luz). */
-export function Spotlight({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div
-      className={className}
-      onPointerMove={(e) => {
-        const t = e.target as HTMLElement;
-        const card = t.closest<HTMLElement>("[data-spot]");
-        if (!card) return;
-        const r = card.getBoundingClientRect();
-        card.style.setProperty("--mx", `${e.clientX - r.left}px`);
-        card.style.setProperty("--my", `${e.clientY - r.top}px`);
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
 /** Inclina su contenido en 3D siguiendo el mouse. */
 export function Tilt({ children, className, max = 6 }: { children: React.ReactNode; className?: string; max?: number }) {
   const ref = useRef<HTMLDivElement | null>(null);

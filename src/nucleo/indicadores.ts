@@ -3,7 +3,7 @@
  * Todos se calculan para un período y se comparan con el período anterior de
  * igual duración, para mostrar variaciones relativas.
  */
-import type { Documento, Estado, TipoDoc } from "./tipos";
+import type { Documento, Estado } from "./tipos";
 
 export type Periodo = "30d" | "90d" | "6m" | "12m";
 export const PERIODOS: { clave: Periodo; nombre: string; dias: number }[] = [

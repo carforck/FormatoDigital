@@ -143,7 +143,6 @@ export default function Tablero() {
   const nombreTecnico = demo.usuarios.find((x) => x.id === tecnico)?.nombre;
   const opcionesMes = mesesFiltro(12);
   const nombrePeriodo = mes ? opcionesMes.find((m) => m.clave === mes)?.nombre ?? mes : PERIODOS.find((p) => p.clave === periodo)!.nombre;
-  const contraPeriodo = mes ? "vs mes anterior" : "vs período anterior";
 
   return (
     <div className="space-y-6">

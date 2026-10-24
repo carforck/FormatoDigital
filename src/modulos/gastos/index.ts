@@ -1,11 +1,10 @@
 import type { ModuloDocumento } from "@/modulos/contrato";
+import { cop } from "@/nucleo/letras";
 
 import { gastoVacio } from "./catalogo";
 import { PlantillaGasto } from "./PlantillaGasto";
 import { totalGastos, type DatosGasto, type ItemGasto } from "./tipos";
 import { faltantesGasto } from "./validar";
-
-const cop = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
 
 /** Módulo FO-GSST-25 · Legalización y registro de gastos operativos. */
 export const moduloGastos: ModuloDocumento<DatosGasto> = {

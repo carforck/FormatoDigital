@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowRight, Building, Building2, Calculator, ChevronDown, Download, Factory, Info, ShieldAlert, Users } from "lucide-react";
+import { ArrowRight, Building, Building2, Calculator, ChevronDown, Download, Factory, Info, ShieldAlert } from "lucide-react";
 
 import { Contador } from "@/components/fx/Reveal";
 import { cn } from "@/lib/utils";
+import { cop } from "@/nucleo/letras";
 
 /**
  * Calculadora de retorno (caso de negocio) de digitalizar los formatos del SGC.
@@ -56,7 +57,6 @@ const INICIAL: Supuestos = {
   inversion: 0,
 };
 
-const cop = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(Math.round(n));
 const num = (n: number, d = 0) => n.toLocaleString("es-CO", { maximumFractionDigits: d, minimumFractionDigits: d });
 
 function calcular(s: Supuestos) {

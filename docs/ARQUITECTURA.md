@@ -379,8 +379,14 @@ aporta en `ModuloDocumento` lo que el resto lee del registro con
 ## Base de datos (Supabase / PostgreSQL)
 
 El proyecto de Supabase está **instalado y en línea** (ref.
-`thlbjdglwynotglcgxwc`) con todas las migraciones aplicadas. La app todavía
-no se conecta a él (ver *Pendiente*).
+`thlbjdglwynotglcgxwc`) con todas las migraciones aplicadas.
+
+**Modo empresa (fase 1):** `/acceso` ofrece el login por correo al espacio real
+de la empresa o los perfiles de la demo. En modo empresa la app guarda su estado
+completo por organización en `public.espacios` (`0012_espacio_empresa.sql`) con
+versión optimista (`src/nucleo/datos/empresa.ts`) y lo sincroniza entre equipos;
+la demo sigue en `localStorage`. Los permisos por rol se aplican en la app; la
+fase 2 pasa cada módulo a sus tablas con RLS y retira `espacios`.
 
 Migraciones en `supabase/migrations/`:
 
@@ -397,6 +403,7 @@ Migraciones en `supabase/migrations/`:
 | `0009_proyectos.sql` | tabla `proyectos` (código PRY por consecutivos, `crear_proyecto` solo admin y SST, RLS: el equipo ve los de su empresa y el cliente los suyos); `documentos.proyecto_id` y `cuentas_cobro.proyecto_id` (misma organización y mismo cliente, se bloquean al enviar o emitir); `crear_documento` y `crear_cuenta_cobro` reciben el proyecto (el cliente sale de él; no en proyectos cerrados); formato `cotizacion` (COT, visible para el cliente); `firmar_como_cliente`: el cliente firma en su portal un reporte o cotización aprobados y eso lo cierra |
 | `0010_equipos.sql` | tabla `equipos` (nombre único por organización, cliente y sistema; trigger `equipos_coherencia`: cliente y proyecto de la misma organización, el cliente no cambia, auditoría al registrar y al cambiar de estado; RLS: el equipo interno ve, crea y edita, admin y SST borran, el cliente ve los de su empresa) y `documento_equipos` (equipos atendidos en un documento: solo el autor, solo en borrador o rechazado y solo equipos del cliente del documento; visible si el documento lo es; FK `restrict`: un equipo con historial no se borra, se retira) |
 | `0011_comercial_solo_admin.sql` | lo comercial es solo de la administración: `formato_comercial(formato)` (hoy `cotizacion`); `documentos_ver`/`crear`/`editar` dejan esos documentos solo al `admin` (el cliente sigue viendo los suyos aprobados o aceptados); `documentos_flujo`: la cotización pasa de borrador o rechazado a aprobado por el admin autor en un paso («Aprobó y envió al cliente»), no va a revisión, y SST o técnico no la tocan; `crear_documento('cotizacion')`, `crear_cuenta_cobro` y `crear_enlace_firma` (sobre lo comercial) exigen admin; cuentas de cobro e ítems: ver, crear y editar solo `admin` (el cliente, las suyas emitidas); `notif_ver` solo muestra avisos de documentos visibles; `proyectos_borrar` cuenta documentos y cuentas sin RLS (`proyecto_vacio`) |
+| `0012_espacio_empresa.sql` | `espacios`: estado del modo empresa por organización (fase 1), RLS para el equipo interno y versión que solo avanza de a uno |
 | `seed.sql` | organización SOTEC, sus formatos y un cliente ficticio |
 
 `supabase/instalar.sql` une migraciones y semilla para instalar un proyecto
@@ -517,8 +524,9 @@ datos; los módulos y las pantallas no cambian.
 
 ### Pendiente
 
-- Conectar la app a Supabase: login real y datos compartidos entre usuarios
-  y equipos (hoy cada navegador tiene su propia demo).
+- Fase 2 de Supabase: cada módulo en sus tablas con RLS (hoy el modo empresa
+  guarda el estado completo en `espacios`), fotos en Storage, alta de usuarios
+  con login desde la app y firma remota por enlace en el modo empresa.
 - Envío de correo desde la plataforma con Resend (PDF adjunto y enlace de
   firma).
 - Órdenes de servicio en la interfaz.

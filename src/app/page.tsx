@@ -22,7 +22,6 @@ import { ChatEnVivo } from "@/components/landing/ChatEnVivo";
 import { FirmaDigital, Foto, ServiciosSotec } from "@/components/landing/Fotos";
 import { FuncionesBento } from "@/components/landing/FuncionesBento";
 import { LottieDigitaliza } from "@/components/landing/LottieDigitaliza";
-import { NormasReferencia } from "@/components/landing/NormasReferencia";
 import { PapelVsDigital } from "@/components/landing/PapelVsDigital";
 
 const FORMATOS_TIPICOS = [
@@ -89,7 +88,7 @@ export default function Landing() {
         <div className="container relative grid items-center gap-12 py-16 lg:grid-cols-2 lg:py-24">
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-sotec-green/60 bg-white/80 px-3 py-1 text-xs font-medium text-sotec-greenDeep shadow-sm backdrop-blur">
-              <ShieldCheck className="h-3.5 w-3.5" /> ControlOne by SOTEC · Calidad · SG-SST · ISO 9001
+              <ShieldCheck className="h-3.5 w-3.5" /> ControlOne by SOTEC
             </p>
             <h1 className="mt-5 text-4xl font-semibold leading-[1.05] tracking-tight text-sotec sm:text-5xl lg:text-6xl">
               Toda tu empresa, <span className="text-sotec-greenDeep">un solo control</span>.
@@ -328,8 +327,6 @@ export default function Landing() {
         </div>
       </section>
 
-      <NormasReferencia />
-
       {/* Planes */}
       <section id="planes" className="container scroll-mt-16 py-20">
         <h2 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">Para pequeñas y grandes empresas</h2>
@@ -450,7 +447,6 @@ export default function Landing() {
             <p className="font-semibold uppercase tracking-wider text-white/60">Notas</p>
             <ul className="mt-2 space-y-1">
               <li>* Cifras ilustrativas de un piloto típico (50 min en papel frente a 9 min digital por formato).</li>
-              <li>Las normas ISO y la legislación se citan solo como referencia; ControlOne no otorga certificación ni está avalado por ISO u organismos certificadores.</li>
               <li>Los clientes, personas y datos de la demo son ficticios. SOTEC aparece con su autorización.</li>
               <li>Fotografías: Pexels (licencia libre).</li>
             </ul>

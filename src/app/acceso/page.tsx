@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
-  FileCheck2,
   Loader2,
   Lock,
   PlayCircle,
@@ -31,7 +30,6 @@ const BENEFICIOS = [
   ["Cada quien ve lo suyo", "Menús y permisos según el rol: técnico, SST, administración y cliente."],
 ];
 
-const SELLOS = ["Calidad", "SG-SST", "ISO 9001"];
 
 // Qué hace cada perfil de la demo, en una línea
 const RESUMEN_ROL: Record<string, string> = {
@@ -159,17 +157,6 @@ export default function Acceso() {
               ))}
             </ul>
           </div>
-
-          <div className="border-t border-white/10 pt-6">
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/60">Diseñado para sistemas de gestión</p>
-            <ul className="mt-3 flex flex-wrap gap-2" aria-label="Sistemas de gestión">
-              {SELLOS.map((s) => (
-                <li key={s} className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-white/85">
-                  <FileCheck2 className="h-3.5 w-3.5 text-sotec-green" /> {s}
-                </li>
-              ))}
-            </ul>
-          </div>
         </div>
       </aside>
 
@@ -191,7 +178,7 @@ export default function Acceso() {
             Toda tu empresa, <span className="text-sotec-green">un solo control</span>.
           </p>
           <p className="relative mt-2 flex flex-wrap items-center gap-x-2 text-xs font-medium text-white/75">
-            <ShieldCheck className="h-3.5 w-3.5 text-sotec-green" /> ControlOne by SOTEC · {SELLOS.join(" · ")}
+            <ShieldCheck className="h-3.5 w-3.5 text-sotec-green" /> ControlOne by SOTEC
           </p>
         </div>
 

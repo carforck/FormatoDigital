@@ -4,23 +4,18 @@
  * Landing · «Llévala como app»: presenta ControlOne como aplicación web progresiva
  * (PWA) instalable sin tiendas, con sus funciones y los pasos según el equipo
  * (Android, iPhone o computador). Detecta el sistema para abrir la pestaña que
- * corresponde y, si el navegador lo permite (`beforeinstallprompt`), ofrece
- * instalar con un clic. Incluye un aviso flotante que lleva a esta sección y se
+ * corresponde y, si el navegador lo permite, ofrece instalar con un clic usando el
+ * estado compartido de la PWA (`components/pwa/instalacion.ts`). Incluye un aviso flotante que lleva a esta sección y se
  * descarta una sola vez por navegador.
  */
 import { useEffect, useState } from "react";
 import { BellRing, Check, Download, Laptop, MoreVertical, Plus, RefreshCw, Share, Smartphone, WifiOff, X, Zap } from "lucide-react";
 
 import { Reveal } from "@/components/fx/Reveal";
+import { enModoApp, useInstalarApp } from "@/components/pwa/instalacion";
 import { cn } from "@/lib/utils";
 
 type Plataforma = "android" | "iphone" | "computador";
-
-/** Evento de instalación de Chrome/Edge (no está en los tipos del DOM). */
-interface EventoInstalar extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
 
 const KEY_AVISO = "fd-aviso-app-visto";
 
@@ -66,32 +61,16 @@ function detectar(): Plataforma {
 
 export function DescargaApp() {
   const [plataforma, setPlataforma] = useState<Plataforma>("android");
-  const [evento, setEvento] = useState<EventoInstalar | null>(null);
   const [instalada, setInstalada] = useState(false);
+  const { forma, instalar: lanzar } = useInstalarApp();
 
   useEffect(() => {
     setPlataforma(detectar());
-    setInstalada(window.matchMedia("(display-mode: standalone)").matches);
-    // Chrome/Edge avisan que se puede instalar: se guarda el evento para el botón
-    const alPoder = (e: Event) => {
-      e.preventDefault();
-      setEvento(e as EventoInstalar);
-    };
-    const alInstalar = () => setInstalada(true);
-    window.addEventListener("beforeinstallprompt", alPoder);
-    window.addEventListener("appinstalled", alInstalar);
-    return () => {
-      window.removeEventListener("beforeinstallprompt", alPoder);
-      window.removeEventListener("appinstalled", alInstalar);
-    };
-  }, []);
+    setInstalada(enModoApp());
+  }, [forma]);
 
   const instalar = async () => {
-    if (!evento) return;
-    await evento.prompt();
-    const { outcome } = await evento.userChoice;
-    if (outcome === "accepted") setInstalada(true);
-    setEvento(null);
+    if (await lanzar()) setInstalada(true);
   };
 
   return (
@@ -164,7 +143,7 @@ export function DescargaApp() {
                 <Check className="h-4 w-4" /> ControlOne ya está instalada en este equipo.
               </p>
             ) : (
-              evento && (
+              forma === "dialogo" && (
                 <button
                   onClick={instalar}
                   className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-sotec px-4 py-3 text-sm font-semibold text-white transition hover:bg-black"
@@ -188,7 +167,7 @@ export function AvisoApp() {
   useEffect(() => {
     let visto = false;
     try {
-      visto = localStorage.getItem(KEY_AVISO) === "1" || window.matchMedia("(display-mode: standalone)").matches;
+      visto = localStorage.getItem(KEY_AVISO) === "1" || enModoApp();
     } catch {
       /* sin almacenamiento: se muestra igual */
     }

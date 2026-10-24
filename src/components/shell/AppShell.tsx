@@ -358,7 +358,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {demo.organizacion || "Empresa"} · ControlOne
             <span aria-live="polite">
               {" · "}
-              {demo.sincronizacion === "guardado" ? "Todo guardado" : demo.sincronizacion === "guardando" ? "Guardando…" : "Sin conexión, reintentando"}
+              {demo.sincronizacion === "guardado"
+                ? "Todo guardado"
+                : demo.sincronizacion === "guardando"
+                  ? "Guardando…"
+                  : "Sin conexión · tus cambios se guardan en este equipo"}
             </span>
           </span>
         </div>

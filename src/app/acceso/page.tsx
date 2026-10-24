@@ -31,6 +31,7 @@ import { KEY_TRAS_LOGIN, useDemo } from "@/nucleo/datos/DemoProvider";
 import { ETIQUETA_ROL } from "@/nucleo/catalogos";
 import { cn } from "@/lib/utils";
 import { LottieControl } from "@/components/acceso/LottieControl";
+import { BotonInstalar } from "@/components/pwa/BotonInstalar";
 
 /** Beneficios del panel de marca: [título, descripción]. */
 const BENEFICIOS = [
@@ -223,6 +224,8 @@ export default function Acceso() {
             <p className="mt-2 max-w-2xl text-slate-600">
               Entra al espacio de tu empresa o conoce la plataforma con la demo corporativa.
             </p>
+            {/* App instalable (PWA): solo si el navegador la puede instalar; en iOS, las instrucciones */}
+            <BotonInstalar variante="acceso" className="mt-3" />
           </header>
 
           <div className="mt-7 grid grid-cols-1 gap-6 xl:grid-cols-2 xl:items-start">

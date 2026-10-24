@@ -49,6 +49,7 @@ import { TIPOS_DOC, rutaNuevo } from "@/modulos/registro";
 import { puede, puedeCrearTipo, type Accion } from "@/nucleo/permisos";
 import type { TipoDoc } from "@/nucleo/tipos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
+import { BotonInstalar } from "@/components/pwa/BotonInstalar";
 import { cn } from "@/lib/utils";
 
 /** Entrada del menú lateral. `req`: permiso necesario para verla; `contador`: insignia numérica. */
@@ -587,6 +588,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </label>
                 )}
                 <div className="my-1 border-t border-slate-100" />
+                {/* App instalable: solo aparece si el navegador la puede instalar (o instrucciones en iOS) */}
+                <BotonInstalar variante="menu" />
                 <Link href="/" onClick={() => setPerfil(false)} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-slate-600 hover:bg-slate-50">
                   <Globe className="h-4 w-4" /> Volver al sitio
                 </Link>

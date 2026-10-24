@@ -4,9 +4,28 @@
  * gasto, cotización en `src/modulos/<tipo>/Plantilla….tsx`): encabezado con control
  * documental y casilla de firma. Usa `<img>` simple para que salga en el PDF/impresión.
  */
+import { cn } from "@/lib/utils";
+import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { asset } from "@/nucleo/rutas";
 import { formatoDe } from "@/modulos/registro";
 import type { TipoDoc } from "@/nucleo/tipos";
+
+/**
+ * Logo de los formatos impresos. En el modo empresa va el logo de la organización
+ * (SOTEC); en la demo va la marca ControlOne con «by SOTEC» debajo en pequeño
+ * (public/controlone-logo.png, generado por scripts/generar-logo-formato.py).
+ * `className` da el tamaño del logo de la empresa; `anchoDemo`, el ancho máximo de la marca.
+ */
+export function LogoFormato({ className, anchoDemo = "max-w-[190px]", alt = "SOTEC" }: { className?: string; anchoDemo?: string; alt?: string }) {
+  const { modo } = useDemo();
+  if (modo === "empresa") return <img src={asset("/sotec-logo-v3.png")} alt={alt} className={className} />;
+  return (
+    <span className="inline-flex flex-col items-center">
+      <img src={asset("/controlone-logo.png")} alt="ControlOne" className={cn("h-auto w-full object-contain", anchoDemo)} />
+      <span className="mt-0.5 text-[9px] font-medium uppercase tracking-[0.18em] text-slate-500">by SOTEC</span>
+    </span>
+  );
+}
 
 /** Encabezado del formato: logo, título y control documental (código, versión, fecha). */
 export function Encabezado({ tipo, codigoDoc }: { tipo: TipoDoc; codigoDoc?: string }) {
@@ -16,8 +35,8 @@ export function Encabezado({ tipo, codigoDoc }: { tipo: TipoDoc; codigoDoc?: str
     <table className="w-full border-collapse border border-black text-[11px]">
       <tbody>
         <tr>
-          <td rowSpan={3} className="w-[30%] border border-black p-2">
-            <img src={asset("/sotec-logo-v3.png")} alt="SOTEC" className="mx-auto h-14 w-auto object-contain" />
+          <td rowSpan={3} className="w-[30%] border border-black p-2 text-center">
+            <LogoFormato className="mx-auto h-14 w-auto object-contain" />
           </td>
           <td rowSpan={3} className="border border-black p-2 text-center font-serif text-[13px] font-bold uppercase">
             {f.nombre}

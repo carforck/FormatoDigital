@@ -11,12 +11,11 @@
 import { Camera, Plus, Receipt, Trash2 } from "lucide-react";
 
 import { EditableText } from "@/components/docs/EditableText";
-import { Firma } from "@/components/docs/Encabezado";
+import { Firma, LogoFormato } from "@/components/docs/Encabezado";
 import { cn } from "@/lib/utils";
 import { formatoDe } from "@/modulos/registro";
 import { comprimirImagen } from "@/nucleo/imagenes";
 import { cop } from "@/nucleo/letras";
-import { asset } from "@/nucleo/rutas";
 
 import { TIPOS_GASTO } from "./catalogo";
 import { totalGastos, totalItemGasto, type DatosGasto, type ItemGasto, type TipoGasto } from "./tipos";
@@ -86,8 +85,8 @@ export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: P
         <table className="w-full border-collapse" style={{ border: `1.5px solid ${VERDE}` }}>
           <tbody>
             <tr>
-              <td className="w-[26%] p-2" style={{ background: VERDE_CLARO }}>
-                <img src={asset("/sotec-logo-v3.png")} alt="SOTEC" className="mx-auto h-14 w-auto object-contain" />
+              <td className="w-[26%] p-2 text-center" style={{ background: VERDE_CLARO }}>
+                <LogoFormato className="mx-auto h-14 w-auto object-contain" anchoDemo="max-w-[170px]" />
               </td>
               <td className="p-2 text-center text-[14px] font-bold uppercase leading-tight text-white" style={{ background: VERDE }}>
                 Formato de legalización y registro de gastos operativos

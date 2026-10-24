@@ -1,4 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
 
 /**
  * Plantilla de la cuenta de cobro (solo lectura): «DEBE A … LA SUMA DE …» con el
@@ -6,8 +5,8 @@
  * bancarios de Configuración. Se edita en su propia pantalla, no en línea.
  */
 
+import { LogoFormato } from "@/components/docs/Encabezado";
 import { cop, pesosEnLetras } from "@/nucleo/letras";
-import { asset } from "@/nucleo/rutas";
 import type { Cliente, Config, Documento, Proyecto } from "@/nucleo/tipos";
 
 import { totalItem, totales, type CuentaCobro } from "./tipos";
@@ -39,7 +38,7 @@ export function PlantillaCuentaCobro({ cuenta, cliente, proyecto, config, docume
     <div className="doc-zona">
       <article className="doc-print mx-auto w-full max-w-[816px] bg-white p-6 text-[12px] leading-snug shadow-sm ring-1 ring-slate-200 sm:p-10">
         <header className="flex items-start justify-between gap-4 border-b-2 border-black pb-3">
-          <img src={asset("/sotec-logo-v3.png")} alt={config.empresa} className="h-16 w-auto" />
+          <LogoFormato className="h-16 w-auto" alt={config.empresa} anchoDemo="max-w-[200px]" />
           <div className="text-right">
             <p className="text-lg font-bold tracking-wide">CUENTA DE COBRO</p>
             <p className="font-mono text-sm">No. {cuenta.codigo}</p>

@@ -1,6 +1,5 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
 
 /**
  * Plantilla de la cotización: réplica en carta de la cotización de Odoo de SOTEC
@@ -11,11 +10,10 @@
 import { Plus, Trash2 } from "lucide-react";
 
 import { EditableText } from "@/components/docs/EditableText";
-import { Firma } from "@/components/docs/Encabezado";
+import { Firma, LogoFormato } from "@/components/docs/Encabezado";
 import { cn } from "@/lib/utils";
 import type { PropsPlantilla } from "@/modulos/contrato";
 import { cop, pesosEnLetras } from "@/nucleo/letras";
-import { asset } from "@/nucleo/rutas";
 
 import { cantidadTexto, diasEntre, fechaCorta, importeItem, totalesCotizacion } from "./calculos";
 import { CATALOGO_SERVICIOS, EMPRESA_COTIZACION, FORMATO_COTIZACION, TARIFAS_IVA, UNIDADES, itemDeCatalogo, itemVacio, type EmpresaCotizacion } from "./catalogo";
@@ -89,7 +87,7 @@ export function PlantillaCotizacion({ datos, codigoDoc, editar, firmar, resaltar
         {/* Franja verde del encabezado: va de borde a borde, también al imprimir */}
         <header className="relative -mx-5 sm:-mx-10 print:-mx-[1cm] print:-mt-[0.8cm]" style={{ background: FRANJA }}>
           <div className={cn("flex items-start justify-between gap-3 px-5 pt-5 sm:px-10 sm:pt-7", pk("print:pt-4"))}>
-            <img src={asset("/sotec-logo-v3.png")} alt="SOTEC" className={cn("h-16 w-auto object-contain sm:h-[88px]", pk("print:h-14"))} />
+            <LogoFormato className={cn("h-16 w-auto object-contain sm:h-[88px]", pk("print:h-14"))} anchoDemo="max-w-[200px] sm:max-w-[240px]" />
             <div className="text-right text-[11px] leading-[1.6] sm:text-[12.5px]">
               <p>{empresa.nombre}</p>
               {empresa.direccion.map((l) => (

@@ -1,5 +1,13 @@
+/**
+ * Catálogos del permiso de trabajo (F-GSST-13): opciones del formato en el
+ * orden en que se imprimen, atajos por actividad y contenido inicial. Los textos
+ * son también los valores guardados y los que revisa `validar.ts`: no cambiarlos
+ * sin migrar los datos.
+ */
+
 import type { DatosPermiso } from "./tipos";
 
+/** Opciones de «Equipo requerido» («Maquinaria» y «Equipo menor» piden cuál). */
 export const EQUIPO_REQUERIDO = [
   "Herramienta menor",
   "Escaleras portátiles",
@@ -15,6 +23,7 @@ export const EQUIPO_REQUERIDO = [
   "Equipo menor",
 ] as const;
 
+/** Opciones de «Peligros identificados». */
 export const PELIGROS = [
   "Ruido",
   "Vibraciones",
@@ -42,6 +51,7 @@ export const PELIGROS = [
   "Seguridad física",
 ] as const;
 
+/** Opciones de «Medidas de seguridad requeridas». */
 export const MEDIDAS = [
   "Delimitación del área",
   "Señalización del área",
@@ -54,6 +64,7 @@ export const MEDIDAS = [
   "Lista verificación excavaciones/confinado",
 ] as const;
 
+/** Opciones de «Verificación elementos de protección». */
 export const EPP = [
   "Casco",
   "Casco con barbuquejo",
@@ -72,6 +83,7 @@ export const EPP = [
   "Líneas de conexión, cuerdas",
 ] as const;
 
+/** Preguntas de «Verificación de condiciones de trabajo»; un «NO» impide enviar el permiso. */
 export const PREGUNTAS_VERIFICACION = [
   "¿Todos los trabajadores cuentan con afiliación vigente al sistema de riesgos profesionales y se cuenta con los soportes?",
   "¿El sitio donde se realizará el trabajo está aislado completamente y es adecuado?",
@@ -109,6 +121,7 @@ export const PLANTILLAS_ACTIVIDAD: Record<string, { peligros: string[]; medidas:
   },
 };
 
+/** Permiso en blanco con la fecha de emisión dada y una verificación sin responder por pregunta. */
 export function permisoVacio(fecha: string): DatosPermiso {
   return {
     fechaEmision: fecha,

@@ -1,8 +1,15 @@
+/**
+ * Validación del reporte técnico antes de enviarlo a revisión.
+ */
+
 import type { DatosReporte } from "./tipos";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-/** Lista de pendientes antes de enviar a revisión. Vacía = listo. */
+/**
+ * Lista de pendientes antes de enviar a revisión. Vacía = listo.
+ * Correo, teléfono y horas son opcionales, pero si se escriben deben ser válidos.
+ */
 export function faltantesReporte(d: DatosReporte): string[] {
   const f: string[] = [];
   if (!d.fecha) f.push("Fecha");

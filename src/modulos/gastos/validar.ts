@@ -1,3 +1,7 @@
+/**
+ * Validación de la legalización de gastos antes de enviarla a revisión.
+ */
+
 import type { DatosGasto } from "./tipos";
 
 /** Pendientes antes de enviar la legalización a revisión. Vacía = lista. */

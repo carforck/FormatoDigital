@@ -1,3 +1,7 @@
+/**
+ * Validación de la cotización antes de aprobarla y enviarla al cliente.
+ */
+
 import { diasEntre } from "./calculos";
 import type { DatosCotizacion } from "./tipos";
 

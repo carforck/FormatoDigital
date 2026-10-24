@@ -1,3 +1,11 @@
+/**
+ * Registro central de módulos de la plataforma.
+ *
+ * Cada empresa (organización) habilita los módulos que contrata; todos
+ * comparten el NÚCLEO y se unen a través del PROYECTO y la ORDEN DE SERVICIO.
+ * `MODULOS` es el listado informativo; `DOCUMENTOS` e `infoDoc` exponen los
+ * módulos de documento con sus valores por defecto. Ver docs/ARQUITECTURA.md.
+ */
 import { createElement, type ComponentType } from "react";
 
 import type { EmpresaPlantilla, FlujoDocumento, InfoFormato, ModuloDocumento, PropsPlantilla } from "./contrato";
@@ -9,15 +17,10 @@ import { ETIQUETA_ESTADO } from "@/nucleo/catalogos";
 import type { Accion } from "@/nucleo/permisos";
 import type { Cliente, Config, DatosDe, Documento, Estado, Proyecto, TipoDoc } from "@/nucleo/tipos";
 
-/**
- * Registro central de módulos de la plataforma.
- *
- * Cada empresa (organización) habilita los módulos que contrata; todos
- * comparten el NÚCLEO y se unen a través del PROYECTO y la ORDEN DE SERVICIO.
- * Ver docs/ARQUITECTURA.md.
- */
+/** Estado de un módulo en el listado de Configuración. */
 export type EstadoModulo = "activo" | "en_construccion" | "planeado";
 
+/** Ficha de un módulo para el listado de Configuración (no afecta permisos ni rutas). */
 export interface InfoModulo {
   clave: string;
   nombre: string;
@@ -31,6 +34,7 @@ export interface InfoModulo {
   requiere?: Accion;
 }
 
+/** Módulos de la plataforma (activos, en construcción y planeados), en el orden de Configuración. */
 export const MODULOS: InfoModulo[] = [
   { clave: "nucleo", nombre: "Núcleo", descripcion: "Usuarios y roles, clientes y sitios, firmas (en sitio y por enlace), archivos, envío por correo y WhatsApp, PDF, consecutivos y auditoría.", estado: "activo", relaciona: ["todos"] },
   { clave: "proyectos", nombre: "Proyectos", descripcion: "Cada obra o proyecto de un cliente reúne sus reportes, permisos, gastos, cotizaciones y cuentas de cobro, con presupuesto contra lo gastado y lo cobrado.", estado: "activo", relaciona: ["reportes", "permisos", "gastos", "cotizaciones", "cobros"] },
@@ -86,6 +90,7 @@ export interface InfoDoc {
   equipos?: { despuesDe: string };
 }
 
+// Plantilla por defecto para un módulo que aún no tiene réplica del formato
 function SinPlantilla() {
   return createElement(
     "p",
@@ -94,6 +99,7 @@ function SinPlantilla() {
   );
 }
 
+// Los módulos son estáticos: se resuelve una vez por tipo y se reutiliza
 const cache = new Map<TipoDoc, InfoDoc>();
 
 /** Información completa de un tipo de documento (módulo + valores por defecto). */
@@ -149,7 +155,10 @@ export function valorDoc(d: Documento): number | null {
 /** Etiqueta del estado con la concordancia del formato («Aprobada», «Aceptada»). */
 export const etiquetaEstado = (tipo: TipoDoc, estado: Estado) => infoDoc(tipo).etiquetasEstado[estado];
 
-/** Prefijo del consecutivo: el configurado por la organización o el del módulo. */
+/**
+ * Prefijo del consecutivo: el configurado por la organización (`prefijos`, o los
+ * campos antiguos `prefijoReporte`/`prefijoPermiso`/`prefijoGasto`) o el del módulo.
+ */
 export function prefijoDe(config: Config, tipo: TipoDoc): string {
   const propio = { reporte: config.prefijoReporte, permiso: config.prefijoPermiso, gasto: config.prefijoGasto } as Partial<Record<TipoDoc, string>>;
   return config.prefijos?.[tipo] || propio[tipo] || infoDoc(tipo).prefijo;
@@ -158,6 +167,7 @@ export function prefijoDe(config: Config, tipo: TipoDoc): string {
 /** Ruta del generador de un tipo de documento. */
 export const rutaNuevo = (tipo: TipoDoc, query = "") => `/app/nuevo/${tipo}${query ? `?${query}` : ""}`;
 
+/** Módulo de un tipo de documento con sus datos tipados (sin los valores por defecto de `infoDoc`). */
 export function moduloDe<T extends TipoDoc>(tipo: T): ModuloDocumento<DatosDe<T>> {
   return DOCUMENTOS[tipo];
 }

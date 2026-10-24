@@ -1,10 +1,11 @@
-import type { Equipo, EstadoEquipo, SistemaEquipo } from "./tipos";
-
 /**
  * Inventario de ejemplo (clientes, ubicaciones y seriales ficticios; las marcas
  * son solo fabricantes de equipos). Los reportes de la semilla los marcan como
  * atendidos (EQUIPOS_DE_DOC), así cada ficha ya trae historial.
  */
+import type { Equipo, EstadoEquipo, SistemaEquipo } from "./tipos";
+
+// Una fila compacta por equipo; estado y notas son opcionales
 type Fila = [id: string, sistema: SistemaEquipo, tipo: string, nombre: string, marca: string, modelo: string, serial: string, ubicacion: string, estado?: EstadoEquipo, notas?: string];
 
 const CLAY: Fila[] = [
@@ -54,8 +55,10 @@ const PUERTO: Fila[] = [
   ["eq-puerto-fd2", "incendio", "Detector de humo", "Detector de humo B2-01", "Notifier", "FSP-851", "", "Bodega 2"],
 ];
 
+// Proyecto de la semilla al que se cargan los equipos de cada cliente (los de c-puerto quedan sin proyecto)
 const PROYECTO: Record<string, string> = { "c-clay": "p-1", "c-conj": "p-4", "c-tango": "p-2" };
 
+/** Equipos de la demo, con el evento «Registró el equipo» en su historial. */
 export function equiposSeed(): Equipo[] {
   const armar = (clienteId: string, filas: Fila[], fecha: string, autor: string): Equipo[] =>
     filas.map(([id, sistema, tipo, nombre, marca, modelo, serial, ubicacion, estado = "operativo", notas = ""]) => ({

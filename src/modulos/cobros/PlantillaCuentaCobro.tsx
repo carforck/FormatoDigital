@@ -1,4 +1,11 @@
 /* eslint-disable @next/next/no-img-element */
+
+/**
+ * Plantilla de la cuenta de cobro (solo lectura): «DEBE A … LA SUMA DE …» con el
+ * valor en letras, ítems con el código del reporte que los respalda, IVA y datos
+ * bancarios de Configuración. Se edita en su propia pantalla, no en línea.
+ */
+
 import { cop, pesosEnLetras } from "@/nucleo/letras";
 import { asset } from "@/nucleo/rutas";
 import type { Cliente, Config, Documento, Proyecto } from "@/nucleo/tipos";
@@ -17,6 +24,7 @@ interface Props {
   firmante?: string;
 }
 
+// «25 de septiembre de 2026»; fecha local para que la zona horaria no cambie el día
 function fechaLarga(iso: string) {
   const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });

@@ -1,11 +1,11 @@
-import type { DatosCotizacion, ItemCotizacion } from "./tipos";
-
 /**
  * Cálculos de la cotización (funciones puras, sin React).
  * Todo se redondea a pesos enteros: el importe de cada línea y el IVA de cada
  * tarifa sobre la suma de sus bases (como se liquida en la factura).
  */
+import type { DatosCotizacion, ItemCotizacion } from "./tipos";
 
+// Número finito o 0 (datos viejos o a medio escribir no rompen los totales)
 const num = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? n : 0);
 
 /** Importe de la línea sin impuestos (cantidad × precio, en pesos). */
@@ -13,6 +13,7 @@ export function importeItem(i: Pick<ItemCotizacion, "cantidad" | "precioUnitario
   return Math.round(Math.max(0, num(i.cantidad)) * Math.max(0, num(i.precioUnitario)));
 }
 
+/** Base e IVA de una tarifa (una fila de impuestos en los totales). */
 export interface TarifaIva {
   /** % de la tarifa (19, 5, 0). */
   pct: number;
@@ -32,6 +33,7 @@ export function ivaPorTarifa(items: ItemCotizacion[]): TarifaIva[] {
   return [...bases.entries()].sort((a, b) => b[0] - a[0]).map(([pct, base]) => ({ pct, base, iva: Math.round((base * pct) / 100) }));
 }
 
+/** Totales de la cotización: subtotal, IVA por tarifa y total. */
 export interface TotalesCotizacion {
   /** Base sin impuestos. */
   subtotal: number;
@@ -40,6 +42,7 @@ export interface TotalesCotizacion {
   total: number;
 }
 
+/** Subtotal, IVA (suma de las tarifas ya redondeadas) y total; el total es el `valor` del documento. */
 export function totalesCotizacion(d: Pick<DatosCotizacion, "items">): TotalesCotizacion {
   const tarifas = ivaPorTarifa(d.items);
   const subtotal = tarifas.reduce((a, t) => a + t.base, 0);

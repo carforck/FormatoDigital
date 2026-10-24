@@ -1,3 +1,10 @@
+/**
+ * Módulo de documento Cotización (prefijo COT): comercial, solo la
+ * administración (`requiere: "cotizar"`). La aprueba y la envía al cliente en un
+ * solo paso, sin revisor aparte; el cliente la acepta firmando. Reexporta lo que
+ * usan otras pantallas (plantilla, cálculos y catálogo).
+ */
+
 import type { ModuloDocumento } from "@/modulos/contrato";
 import { cop, pesosEnLetras } from "@/nucleo/letras";
 
@@ -21,11 +28,13 @@ import { PlantillaCotizacion } from "./PlantillaCotizacion";
 import type { DatosCotizacion } from "./tipos";
 import { COMPROBACIONES_COTIZACION, faltantesCotizacion } from "./validar";
 
+// Fecha local AAAA-MM-DD (la de aceptación es la del dispositivo que firma, no UTC)
 const hoyLocal = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
+// Resumen que el asistente muestra en el chat al cambiar los ítems
 const resumenTotal = (d: Pick<DatosCotizacion, "items">) => {
   const { subtotal, iva, total } = totalesCotizacion(d);
   return `Subtotal ${cop(subtotal)} + IVA ${cop(iva)} = ${cop(total)} (${pesosEnLetras(total).toLowerCase()}).`;
@@ -139,6 +148,7 @@ export const moduloCotizaciones: ModuloDocumento<DatosCotizacion> = {
 
   aplicarFirma: (campo, imagen, d) => (campo === "firmaCliente" ? { firmaCliente: imagen, aceptaFecha: d.aceptaFecha || hoyLocal() } : ({ [campo]: imagen } as Partial<DatosCotizacion>)),
 
+  // La copia conserva los días de validez de la original (o `DIAS_VALIDEZ`) e ids nuevos en las líneas
   duplicar: (d, hoy) => ({
     ...d,
     fecha: hoy,

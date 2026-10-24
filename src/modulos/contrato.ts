@@ -1,3 +1,9 @@
+/**
+ * Contrato que implementa cada módulo de documento (reporte, permiso, gasto,
+ * cotización): datos, pasos del asistente, validación, plantilla y flujo.
+ * El registro (`registro.ts`) completa los miembros opcionales con valores por
+ * defecto; el resto de la aplicación solo habla con este contrato.
+ */
 import type { ComponentType } from "react";
 
 import type { Paso, ValorPaso } from "@/components/chat/ChatAsistente";
@@ -93,6 +99,7 @@ export interface FlujoDocumento<D> {
  * (`infoDoc`), así un módulo nuevo compila con lo mínimo y se completa después.
  */
 export interface ModuloDocumento<D> {
+  /** Tipo de documento; también es la clave en `formatos.clave` de la base de datos. */
   clave: TipoDoc;
   /** Contenido inicial del formato para un usuario. */
   vacio: (hoy: string, usuario: Usuario) => D;

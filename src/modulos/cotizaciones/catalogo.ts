@@ -1,3 +1,9 @@
+/**
+ * Catálogos de la cotización: control documental, IVA, unidades, servicios con
+ * precios de referencia, condiciones sugeridas, contenido inicial y la lectura de
+ * ítems escritos en texto (paso «items» del asistente).
+ */
+
 import type { InfoFormato } from "@/modulos/contrato";
 
 import { cantidadTexto, sumarDias } from "./calculos";
@@ -23,6 +29,7 @@ export const FORMATO_COTIZACION: InfoFormato = {
 
 /** IVA general en Colombia. */
 export const IVA_GENERAL = 19;
+/** Tarifas de IVA que ofrece el selector de cada línea. */
 export const TARIFAS_IVA = [19, 5, 0] as const;
 
 /** Días de validez por defecto (vencimiento = fecha + 30). */
@@ -45,6 +52,7 @@ export interface EmpresaCotizacion {
   nit: string;
 }
 
+/** Valores por defecto de la empresa (los de Configuración tienen prioridad). */
 export const EMPRESA_COTIZACION: EmpresaCotizacion = {
   nombre: "SOTEC",
   lema: "Tu acceso eficaz a la seguridad electrónica",
@@ -58,6 +66,7 @@ export const EMPRESA_COTIZACION: EmpresaCotizacion = {
 /** Unidades de medida (en plural, como en el formato: «32,00 Unidades»). */
 export const UNIDADES = ["Unidades", "Metros", "Puntos", "Servicios", "Visitas", "Horas", "Global"] as const;
 
+/** Servicio del catálogo que se convierte en una línea de la cotización. */
 export interface ServicioCatalogo {
   clave: string;
   descripcion: string;
@@ -88,12 +97,14 @@ export const SUGERENCIAS_FORMA_PAGO = ["50 % de anticipo y 50 % contra entrega",
 export const SUGERENCIAS_TIEMPO_ENTREGA = ["5 días hábiles después de la aprobación", "Inmediato, según disponibilidad", "15 días hábiles después del anticipo"];
 export const SUGERENCIAS_GARANTIA = ["6 meses sobre mano de obra; equipos según el fabricante", "12 meses sobre equipos y mano de obra", "3 meses sobre mano de obra"];
 
+/** Condiciones con que arranca una cotización nueva (la primera sugerencia de cada una). */
 export const CONDICIONES_DEFECTO = {
   formaPago: SUGERENCIAS_FORMA_PAGO[0],
   tiempoEntrega: SUGERENCIAS_TIEMPO_ENTREGA[0],
   garantia: SUGERENCIAS_GARANTIA[0],
 };
 
+/** Cotización en blanco: vence a los `DIAS_VALIDEZ` días y trae las condiciones por defecto. */
 export function cotizacionVacia(fecha: string): DatosCotizacion {
   return {
     fecha,
@@ -117,14 +128,17 @@ export function cotizacionVacia(fecha: string): DatosCotizacion {
   };
 }
 
+// Contador de la sesión: dos líneas creadas en el mismo milisegundo no repiten id
 let seq = 0;
 /** Id único para una línea nueva. */
 export const idItem = () => `cot-${Date.now().toString(36)}-${(++seq).toString(36)}`;
 
+/** Línea nueva en blanco (1 unidad, IVA general). */
 export function itemVacio(): ItemCotizacion {
   return { id: idItem(), descripcion: "", detalle: "", cantidad: 1, unidad: "Unidades", precioUnitario: 0, ivaPct: IVA_GENERAL };
 }
 
+/** Línea nueva a partir de un servicio del catálogo, con su precio de referencia. */
 export function itemDeCatalogo(s: ServicioCatalogo, cantidad = 1): ItemCotizacion {
   return { id: idItem(), descripcion: s.descripcion, detalle: s.detalle ?? "", cantidad, unidad: s.unidad, precioUnitario: s.precioReferencia, ivaPct: s.ivaPct };
 }
@@ -152,6 +166,7 @@ export function leerNumero(s: string, decimales: boolean): number {
   return /^\d+$/.test(t) ? Number(t) : NaN;
 }
 
+/** Unidad del catálogo que corresponde a lo escrito: sin tildes, singular o plural, o un prefijo de 3+ letras. */
 function unidadDe(token: string): string | undefined {
   const t = quitarTildes(token);
   if (!t) return undefined;
@@ -167,6 +182,7 @@ export function lineaDeItem(i: ItemCotizacion): string {
   return `${cant} ${i.unidad.toLowerCase()} x ${i.descripcion}${i.detalle ? ` | ${i.detalle}` : ""} @ ${i.precioUnitario.toLocaleString("es-CO")}${i.ivaPct !== IVA_GENERAL ? ` [${i.ivaPct}%]` : ""}`;
 }
 
+/** Resultado de `leerItems`: los ítems leídos y los errores por línea. */
 export type LecturaItems = { items: ItemCotizacion[]; errores: string[] };
 
 /**

@@ -1,6 +1,16 @@
+/**
+ * Validación del permiso de trabajo antes de enviarlo a revisión, con las
+ * reglas del SG-SST (alturas, riesgo eléctrico, verificaciones en «NO»).
+ */
+
 import { PREGUNTAS_VERIFICACION } from "./catalogo";
 import type { DatosPermiso } from "./tipos";
 
+/**
+ * Pendientes antes de enviar a revisión (vacía = listo). Además de los campos
+ * obligatorios: caída desde altura exige lista de alturas y arnés; riesgo
+ * eléctrico, una medida de control; y cualquier verificación en «NO» bloquea.
+ */
 export function faltantesPermiso(d: DatosPermiso): string[] {
   const f: string[] = [];
   if (!d.fechaEmision) f.push("Fecha de emisión");

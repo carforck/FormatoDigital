@@ -1,15 +1,16 @@
-import type { Cliente, Documento, Evento, Usuario } from "@/nucleo/tipos";
-
-import { ETIQUETA_ESTADO_EQUIPO, esSistema } from "./catalogo";
-import { equipoRepetido, equipoVacio, equiposIdsDe, faltantesEquipo, idEquipo, puedeEditarEquipos, puedeEliminarEquipos } from "./logica";
-import type { Equipo, EquipoMinimo, EstadoEquipo } from "./tipos";
-
 /**
  * Reglas del inventario como funciones puras: el proveedor de datos de la demo
  * las aplica dentro de su actualización de estado (revalidan con el estado más
  * reciente, así un doble clic o dos pestañas no duplican ni pisan nada) y la
  * base de datos aplica las mismas en 0010 (RLS y trigger equipos_coherencia).
  */
+import type { Cliente, Documento, Evento, Usuario } from "@/nucleo/tipos";
+
+import { ETIQUETA_ESTADO_EQUIPO, esSistema } from "./catalogo";
+import { equipoRepetido, equipoVacio, equiposIdsDe, faltantesEquipo, idEquipo, puedeEditarEquipos, puedeEliminarEquipos } from "./logica";
+import type { Equipo, EquipoMinimo, EstadoEquipo } from "./tipos";
+
+/** Resultado de una regla: la lista nueva (o la misma si no hubo cambio), el equipo afectado y el error. */
 export interface Cambio {
   equipos: Equipo[];
   equipo: Equipo | null;
@@ -19,6 +20,7 @@ export interface Cambio {
   auditoria?: [string, string];
 }
 
+// Quién actúa, el directorio de clientes y la hora del cambio
 interface Ctx {
   usuario: Usuario | undefined;
   clientes: Cliente[];

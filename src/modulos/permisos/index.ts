@@ -1,3 +1,10 @@
+/**
+ * Módulo de documento F-GSST-13 · Permiso de trabajo (prefijo PT): asistente
+ * con atajos por actividad, firmas por ejecutor y flujo propio. Al aprobar, el
+ * revisor firma como «quien autoriza»; el cierre lo diligencia el emisor en el
+ * formato (`cierre: "formulario"`). Visible para el cliente.
+ */
+
 import type { ModuloDocumento } from "@/modulos/contrato";
 
 import { EPP, EQUIPO_REQUERIDO, MEDIDAS, PELIGROS, PLANTILLAS_ACTIVIDAD, PREGUNTAS_VERIFICACION, permisoVacio } from "./catalogo";
@@ -49,6 +56,7 @@ export const moduloPermisos: ModuloDocumento<DatosPermiso> = {
     { id: "sitioTrabajo", tipo: "texto", resaltar: "sitioTrabajo", pregunta: "¿Cuál es el sitio de trabajo?", sugerencias: d.sitioTrabajo ? [d.sitioTrabajo] : [] },
     { id: "hora", tipo: "hora", resaltar: "hora", pregunta: "¿A qué hora se emite el permiso?", sugerencias: ["07:00", "07:30", "08:00", "13:00"], ayuda: `Fecha de emisión: ${d.fechaEmision}. Puedes cambiarla en el formato.` },
     {
+      // Elegir una actividad precarga su plantilla (ver `aplicar`) y la escribe en «Puesto / proyecto»
       id: "puestoProyecto",
       tipo: "select",
       resaltar: "puestoProyecto",
@@ -85,6 +93,7 @@ export const moduloPermisos: ModuloDocumento<DatosPermiso> = {
       }
       return { cambio: { puestoProyecto: "" }, mensaje: "Escribe el puesto o proyecto directamente en el formato (clic sobre el campo)." };
     }
+    // El formato imprime la hora en 12 h con casilla AM/PM
     if (id === "hora") {
       const [h, mm] = (v as string).split(":").map(Number);
       if (Number.isNaN(h)) return { cambio: {} };

@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Plantilla del FO-GSST-22 · Reporte técnico: réplica en carta del formato con
+ * edición en línea, firmas del técnico y del cliente, equipos atendidos y el
+ * registro fotográfico como hoja(s) anexa(s) con el mismo encabezado.
+ */
+
 import { Camera, Trash2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -24,10 +30,10 @@ interface Props {
   equipos?: EquipoAtendido[];
 }
 
-/** Réplica del FO-GSST-22 · Formato de reporte técnico (carta). */
 /** Campos de texto del formato (todo menos el registro fotográfico). */
 type CampoTexto = Exclude<keyof DatosReporte, "fotos">;
 
+/** Réplica del FO-GSST-22 · Formato de reporte técnico (carta). El anexo de fotos solo sale si hay fotos o se está editando. */
 export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, equipos = [] }: Props) {
   const fotos = datos.fotos ?? [];
   const campo = (k: CampoTexto, opts: { multiline?: boolean; type?: "text" | "date" | "time" | "email" | "tel"; placeholder?: string } = {}) => (
@@ -162,6 +168,7 @@ function AnexoFotos({ fotos, codigoDoc, editar, resaltar }: { fotos: FotoReporte
   );
 }
 
+/** Una hoja del anexo; solo la última ofrece «Agregar fotos» (máx. 12 por carga, comprimidas). */
 function HojaFotos({
   fotos,
   grupo,

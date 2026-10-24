@@ -1,3 +1,9 @@
+/**
+ * Tipos del módulo Equipos (inventario simple por cliente y sistema). Se guardan
+ * en public.equipos y la relación con los reportes en public.documento_equipos
+ * (0010_equipos.sql). Reexportados en `@/nucleo/tipos`.
+ */
+
 import type { Evento } from "@/nucleo/tipos";
 
 import type { SISTEMAS } from "./catalogo";

@@ -1,3 +1,9 @@
+/**
+ * Módulo de documento FO-GSST-25 · Legalización de gastos (prefijo LG):
+ * interno (el cliente nunca lo ve), Vo.Bo. con firma al aprobar y cierre de un
+ * revisor al reembolsar. Su total suma a los gastos del proyecto (`valor`).
+ */
+
 import type { ModuloDocumento } from "@/modulos/contrato";
 import { cop } from "@/nucleo/letras";
 

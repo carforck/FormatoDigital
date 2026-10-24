@@ -1,3 +1,8 @@
+/**
+ * Piezas visuales del módulo Equipos: íconos por tipo y por sistema y la
+ * insignia de estado.
+ */
+
 import {
   BatteryCharging,
   Cable,
@@ -32,6 +37,7 @@ import type { EstadoEquipo } from "./tipos";
 
 type Icono = typeof Cctv;
 
+// Ícono de cada sistema del catálogo (al agregar un sistema, agregar aquí su ícono)
 const POR_SISTEMA: Record<string, Icono> = { cctv: Cctv, alarmas: Siren, acceso: Fingerprint, incendio: Flame, computo: Monitor, cerca: Zap };
 
 // El primero que coincide con el tipo gana; si ninguno, el ícono del sistema
@@ -62,6 +68,7 @@ export function IconoEquipo({ tipo, sistema, className = "h-5 w-5" }: { tipo: st
   return <I className={className} aria-hidden />;
 }
 
+/** Ícono del sistema (Cpu si la clave no está en el catálogo). */
 export function IconoSistema({ sistema, className = "h-4 w-4" }: { sistema: string; className?: string }) {
   const I = POR_SISTEMA[sistema] ?? Cpu;
   return <I className={className} aria-hidden />;

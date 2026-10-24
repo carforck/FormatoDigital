@@ -1,3 +1,10 @@
+/**
+ * Módulo de documento FO-GSST-22 · Reporte técnico (prefijo RT): pasos del
+ * asistente, autollenado por cliente y proyecto, equipos atendidos y flujo.
+ * Visible para el cliente; se cierra con la firma del cliente (en sitio o por
+ * enlace) y sus ítems alimentan las cuentas de cobro.
+ */
+
 import type { ModuloDocumento } from "@/modulos/contrato";
 
 import { TIPOS_REPORTE, reporteVacio } from "./catalogo";
@@ -18,6 +25,7 @@ Como acción ${tipo === "preventivo" ? "preventiva" : "correctiva"}, se ejecutan
 Finalmente se realizan pruebas de funcionamiento junto con ${d.personaContactada || "la persona contactada"}, confirmando que el sistema queda operando bajo condiciones normales.`;
 }
 
+// Minutos del día ⇄ "HH:MM" (sugerencias de hora del asistente)
 const hhmm = (min: number) => `${String(Math.floor(min / 60) % 24).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 const minutos = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5));
 /** Hora actual redondeada a 5 minutos (sugerencia de llegada o salida). */

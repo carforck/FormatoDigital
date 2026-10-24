@@ -1,3 +1,9 @@
+/**
+ * Lógica pura del módulo Equipos: permisos, normalización de nombres, ids
+ * estables, historial a partir de los documentos, agrupación por sistema y lo
+ * que imprime el formato.
+ */
+
 import { puede } from "@/nucleo/permisos";
 import type { Documento, Rol, Usuario } from "@/nucleo/tipos";
 
@@ -15,7 +21,10 @@ export function puedeVerEquipo(u: Usuario, e: Equipo): boolean {
   return u.rol === "cliente" ? e.clienteId === u.clienteId : true;
 }
 
-/** Texto comparable: sin tildes, minúsculas, sin guiones ni espacios repetidos. */
+/**
+ * Texto comparable: sin tildes, minúsculas, sin guiones ni espacios repetidos.
+ * Es más estricto que el índice único de la base (que solo ignora mayúsculas y espacios).
+ */
 export function normalizar(s: string): string {
   return s
     .normalize("NFD")

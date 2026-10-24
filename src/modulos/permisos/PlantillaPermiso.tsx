@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Plantilla del F-GSST-13 · Permiso de trabajo: réplica en A4 con casillas,
+ * verificaciones SI/NO/N/A, grupo ejecutor (mínimo 5 filas impresas) y la
+ * sección de cierre, que se edita aparte con `editarCierre`.
+ */
+
 import { EPP, EQUIPO_REQUERIDO, MEDIDAS, PELIGROS, PREGUNTAS_VERIFICACION } from "@/modulos/permisos/catalogo";
 import { cn } from "@/lib/utils";
 import type { DatosPermiso, Ejecutor, SiNoNa } from "@/nucleo/tipos";
@@ -7,6 +13,7 @@ import type { DatosPermiso, Ejecutor, SiNoNa } from "@/nucleo/tipos";
 import { EditableText } from "@/components/docs/EditableText";
 import { Encabezado, Firma } from "@/components/docs/Encabezado";
 
+/** Campos que se firman en el pad; `ejecutor:<i>` es la fila i del grupo ejecutor. */
 export type CampoFirmaPermiso = "firmaAutoriza" | "firmaEncargado" | "firmaCierre" | `ejecutor:${number}`;
 
 interface Props {

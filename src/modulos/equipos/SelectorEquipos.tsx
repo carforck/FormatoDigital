@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Selector de equipos atendidos del generador (paso del asistente y formulario):
+ * marca equipos del cliente del documento y crea nuevos con lo mínimo.
+ */
+
 import { useId, useMemo, useRef, useState } from "react";
 import { Check, Plus, Search, X } from "lucide-react";
 
@@ -17,7 +22,7 @@ interface Props {
   onCambiar: (ids: string[]) => void;
   /** Crea un equipo con lo mínimo; sin esta función no se ofrece crear. */
   crear?: (m: Omit<EquipoMinimo, "clienteId" | "proyectoId">) => ResultadoEquipo;
-  /** Proyecto del documento: sus equipos salen primero y se ofrece filtrar por él. */
+  /** Proyecto del documento: se ofrece filtrar por sus equipos (filtro activo de entrada si hay de ambos). */
   proyectoId?: string;
   /** El documento aún no tiene un cliente del directorio. */
   sinCliente?: boolean;

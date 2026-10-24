@@ -1,6 +1,13 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+
+/**
+ * Plantilla del FO-GSST-25 · Legalización de gastos: réplica en A4 con los
+ * colores del formato de SOTEC (encabezado propio, no el `Encabezado` común),
+ * tabla de ítems editable y las fotos de las facturas en hojas anexas «Soportes».
+ */
+
 import { Camera, Plus, Receipt, Trash2 } from "lucide-react";
 
 import { EditableText } from "@/components/docs/EditableText";
@@ -14,6 +21,7 @@ import { asset } from "@/nucleo/rutas";
 import { TIPOS_GASTO } from "./catalogo";
 import { totalGastos, totalItemGasto, type DatosGasto, type ItemGasto, type TipoGasto } from "./tipos";
 
+/** Campos que se firman en el pad (el Vo.Bo. se firma al aprobar, no desde la plantilla). */
 export type CampoFirmaGasto = "firmaColaborador" | "firmaVobo";
 
 interface Props {
@@ -146,6 +154,7 @@ export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: P
             </tr>
           </thead>
           <tbody>
+            {/* Sin ítems: una fila guía por tipo de gasto (solo visual, no se guarda) */}
             {datos.items.length === 0 &&
               TIPOS_GASTO.map((t, k) => (
                 <tr key={t} className="text-slate-400">

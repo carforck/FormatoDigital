@@ -1,9 +1,13 @@
+/**
+ * Catálogo del módulo Equipos: sistemas con sus tipos sugeridos y los estados
+ * de un equipo (etiquetas y colores).
+ */
 import type { EstadoEquipo, SistemaEquipo } from "./tipos";
 
 /**
  * Sistemas en los que se agrupan los equipos de un cliente. Para agregar uno
- * basta una entrada aquí (y su ícono en IconoEquipo.tsx): la base de datos
- * guarda la clave como texto, sin lista cerrada.
+ * basta una entrada aquí (y su ícono en `POR_SISTEMA` de piezas.tsx): la base de
+ * datos guarda la clave como texto, sin lista cerrada.
  */
 export const SISTEMAS = [
   {
@@ -44,8 +48,10 @@ export const SISTEMAS = [
   },
 ] as const;
 
+/** Claves de los sistemas, en el orden del catálogo. */
 export const CLAVES_SISTEMA = SISTEMAS.map((s) => s.clave) as SistemaEquipo[];
 
+/** Si la clave es de un sistema del catálogo. */
 export const esSistema = (x: string): x is SistemaEquipo => (CLAVES_SISTEMA as string[]).includes(x);
 
 /** Sistema por clave (con un valor por defecto si la clave no está en el catálogo). */
@@ -53,6 +59,7 @@ export function sistemaDe(clave: string) {
   return SISTEMAS.find((s) => s.clave === clave) ?? { clave, nombre: clave || "Sin sistema", corto: clave || "Sin sistema", tipos: [] as readonly string[] };
 }
 
+/** Etiqueta visible de cada estado del equipo. */
 export const ETIQUETA_ESTADO_EQUIPO: Record<EstadoEquipo, string> = {
   operativo: "Operativo",
   con_falla: "Con falla",
@@ -68,4 +75,5 @@ export const COLOR_ESTADO_EQUIPO: Record<EstadoEquipo, string> = {
   retirado: "bg-slate-100 text-slate-700 ring-slate-200",
 };
 
+/** Estados en el orden de los selectores. */
 export const ESTADOS_EQUIPO = Object.keys(ETIQUETA_ESTADO_EQUIPO) as EstadoEquipo[];

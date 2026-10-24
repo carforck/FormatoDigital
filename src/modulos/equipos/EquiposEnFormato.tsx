@@ -1,3 +1,7 @@
+/**
+ * Equipos atendidos tal como salen impresos en el formato (reporte técnico).
+ */
+
 import { sistemaDe } from "./catalogo";
 import type { EquipoAtendido } from "./tipos";
 

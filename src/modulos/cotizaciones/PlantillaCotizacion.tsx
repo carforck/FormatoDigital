@@ -1,6 +1,13 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+
+/**
+ * Plantilla de la cotización: réplica en carta de la cotización de Odoo de SOTEC
+ * (colores y encabezado propios), ítems editables con catálogo, IVA por tarifa,
+ * valor en letras, condiciones comerciales y aceptación con la firma del cliente.
+ */
+
 import { Plus, Trash2 } from "lucide-react";
 
 import { EditableText } from "@/components/docs/EditableText";
@@ -14,6 +21,7 @@ import { cantidadTexto, diasEntre, fechaCorta, importeItem, totalesCotizacion } 
 import { CATALOGO_SERVICIOS, EMPRESA_COTIZACION, FORMATO_COTIZACION, TARIFAS_IVA, UNIDADES, itemDeCatalogo, itemVacio, type EmpresaCotizacion } from "./catalogo";
 import type { DatosCotizacion, ItemCotizacion } from "./tipos";
 
+/** Props de la plantilla: las comunes más los datos de empresa propios de la cotización (lema, web). */
 export interface PropsPlantillaCotizacion extends PropsPlantilla<DatosCotizacion> {
   /** Datos de la empresa para el encabezado y el pie (teléfono, NIT…). Por defecto: `EMPRESA_COTIZACION`. */
   empresa?: Partial<EmpresaCotizacion>;
@@ -59,6 +67,7 @@ export function PlantillaCotizacion({ datos, codigoDoc, editar, firmar, resaltar
   );
 
   const item = (id: string, patch: Partial<ItemCotizacion>) => editar?.({ items: datos.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) });
+  // Acepta coma decimal es-CO; negativos o texto quedan en 0
   const numero = (v: string) => Math.max(0, Number(String(v).replace(",", ".")) || 0);
 
   const etiqueta = "text-[12px] leading-tight" as const;

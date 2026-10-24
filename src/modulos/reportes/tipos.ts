@@ -1,3 +1,8 @@
+/**
+ * Tipos del reporte técnico (FO-GSST-22). El contenido se guarda en
+ * `documentos.datos` (jsonb); las fotos del anexo, en `archivos` (Storage).
+ */
+
 /** Foto del registro fotográfico (hoja anexa del reporte). */
 export interface FotoReporte {
   id: string;

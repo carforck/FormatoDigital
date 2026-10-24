@@ -1,8 +1,9 @@
 /**
  * Cotización comercial de SOTEC a su cliente (réplica de la cotización que hoy
  * sale de Odoo). Se guarda como un documento más (documentos.datos en la base
- * de datos). Flujo: borrador → en revisión → aprobada (= enviada al cliente) →
- * cerrada (el cliente la acepta firmando). El cliente sí la ve.
+ * de datos). Flujo sin revisor aparte: borrador → aprobada (= enviada al cliente,
+ * en un solo paso de la administración) → cerrada/aceptada (el cliente firma).
+ * El cliente sí la ve.
  */
 
 /** Línea de la cotización. Valores en pesos colombianos (enteros). */
@@ -21,6 +22,7 @@ export interface ItemCotizacion {
   ivaPct: number;
 }
 
+/** Contenido de la cotización (encabezado, ítems, condiciones y aceptación). */
 export interface DatosCotizacion {
   /** Fecha de cotización (AAAA-MM-DD). */
   fecha: string;

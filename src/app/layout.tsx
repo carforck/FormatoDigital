@@ -4,24 +4,24 @@ import "./globals.css";
 
 import { DemoProvider } from "@/nucleo/datos/DemoProvider";
 
-const SITIO = process.env.NEXT_PUBLIC_SITE_URL ?? "https://formato-digital-nine.vercel.app";
-const TITULO = "FormatoDigital · Digitaliza los formatos de tu sistema de gestión";
+const SITIO = process.env.NEXT_PUBLIC_SITE_URL ?? "https://controlone.sotecse.com";
+const TITULO = "ControlOne by SOTEC · Toda tu empresa, un solo control";
 const DESCRIPCION =
-  "Reportes técnicos, permisos de trabajo, gastos y cuentas de cobro con firma, fotos y aprobación desde el celular. Caso de cliente: SOTEC.";
+  "Control digital de todas las áreas de tu empresa: formatos, reportes, aprobaciones, firmas, proyectos, equipos y facturación, con firma, fotos y aprobación desde el celular. La plataforma de SOTEC.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITIO),
-  title: "FormatoDigital · Demo SOTEC",
+  title: "ControlOne by SOTEC · Toda tu empresa, un solo control",
   description: DESCRIPCION,
   // Vista previa al compartir el enlace (WhatsApp, LinkedIn, Facebook, X); imagen: scripts/generar-og.py
   openGraph: {
     type: "website",
     locale: "es_CO",
     url: "/",
-    siteName: "FormatoDigital",
+    siteName: "ControlOne by SOTEC",
     title: TITULO,
     description: DESCRIPCION,
-    images: [{ url: "/og.jpg", width: 1200, height: 630, type: "image/jpeg", alt: "FormatoDigital: digitalizamos y optimizamos cualquier formato de tu sistema de gestión" }],
+    images: [{ url: "/og.jpg", width: 1200, height: 630, type: "image/jpeg", alt: "ControlOne by SOTEC: toda tu empresa, un solo control" }],
   },
   twitter: { card: "summary_large_image", title: TITULO, description: DESCRIPCION, images: ["/og.jpg"] },
 };

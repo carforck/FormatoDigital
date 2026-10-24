@@ -347,7 +347,7 @@ export function CalculadoraROI() {
         <article className="doc-print bg-white p-8 text-[12px] text-black">
           <div className="flex items-center justify-between border-b-2 border-black pb-2">
             <p className="text-lg font-bold">Caso de negocio · Digitalización de formatos del SGC</p>
-            <p className="text-xs">FormatoDigital</p>
+            <p className="text-xs">ControlOne</p>
           </div>
           <p className="mt-3">
             Escenario: {num(s.formatos)} formatos al mes · {num(s.tecnicos)} personas · salario promedio {cop(s.salario)} · factor prestacional {num(s.factor, 2)} · {HORAS_MES} h/mes.

@@ -1,6 +1,9 @@
-# FormatoDigital · Demo SOTEC
+# ControlOne by SOTEC
 
-Plataforma que digitaliza los formatos de calidad y SG-SST. SOTEC es el cliente piloto:
+**Toda tu empresa, un solo control.** ControlOne (antes FormatoDigital) es la plataforma de SOTEC
+para el control digital de todas las áreas de una empresa: formatos, reportes, aprobaciones, firmas,
+proyectos, equipos y facturación. Se publica en https://controlone.sotecse.com. Primeros formatos
+digitalizados (calidad y SG-SST):
 FO-GSST-22 Reporte técnico (con registro fotográfico), F-GSST-13 Permiso de trabajo,
 FO-GSST-25 Legalización de gastos y cuentas de cobro. Asistente conversacional por pasos,
 vista previa en vivo editable, firmas, roles y flujo de aprobación.

@@ -169,7 +169,7 @@ export function armarGrafoModulos(modulos: InfoModulo[], clavesDocumento: string
     {
       id: "plataforma",
       tipo: "plataforma",
-      titulo: "Plataforma FormatoDigital",
+      titulo: "Plataforma ControlOne",
       subtitulo: nucleo ? nucleo.nombre : "Núcleo",
       descripcion: nucleo?.descripcion ?? "Usuarios, roles, firmas, archivos, PDF, consecutivos y auditoría.",
       estado: nucleo?.estado ?? "activo",

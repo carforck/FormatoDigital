@@ -53,7 +53,7 @@ export default function Landing() {
             <span className="flex h-7 w-7 items-center justify-center rounded-md bg-sotec-green text-sotec">
               <Icono><FileCheck2 className="h-4 w-4" /></Icono>
             </span>
-            FormatoDigital
+            <span>Control<span className="text-sotec-green">One</span></span>
           </Link>
           <nav className="hidden gap-5 text-sm text-white/70 lg:flex">
             <a href="#formatos" className="hover:text-white">Caso SOTEC</a>
@@ -72,46 +72,46 @@ export default function Landing() {
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden bg-sotec text-white">
-        {/* Foto de fondo: oscurecida y con degradado para mantener el contraste del texto */}
-        <div aria-hidden className="pointer-events-none absolute inset-0 lg:left-[35%]">
+      <section className="relative overflow-hidden bg-gradient-to-br from-white via-sotec-soft to-[#E9F5DC] text-slate-900">
+        {/* Foto de fondo: aclarada con un velo blanco para mantener el contraste del texto oscuro */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 lg:left-[30%] lg:[mask-image:linear-gradient(to_right,transparent,#000_35%)]">
           <img
             src={asset("/landing/tecnico-tablet-obra.webp")}
             alt=""
             width={1600}
             height={1067}
-            className="h-full w-full object-cover object-[70%_center] opacity-25 lg:opacity-45"
+            className="h-full w-full object-cover object-[70%_center] opacity-20 lg:opacity-90"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-sotec/70 via-sotec/80 to-sotec lg:bg-gradient-to-r lg:from-sotec lg:via-sotec/70 lg:to-sotec/30" />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/80 via-white/85 to-sotec-soft lg:bg-gradient-to-r lg:from-sotec-soft lg:via-sotec-soft/50 lg:to-transparent" />
         </div>
-        <FondoInteractivo />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-sotec to-transparent" />
+        <FondoInteractivo rgb="63,122,18" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-50 to-transparent" />
         <div className="container relative grid items-center gap-12 py-16 lg:grid-cols-2 lg:py-24">
           <div>
-            <p className="inline-flex items-center gap-2 rounded-full border border-sotec-green/40 bg-sotec-green/10 px-3 py-1 text-xs font-medium text-sotec-green">
-              <ShieldCheck className="h-3.5 w-3.5" /> Calidad · SG-SST · ISO 9001
+            <p className="inline-flex items-center gap-2 rounded-full border border-sotec-green/60 bg-white/80 px-3 py-1 text-xs font-medium text-sotec-greenDeep shadow-sm backdrop-blur">
+              <ShieldCheck className="h-3.5 w-3.5" /> ControlOne by SOTEC · Calidad · SG-SST · ISO 9001
             </p>
-            <h1 className="mt-5 text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
-              Digitalizamos y optimizamos <span className="text-sotec-green">cualquier formato</span> de tu sistema de gestión.
+            <h1 className="mt-5 text-4xl font-semibold leading-[1.05] tracking-tight text-sotec sm:text-5xl lg:text-6xl">
+              Toda tu empresa, <span className="text-sotec-greenDeep">un solo control</span>.
             </h1>
-            <p className="mt-5 flex flex-wrap items-center gap-2 font-mono text-sm text-white/60">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-sotec-green" /> digitalizando:
-              <span className="text-sotec-green">
-                <TextoRotativo palabras={["permisos de trabajo", "reportes técnicos", "inspecciones de EPP", "análisis de trabajo seguro", "actas y listas de chequeo", "cuentas de cobro"]} />
+            <p className="mt-5 flex flex-wrap items-center gap-2 font-mono text-sm text-slate-600">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-sotec-greenDeep" /> controlando:
+              <span className="font-semibold text-sotec-greenDeep">
+                <TextoRotativo palabras={["permisos de trabajo", "reportes técnicos", "aprobaciones y firmas", "proyectos y cotizaciones", "hojas de vida de equipos", "cuentas de cobro"]} />
               </span>
             </p>
-            <p className="mt-4 max-w-xl text-lg text-white/75">
-              De papel, Word o Excel a un formulario guiado con firmas, aprobaciones y trazabilidad lista para auditoría. Para pequeñas y grandes empresas.
+            <p className="mt-4 max-w-xl text-lg text-slate-700">
+              Digitalizamos y optimizamos cualquier formato de tu sistema de gestión y conectamos todas tus áreas: reportes, aprobaciones, firmas, proyectos, equipos y facturación, con trazabilidad lista para auditoría. Para pequeñas y grandes empresas.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/acceso" className="icono-nudge inline-flex items-center gap-2 rounded-full bg-sotec-green px-6 py-3 font-semibold text-sotec shadow-[0_0_0_0_rgba(146,208,80,0.6)] transition hover:shadow-[0_0_0_8px_rgba(146,208,80,0.15)] hover:brightness-110">
-                Probar la demo con SOTEC <ArrowRight className="h-4 w-4" />
+              <Link href="/acceso" className="icono-nudge inline-flex items-center gap-2 rounded-full bg-sotec px-6 py-3 font-semibold text-white shadow-lg shadow-sotec/20 transition hover:bg-sotec-ink">
+                Probar la demo con SOTEC <ArrowRight className="h-4 w-4 text-sotec-green" />
               </Link>
-              <a href="#contacto" className="inline-flex items-center gap-2 rounded-full border border-white/25 px-6 py-3 font-semibold hover:bg-white/10">
+              <a href="#contacto" className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white/70 px-6 py-3 font-semibold text-sotec backdrop-blur hover:border-sotec-green hover:bg-white">
                 Solicitar propuesta
               </a>
             </div>
-            <p className="mt-4 text-sm text-white/50">Sin registro ni contraseña · datos de ejemplo</p>
+            <p className="mt-4 text-sm text-slate-600">Sin registro ni contraseña · datos de ejemplo</p>
           </div>
           <LottieDigitaliza />
         </div>
@@ -273,7 +273,7 @@ export default function Landing() {
             <p className="mt-3 text-sm text-slate-500">— Frase atribuida a Lord Kelvin (William Thomson)</p>
             <figcaption className="mt-5 flex flex-col gap-4 border-l-2 border-sotec-green pl-4 sm:flex-row sm:items-center sm:justify-between">
               <span className="max-w-2xl text-slate-600">
-                Con cada formato digital, tu sistema de gestión mide en tiempo real: tiempos, aprobaciones, pendientes y cumplimiento.
+                Con ControlOne, cada área de tu empresa se mide en tiempo real: tiempos, aprobaciones, pendientes y cumplimiento.
               </span>
               <a href="#impacto" className="icono-nudge inline-flex shrink-0 items-center gap-1.5 font-semibold text-sotec-greenDeep hover:underline">
                 Ver los indicadores <ArrowRight className="h-4 w-4" />
@@ -429,9 +429,10 @@ export default function Landing() {
                 <span className="flex h-7 w-7 items-center justify-center rounded-md bg-sotec-green text-sotec">
                   <FileCheck2 className="h-4 w-4" />
                 </span>
-                FormatoDigital
+                <span>Control<span className="text-sotec-green">One</span></span>
+                <span className="text-xs font-normal text-white/60">by SOTEC</span>
               </p>
-              <p className="mt-2 text-sm">Digitalización de formatos para sistemas de gestión</p>
+              <p className="mt-2 text-sm">Toda tu empresa, un solo control: formatos, aprobaciones, proyectos, equipos y cobros.</p>
             </div>
             <p className="text-sm">
               Desarrollado por{" "}
@@ -449,11 +450,11 @@ export default function Landing() {
             <p className="font-semibold uppercase tracking-wider text-white/60">Notas</p>
             <ul className="mt-2 space-y-1">
               <li>* Cifras ilustrativas de un piloto típico (50 min en papel frente a 9 min digital por formato).</li>
-              <li>Las normas ISO y la legislación se citan solo como referencia; FormatoDigital no otorga certificación ni está avalado por ISO u organismos certificadores.</li>
+              <li>Las normas ISO y la legislación se citan solo como referencia; ControlOne no otorga certificación ni está avalado por ISO u organismos certificadores.</li>
               <li>Los clientes, personas y datos de la demo son ficticios. SOTEC aparece con su autorización.</li>
               <li>Fotografías: Pexels (licencia libre).</li>
             </ul>
-            <p className="mt-4">© {new Date().getFullYear()} FormatoDigital · Prototipo de demostración para SOTEC</p>
+            <p className="mt-4">© {new Date().getFullYear()} ControlOne by SOTEC · Prototipo de demostración</p>
           </div>
         </div>
       </footer>

@@ -39,7 +39,7 @@ export function PapelVsDigital() {
           </p>
           <span />
           <p className="group flex items-center gap-2 px-5 text-sm font-semibold uppercase tracking-wider text-sotec-greenDeep">
-            <Icono icon={FileCheck2} className="h-4 w-4" /> Con FormatoDigital
+            <Icono icon={FileCheck2} className="h-4 w-4" /> Con ControlOne
           </p>
         </div>
         <div className="space-y-3">

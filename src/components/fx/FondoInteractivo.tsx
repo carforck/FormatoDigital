@@ -7,7 +7,7 @@ import { useEffect, useRef } from "react";
  * y se iluminan / apartan alrededor del cursor. Se pausa fuera de pantalla y
  * queda estática con prefers-reduced-motion.
  */
-export function FondoInteractivo({ densidad = 0.00009 }: { densidad?: number }) {
+export function FondoInteractivo({ densidad = 0.00009, rgb = "146,208,80" }: { densidad?: number; rgb?: string }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export function FondoInteractivo({ densidad = 0.00009 }: { densidad?: number }) 
           const b = ps[j];
           const d = Math.hypot(a.x - b.x, a.y - b.y);
           if (d < 120) {
-            ctx.strokeStyle = `rgba(146,208,80,${(1 - d / 120) * 0.22})`;
+            ctx.strokeStyle = `rgba(${rgb},${(1 - d / 120) * 0.22})`;
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
@@ -67,13 +67,13 @@ export function FondoInteractivo({ densidad = 0.00009 }: { densidad?: number }) 
         }
         const dm = Math.hypot(a.x - mouse.x, a.y - mouse.y);
         if (dm < 180) {
-          ctx.strokeStyle = `rgba(146,208,80,${(1 - dm / 180) * 0.55})`;
+          ctx.strokeStyle = `rgba(${rgb},${(1 - dm / 180) * 0.55})`;
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
           ctx.lineTo(mouse.x, mouse.y);
           ctx.stroke();
         }
-        ctx.fillStyle = dm < 180 ? "rgba(146,208,80,0.95)" : "rgba(146,208,80,0.5)";
+        ctx.fillStyle = dm < 180 ? `rgba(${rgb},0.95)` : `rgba(${rgb},0.5)`;
         ctx.beginPath();
         ctx.arc(a.x, a.y, a.r + (dm < 180 ? 1 : 0), 0, Math.PI * 2);
         ctx.fill();
@@ -109,7 +109,7 @@ export function FondoInteractivo({ densidad = 0.00009 }: { densidad?: number }) 
       host.removeEventListener("pointermove", mover);
       host.removeEventListener("pointerleave", salir);
     };
-  }, [densidad]);
+  }, [densidad, rgb]);
 
   return <canvas ref={ref} aria-hidden className="pointer-events-none absolute inset-0 h-full w-full" />;
 }

@@ -6,6 +6,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export function faltantesReporte(d: DatosReporte): string[] {
   const f: string[] = [];
   if (!d.fecha) f.push("Fecha");
+  if (d.horaLlegada && d.horaSalida && d.horaSalida <= d.horaLlegada) f.push("Hora de salida posterior a la de llegada");
   if (!d.tipoReporte) f.push("Tipo de reporte");
   if (!d.cliente.trim()) f.push("Cliente");
   if (!d.personaContactada.trim()) f.push("Persona contactada");

@@ -82,3 +82,38 @@ export function meses(docs: Documento[], n = 6, hoy = new Date()) {
 
 export const ESTADOS_ORDEN: Estado[] = ["borrador", "en_revision", "aprobado", "cerrado", "rechazado"];
 export { TIPOS_DOC as TIPOS_ORDEN } from "@/modulos/registro";
+
+const MESES_LARGO = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+/** Últimos `n` meses para el filtro «Mes» del tablero (el actual primero). */
+export function mesesFiltro(n = 12, hoy = new Date()) {
+  return Array.from({ length: n }).map((_, k) => {
+    const dt = new Date(hoy.getFullYear(), hoy.getMonth() - k, 1);
+    return { clave: `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`, nombre: `${MESES_LARGO[dt.getMonth()]} ${dt.getFullYear()}` };
+  });
+}
+
+/** Rango de un mes (AAAA-MM) y del mes anterior, con la misma forma que `rango`. */
+export function rangoMes(clave: string) {
+  const [y, m] = clave.split("-").map(Number);
+  const desde = new Date(Date.UTC(y, m - 1, 1));
+  const hasta = new Date(Date.UTC(y, m, 1));
+  const prevDesde = new Date(Date.UTC(y, m - 2, 1));
+  return { desde: iso(desde), hasta: iso(hasta), prevDesde: iso(prevDesde), prevHasta: iso(desde), dias: (hasta.getTime() - desde.getTime()) / DIA };
+}
+
+/** Horas en sitio de un reporte (llegada → salida); null si no las registró. */
+export function horasServicio(d: Documento): number | null {
+  if (d.tipo !== "reporte") return null;
+  const { horaLlegada: a, horaSalida: b } = d.datos as { horaLlegada?: string; horaSalida?: string };
+  if (!a || !b) return null;
+  const min = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5));
+  const dif = min(b) - min(a);
+  return dif > 0 ? dif / 60 : null;
+}
+
+/** Promedio y total de horas en sitio de los reportes que las registran. */
+export function tiempoServicio(docs: Documento[]) {
+  const h = docs.map(horasServicio).filter((x): x is number => x !== null);
+  return { promedio: h.length ? h.reduce((a, b) => a + b, 0) / h.length : null, total: h.reduce((a, b) => a + b, 0), servicios: h.length };
+}

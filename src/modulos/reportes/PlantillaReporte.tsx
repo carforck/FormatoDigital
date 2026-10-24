@@ -30,7 +30,7 @@ type CampoTexto = Exclude<keyof DatosReporte, "fotos">;
 
 export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, equipos = [] }: Props) {
   const fotos = datos.fotos ?? [];
-  const campo = (k: CampoTexto, opts: { multiline?: boolean; type?: "text" | "date" | "email" | "tel"; placeholder?: string } = {}) => (
+  const campo = (k: CampoTexto, opts: { multiline?: boolean; type?: "text" | "date" | "time" | "email" | "tel"; placeholder?: string } = {}) => (
     <span className={cn("rounded transition-colors", resaltar === k && "bg-sotec-green/40 ring-2 ring-sotec-green")}>
       <EditableText
         value={datos[k] ?? ""}
@@ -63,6 +63,14 @@ export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, e
             <tr>
               <td className="hdr w-1/2 border border-black py-1">FECHA:</td>
               <td className="border border-black px-2">{campo("fecha", { type: "date" })}</td>
+            </tr>
+            <tr>
+              <td className="hdr border border-black py-1">HORA DE LLEGADA:</td>
+              <td className="border border-black px-2">{campo("horaLlegada", { type: "time" })}</td>
+            </tr>
+            <tr>
+              <td className="hdr border border-black py-1">HORA DE SALIDA:</td>
+              <td className="border border-black px-2">{campo("horaSalida", { type: "time" })}</td>
             </tr>
           </tbody>
         </table>

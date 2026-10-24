@@ -9,6 +9,9 @@ export interface FotoReporte {
 /** FO-GSST-22 · Formato de reporte técnico: contenido del formato. */
 export interface DatosReporte {
   fecha: string;
+  /** Hora de llegada y de salida del sitio (HH:MM): duración del servicio en el tablero. */
+  horaLlegada?: string;
+  horaSalida?: string;
   tipoReporte: string;
   cliente: string;
   direccion: string;

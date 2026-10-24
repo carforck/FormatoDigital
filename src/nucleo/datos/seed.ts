@@ -430,9 +430,11 @@ export function documentosSeed(): Documento[] {
 
   // Cada documento queda en su proyecto; el reporte lo muestra en «Proyecto»
   const proyectos = proyectosSeed();
-  // y los reportes marcan sus equipos atendidos (módulo Equipos)
-  return docs.map((d0) => {
-    const d = (EQUIPOS_DE_DOC[d0.id] ? { ...d0, equiposIds: EQUIPOS_DE_DOC[d0.id] } : d0) as Documento;
+  // y los reportes marcan sus equipos atendidos (módulo Equipos) y su hora de llegada y salida
+  const HORAS = [["08:00", "10:30"], ["07:30", "11:15"], ["09:00", "12:00"], ["13:00", "16:45"], ["08:15", "09:50"], ["10:00", "14:30"]];
+  return docs.map((d0, k) => {
+    let d = (EQUIPOS_DE_DOC[d0.id] ? { ...d0, equiposIds: EQUIPOS_DE_DOC[d0.id] } : d0) as Documento;
+    if (d.tipo === "reporte" && d.estado !== "borrador") d = { ...d, datos: { ...d.datos, horaLlegada: HORAS[k % 6][0], horaSalida: HORAS[k % 6][1] } } as Documento;
     const p = proyectos.find((x) => x.id === PROYECTO_DE[d.id]);
     if (!p) return d;
     return (d.tipo === "reporte" ? { ...d, proyectoId: p.id, datos: { ...d.datos, proyecto: `${p.codigo} · ${p.nombre}` } } : { ...d, proyectoId: p.id }) as Documento;

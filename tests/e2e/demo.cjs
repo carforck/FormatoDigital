@@ -17,7 +17,7 @@ const puppeteer = require("puppeteer-core");
 
 const BASE = (process.env.BASE || "http://localhost:3100").replace(/\/$/, "");
 const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion"
-const CLAVE = "sotec-demo-v8";
+const CLAVE = "sotec-demo-v9";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function chrome() {
@@ -100,6 +100,8 @@ async function flujo(b, errores) {
   await clic(p, "PRY-001-26");
   await clic(p, "Correctivo");
   await clic(p, String(new Date().getFullYear()));
+  await clic(p, "08:00");
+  await clic(p, "10:00");
   await clic(p, "Ing. Daniel Ortega");
   await clic(p, "Reparación fibra óptica");
   await clic(p, "Continuar sin equipos");
@@ -314,6 +316,8 @@ async function magno(b, errores) {
   await clic(p, "Sin proyecto");
   await clic(p, "Preventivo");
   await clic(p, String(new Date().getFullYear()));
+  await clic(p, "08:00");
+  await clic(p, "10:00");
   await clic(p, "Ing. Daniel Ortega");
   await clic(p, "Mantenimiento preventivo CCTV");
   await clic(p, "Continuar sin equipos");
@@ -474,6 +478,8 @@ async function proyectos(b, errores) {
   await clic(p, "PRY-006-26");
   await clic(p, "Correctivo");
   await clic(p, String(new Date().getFullYear()));
+  await clic(p, "08:00");
+  await clic(p, "10:00");
   await clic(p, "Ing. Daniel Ortega");
   await clic(p, "Reparación fibra óptica");
   await clic(p, "Continuar sin equipos");
@@ -728,6 +734,8 @@ async function equipos(b, errores) {
   await clic(p, "PRY-001-26");
   await clic(p, "Preventivo");
   await clic(p, String(new Date().getFullYear()));
+  await clic(p, "08:00");
+  await clic(p, "10:00");
   await clic(p, "Ing. Daniel Ortega");
   await clic(p, "Mantenimiento preventivo CCTV");
   ok((await texto()).includes("¿Qué equipos atendiste?"), "después del asunto, el asistente pregunta los equipos atendidos");

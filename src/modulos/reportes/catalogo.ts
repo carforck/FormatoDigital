@@ -5,6 +5,8 @@ export const TIPOS_REPORTE = ["Preventivo", "Correctivo", "Instalación", "Diagn
 export function reporteVacio(fecha: string): DatosReporte {
   return {
     fecha,
+    horaLlegada: "",
+    horaSalida: "",
     tipoReporte: "",
     cliente: "",
     direccion: "",

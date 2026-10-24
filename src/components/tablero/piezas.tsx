@@ -258,3 +258,79 @@ export function BarrasFiltro({
     </ul>
   );
 }
+
+/** Dona de proporciones con leyenda clicable (estados del documento). */
+export function Dona({
+  filas,
+  activo,
+  onElegir,
+  centro,
+}: {
+  filas: { clave: string; nombre: string; valor: number; color: string }[];
+  activo: string | null;
+  onElegir: (clave: string | null) => void;
+  centro: { valor: string; texto: string };
+}) {
+  const total = filas.reduce((a, f) => a + f.valor, 0);
+  const R = 42;
+  const C = 2 * Math.PI * R;
+  let acumulado = 0;
+  return (
+    <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
+      <svg viewBox="0 0 120 120" className="h-36 w-36 shrink-0 -rotate-90" role="img" aria-label={filas.map((f) => `${f.nombre}: ${f.valor}`).join(", ")}>
+        <circle cx="60" cy="60" r={R} fill="none" stroke="currentColor" strokeWidth="16" className="text-slate-100" />
+        {total > 0 &&
+          filas
+            .filter((f) => f.valor > 0)
+            .map((f) => {
+              const largo = (f.valor / total) * C;
+              const el = (
+                <circle
+                  key={f.clave}
+                  cx="60"
+                  cy="60"
+                  r={R}
+                  fill="none"
+                  stroke={f.color}
+                  strokeWidth={activo === f.clave ? 20 : 16}
+                  strokeDasharray={`${Math.max(largo - 1.5, 0.5)} ${C}`}
+                  strokeDashoffset={-acumulado}
+                  className={cn("transition-all", activo && activo !== f.clave && "opacity-35")}
+                />
+              );
+              acumulado += largo;
+              return el;
+            })}
+        <g className="rotate-90" style={{ transformOrigin: "60px 60px" }}>
+          <text x="60" y="58" textAnchor="middle" className="fill-slate-900 text-[20px] font-semibold dark:fill-slate-100">
+            {centro.valor}
+          </text>
+          <text x="60" y="74" textAnchor="middle" className="fill-slate-500 text-[9px] dark:fill-slate-400">
+            {centro.texto}
+          </text>
+        </g>
+      </svg>
+      <ul className="w-full min-w-0 space-y-1">
+        {filas.map((f) => {
+          const on = activo === f.clave;
+          return (
+            <li key={f.clave}>
+              <button
+                onClick={() => onElegir(on ? null : f.clave)}
+                aria-pressed={on}
+                className={cn("flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition hover:bg-slate-50", on && "bg-sotec-soft ring-1 ring-sotec-green/50", activo && !on && "opacity-60")}
+              >
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: f.color }} />
+                <span className="min-w-0 flex-1 truncate text-slate-700">{f.nombre}</span>
+                <span className="shrink-0 tabular-nums">
+                  <strong className="text-slate-900">{f.valor}</strong>
+                  <span className="text-xs text-slate-500"> · {total ? fmt((f.valor / total) * 100) : 0} %</span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}

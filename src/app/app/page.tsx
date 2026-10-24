@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, Clock, FileSignature, FileText, FilterX, FolderKanban, Gauge, HardHat, PenLine, Receipt, Timer, Wallet } from "lucide-react";
+import { ArrowRight, CalendarDays, CheckCircle2, Clock, FileSignature, FileText, FilterX, FolderKanban, Gauge, HardHat, Hourglass, PenLine, Receipt, RotateCcw, Timer, UserRound, Wallet } from "lucide-react";
 
 import { Contador } from "@/components/fx/Reveal";
-import { BarrasFiltro, BarrasMes, Kpi, Sparkline, Variacion } from "@/components/tablero/piezas";
+import { BarrasFiltro, BarrasMes, Dona, Kpi, Sparkline, Variacion } from "@/components/tablero/piezas";
 import { EstadoBadge, fechaCorta } from "@/components/ui/badges";
-import { fechaLarga, nombreCorto, saludo } from "@/components/ui/corporativo";
+import { Avatar, fechaLarga, nombreCorto, saludo } from "@/components/ui/corporativo";
 import { IconoDoc } from "@/components/ui/icono-doc";
 import { cn } from "@/lib/utils";
 import { totales } from "@/modulos/cobros/tipos";
@@ -21,10 +21,13 @@ import {
   enRango,
   horasAprobacion,
   meses as mesesDe,
+  mesesFiltro,
   pendientes as pendientesDe,
   rango,
+  rangoMes,
   tasaFirmaCliente,
   tasaPrimerIntento,
+  tiempoServicio,
   variacion,
   type Periodo,
 } from "@/nucleo/indicadores";
@@ -34,6 +37,9 @@ import { rutaDoc } from "@/nucleo/rutas";
 import type { Documento, Estado, TipoDoc } from "@/nucleo/tipos";
 
 const pct = (n: number | null) => (n === null ? "—" : `${Math.round(n * 100)} %`);
+/** Colores de la dona por estado (mismos tonos de los badges). */
+const COLOR_ESTADO: Record<Estado, string> = { borrador: "#94A3B8", en_revision: "#D9963A", aprobado: "var(--serie-a)", cerrado: "var(--serie-b)", rechazado: "#E11D48" };
+const duracion = (h: number | null) => (h === null ? "—" : `${Math.floor(h)} h ${String(Math.round((h % 1) * 60)).padStart(2, "0")} min`);
 const horas = (h: number | null) => (h === null ? "—" : h < 24 ? `${h.toLocaleString("es-CO", { maximumFractionDigits: 1 })} h` : `${(h / 24).toLocaleString("es-CO", { maximumFractionDigits: 1 })} días`);
 
 export default function Tablero() {
@@ -44,12 +50,17 @@ export default function Tablero() {
   const [estado, setEstado] = useState<Estado | null>(null);
   const [cliente, setCliente] = useState<string | null>(null);
   const [proyecto, setProyecto] = useState<string>("");
+  const [tecnico, setTecnico] = useState<string | null>(null);
+  // Mes puntual (AAAA-MM): si se elige, reemplaza al período y compara con el mes anterior
+  const [mes, setMes] = useState("");
 
-  const r = rango(periodo);
-  const base = useMemo(
+  const r = mes ? rangoMes(mes) : rango(periodo);
+  // Todos los filtros menos el técnico: base de la productividad por técnico
+  const baseEquipo = useMemo(
     () => demo.visibles.filter((d) => (tipo === "todos" || d.tipo === tipo) && (!cliente || d.clienteId === cliente) && (!proyecto || d.proyectoId === proyecto)),
     [demo.visibles, tipo, cliente, proyecto],
   );
+  const base = useMemo(() => baseEquipo.filter((d) => !tecnico || d.autorId === tecnico), [baseEquipo, tecnico]);
   const actual = base.filter((d) => enRango(d, r.desde, r.hasta));
   const anterior = base.filter((d) => enRango(d, r.prevDesde, r.prevHasta));
   const lista = estado ? actual.filter((d) => d.estado === estado) : actual;
@@ -68,13 +79,42 @@ export default function Tablero() {
     pend: pendientesDe(base),
     firma: tasaFirmaCliente(actual),
     firmaAnt: tasaFirmaCliente(anterior),
+    servicio: tiempoServicio(actual),
+    servicioAnt: tiempoServicio(anterior),
   };
   const diff = (a: number | null, b: number | null) => (a === null || b === null ? null : a - b);
 
   const tipos = TIPOS_ORDEN.filter((t) => (tipo === "todos" ? demo.visibles.some((d) => d.tipo === t) : t === tipo));
   const mesesGrafica = serie.map((m) => ({ etiqueta: m.etiqueta, ...Object.fromEntries(tipos.map((t) => [t, m.docs.filter((d) => d.tipo === t).length])) }));
 
-  const filasEstado = ESTADOS_ORDEN.map((e) => ({ clave: e, nombre: ETIQUETA_ESTADO[e], valor: actual.filter((d) => d.estado === e).length })).filter((f) => f.valor > 0 || f.clave === estado);
+  const filasEstado = ESTADOS_ORDEN.map((e) => ({ clave: e, nombre: ETIQUETA_ESTADO[e], valor: actual.filter((d) => d.estado === e).length, color: COLOR_ESTADO[e] })).filter((f) => f.valor > 0 || f.clave === estado);
+  const finalizados = actual.filter((d) => d.estado === "aprobado" || d.estado === "cerrado").length;
+
+  // Productividad por técnico: quien ve al equipo (no el técnico ni el cliente)
+  const veEquipo = u.rol !== "tecnico" && u.rol !== "cliente";
+  const actualEquipo = baseEquipo.filter((d) => enRango(d, r.desde, r.hasta));
+  const devuelto = (d: Documento) => d.estado === "rechazado" || d.historial.some((h) => h.accion === "Rechazó");
+  const filasTecnico = veEquipo
+    ? Array.from(new Set([...demo.usuarios.filter((x) => x.rol === "tecnico" && x.activo).map((x) => x.id), ...actualEquipo.map((d) => d.autorId)]))
+        .map((id) => {
+          const persona = demo.usuarios.find((x) => x.id === id);
+          const suyos = actualEquipo.filter((d) => d.autorId === id);
+          return {
+            id,
+            nombre: persona?.nombre ?? "Usuario retirado",
+            cargo: persona?.cargo ?? "",
+            docs: suyos.length,
+            primer: tasaPrimerIntento(suyos),
+            devueltos: suyos.filter(devuelto).length,
+            enProceso: suyos.filter((d) => d.estado === "borrador" || d.estado === "en_revision").length,
+            servicio: tiempoServicio(suyos).promedio,
+          };
+        })
+        .filter((f) => f.docs > 0 || demo.usuarios.some((x) => x.id === f.id && x.rol === "tecnico"))
+        .sort((a, b) => b.docs - a.docs)
+    : [];
+  const maxDocsTecnico = Math.max(1, ...filasTecnico.map((f) => f.docs));
+  const tecnicosFiltro = veEquipo ? demo.usuarios.filter((x) => x.rol !== "cliente" && (x.rol === "tecnico" || demo.visibles.some((d) => d.autorId === x.id))) : [];
   const filasCliente = demo.clientes
     .map((c) => ({ clave: c.id, nombre: c.nombre, valor: demo.visibles.filter((d) => d.clienteId === c.id && enRango(d, r.desde, r.hasta) && (tipo === "todos" || d.tipo === tipo) && (!proyecto || d.proyectoId === proyecto)).length }))
     .filter((f) => f.valor > 0 || f.clave === cliente)
@@ -97,10 +137,13 @@ export default function Tablero() {
   if (u.rol === "cliente") docs.filter((d) => d.estado === "aprobado" && infoDoc(d.tipo).flujo.cierre === "cliente").forEach((d) => pendientes.push({ d, accion: "Firmar" }));
   docs.filter((d) => d.autorId === u.id && (d.estado === "rechazado" || d.estado === "borrador")).forEach((d) => pendientes.push({ d, accion: d.estado === "rechazado" ? "Corregir" : "Completar" }));
 
-  const hayFiltros = tipo !== "todos" || estado !== null || cliente !== null || proyecto !== "";
+  const hayFiltros = tipo !== "todos" || estado !== null || cliente !== null || proyecto !== "" || tecnico !== null || mes !== "";
   const proyectosFiltro = demo.proyectosVisibles.filter((p) => !cliente || p.clienteId === cliente);
   const nombreCliente = demo.clientes.find((c) => c.id === cliente)?.nombre;
-  const nombrePeriodo = PERIODOS.find((p) => p.clave === periodo)!.nombre;
+  const nombreTecnico = demo.usuarios.find((x) => x.id === tecnico)?.nombre;
+  const opcionesMes = mesesFiltro(12);
+  const nombrePeriodo = mes ? opcionesMes.find((m) => m.clave === mes)?.nombre ?? mes : PERIODOS.find((p) => p.clave === periodo)!.nombre;
+  const contraPeriodo = mes ? "vs mes anterior" : "vs período anterior";
 
   return (
     <div className="space-y-6">
@@ -139,11 +182,37 @@ export default function Tablero() {
       <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Filtros del tablero">
         <div className="flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm" role="group" aria-label="Período">
           {PERIODOS.map((p) => (
-            <button key={p.clave} onClick={() => setPeriodo(p.clave)} aria-pressed={periodo === p.clave} className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition sm:text-sm", periodo === p.clave ? "bg-sotec text-white" : "text-slate-600 hover:bg-slate-100")}>
+            <button key={p.clave} onClick={() => (setPeriodo(p.clave), setMes(""))} aria-pressed={!mes && periodo === p.clave} className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition sm:text-sm", !mes && periodo === p.clave ? "bg-sotec text-white" : "text-slate-600 hover:bg-slate-100")}>
               {p.nombre}
             </button>
           ))}
         </div>
+        <label className={cn("flex items-center gap-1.5 rounded-lg border bg-white py-0.5 pl-2.5 pr-1 shadow-sm", mes ? "border-sotec-greenDeep ring-1 ring-sotec-green/40" : "border-slate-200")}>
+          <CalendarDays className="h-3.5 w-3.5 text-slate-500" aria-hidden />
+          <span className="sr-only">Mes</span>
+          <select value={mes} onChange={(e) => setMes(e.target.value)} className="bg-transparent py-1 text-xs font-medium text-slate-700 outline-none sm:text-sm">
+            <option value="">Mes…</option>
+            {opcionesMes.map((m) => (
+              <option key={m.clave} value={m.clave}>
+                {m.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
+        {tecnicosFiltro.length > 0 && (
+          <label className={cn("flex items-center gap-1.5 rounded-lg border bg-white py-0.5 pl-2.5 pr-1 shadow-sm", tecnico ? "border-sotec-greenDeep ring-1 ring-sotec-green/40" : "border-slate-200")}>
+            <UserRound className="h-3.5 w-3.5 text-slate-500" aria-hidden />
+            <span className="sr-only">Técnico</span>
+            <select value={tecnico ?? ""} onChange={(e) => setTecnico(e.target.value || null)} className="max-w-[200px] bg-transparent py-1 text-xs font-medium text-slate-700 outline-none sm:text-sm">
+              <option value="">Todos los técnicos</option>
+              {tecnicosFiltro.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <div className="flex flex-wrap rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm" role="group" aria-label="Tipo de documento">
           {(["todos", ...TIPOS_ORDEN] as const)
             .filter((t) => t === "todos" || demo.visibles.some((d) => d.tipo === t))
@@ -170,15 +239,37 @@ export default function Tablero() {
         )}
         {estado && <span className="rounded-full bg-sotec-soft px-2.5 py-1 text-xs font-medium text-sotec-greenDeep">Estado: {ETIQUETA_ESTADO[estado]}</span>}
         {nombreCliente && <span className="rounded-full bg-sotec-soft px-2.5 py-1 text-xs font-medium text-sotec-greenDeep">Cliente: {nombreCliente}</span>}
+        {nombreTecnico && <span className="rounded-full bg-sotec-soft px-2.5 py-1 text-xs font-medium text-sotec-greenDeep">Técnico: {nombreTecnico}</span>}
         {hayFiltros && (
-          <button onClick={() => (setTipo("todos"), setEstado(null), setCliente(null), setProyecto(""))} className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">
+          <button onClick={() => (setTipo("todos"), setEstado(null), setCliente(null), setProyecto(""), setTecnico(null), setMes(""))} className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">
             <FilterX className="h-3.5 w-3.5" /> Limpiar filtros
           </button>
         )}
       </div>
 
+      {/* Mi resumen: el técnico ve su propio trabajo del período de un vistazo (pensado para el celular) */}
+      {u.rol === "tecnico" && (
+        <section className="rounded-xl bg-sotec p-4 text-white shadow-sm">
+          <p className="text-sm text-white/70">Mi resumen · {nombrePeriodo}</p>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              { t: "En proceso", v: actual.filter((d) => d.estado === "borrador" || d.estado === "en_revision").length, icon: Clock },
+              { t: "Aprobados", v: finalizados, icon: CheckCircle2 },
+              { t: "Devueltos", v: actual.filter(devuelto).length, icon: RotateCcw },
+              { t: "Horas en sitio", v: duracion(k.servicio.servicios ? k.servicio.total : null), icon: Hourglass },
+            ].map((x) => (
+              <div key={x.t} className="rounded-lg bg-white/[0.06] p-3">
+                <x.icon className="h-4 w-4 text-sotec-green" />
+                <p className="mt-2 text-xl font-semibold tabular-nums">{x.v}</p>
+                <p className="text-xs text-white/60">{x.t}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Indicadores relativos */}
-      <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <Kpi
           titulo={`Documentos · ${nombrePeriodo}`}
           icon={FileText}
@@ -218,6 +309,14 @@ export default function Tablero() {
           variacion={k.firma !== null ? <span className="text-[11px] text-slate-500">{pct(k.firma)} de los reportes ya tienen la firma del cliente</span> : undefined}
           activo={estado === "en_revision"}
           onClick={() => setEstado(estado === "en_revision" ? null : "en_revision")}
+        />
+        <Kpi
+          titulo="Tiempo promedio por servicio"
+          icon={Hourglass}
+          tono="bg-slate-100 text-slate-700"
+          valor={duracion(k.servicio.promedio)}
+          contexto={k.servicio.servicios ? `${k.servicio.servicios} servicio(s) con llegada y salida · ${duracion(k.servicio.total)} en total` : "Se calcula con la hora de llegada y de salida del reporte técnico"}
+          variacion={k.servicio.promedio !== null ? <Variacion valor={variacion(k.servicio.promedio, k.servicioAnt.promedio)} mejorSi="baja" /> : undefined}
         />
       </div>
 
@@ -259,10 +358,71 @@ export default function Tablero() {
           <h2 className="font-semibold text-slate-900">Estado de los documentos</h2>
           <p className="text-xs text-slate-500">{nombrePeriodo} · toca un estado para filtrar</p>
           <div className="mt-3">
-            <BarrasFiltro filas={filasEstado} activo={estado} onElegir={(c) => setEstado(c as Estado | null)} color="var(--serie-a)" />
+            <Dona filas={filasEstado} activo={estado} onElegir={(c) => setEstado(c as Estado | null)} centro={{ valor: actual.length ? `${Math.round((finalizados / actual.length) * 100)}%` : "—", texto: "finalizados" }} />
           </div>
         </section>
       </div>
+
+      {/* Productividad por técnico: toca una fila para ver solo su trabajo */}
+      {veEquipo && filasTecnico.length > 0 && (
+        <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 px-4 py-3">
+            <h2 className="font-semibold text-slate-900">Productividad por técnico</h2>
+            <p className="text-xs text-slate-500">
+              {nombrePeriodo}
+              {nombreCliente ? ` · ${nombreCliente}` : ""} · documentos, calidad (aprobados al primer intento) y tiempo por servicio
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-2 font-medium">Técnico</th>
+                  <th className="px-4 py-2 font-medium">Documentos</th>
+                  <th className="px-4 py-2 text-right font-medium">1er intento</th>
+                  <th className="px-4 py-2 text-right font-medium">Devueltos</th>
+                  <th className="px-4 py-2 text-right font-medium">En proceso</th>
+                  <th className="px-4 py-2 text-right font-medium">Tiempo / servicio</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filasTecnico.map((f) => {
+                  const on = tecnico === f.id;
+                  return (
+                    <tr
+                      key={f.id}
+                      onClick={() => setTecnico(on ? null : f.id)}
+                      className={cn("cursor-pointer transition hover:bg-slate-50", on && "bg-sotec-soft", tecnico && !on && "opacity-60")}
+                    >
+                      <td className="px-4 py-2.5">
+                        <button type="button" aria-pressed={on} className="flex items-center gap-2.5 text-left">
+                          <Avatar nombre={f.nombre} className="h-8 w-8" />
+                          <span className="min-w-0">
+                            <span className="block font-medium text-slate-900">{f.nombre}</span>
+                            <span className="block text-xs text-slate-500">{f.cargo}</span>
+                          </span>
+                        </button>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className="flex items-center gap-2">
+                          <span className="h-2 w-28 rounded-full bg-slate-100">
+                            <span className="block h-2 origin-left animate-grow-x rounded-full" style={{ width: `${(f.docs / maxDocsTecnico) * 100}%`, background: "var(--serie-b)" }} />
+                          </span>
+                          <strong className="tabular-nums text-slate-900">{f.docs}</strong>
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{pct(f.primer)}</td>
+                      <td className={cn("px-4 py-2.5 text-right tabular-nums", f.devueltos ? "font-medium text-rose-700" : "text-slate-500")}>{f.devueltos}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">{f.enProceso}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">{duracion(f.servicio)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.5fr] [&>*]:min-w-0">
         {u.rol !== "cliente" && filasCliente.length > 0 ? (

@@ -11,7 +11,7 @@ interface EditableTextProps {
   className?: string;
   inputClassName?: string;
   multiline?: boolean;
-  type?: "text" | "number" | "date" | "tel" | "email";
+  type?: "text" | "number" | "date" | "time" | "tel" | "email";
   ariaLabel?: string;
   disabled?: boolean;
   /** Texto a mostrar en modo lectura (ej. "$1.500.000"). Al editar usa `value` crudo. */

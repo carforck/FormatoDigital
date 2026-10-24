@@ -35,7 +35,7 @@ import {
 } from "@/nucleo/datos/empresa";
 
 // Subir la versión al cambiar la semilla: los navegadores cargan los datos nuevos
-const KEY = "sotec-demo-v8";
+const KEY = "sotec-demo-v9";
 
 interface Estado {
   usuarioId: string | null;

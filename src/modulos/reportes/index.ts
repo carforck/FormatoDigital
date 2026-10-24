@@ -18,6 +18,14 @@ Como acción ${tipo === "preventivo" ? "preventiva" : "correctiva"}, se ejecutan
 Finalmente se realizan pruebas de funcionamiento junto con ${d.personaContactada || "la persona contactada"}, confirmando que el sistema queda operando bajo condiciones normales.`;
 }
 
+const hhmm = (min: number) => `${String(Math.floor(min / 60) % 24).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+const minutos = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5));
+/** Hora actual redondeada a 5 minutos (sugerencia de llegada o salida). */
+const ahoraHHMM = () => {
+  const d = new Date();
+  return hhmm(Math.round((d.getHours() * 60 + d.getMinutes()) / 5) * 5);
+};
+
 /** Módulo FO-GSST-22 · Reporte técnico. */
 export const moduloReportes: ModuloDocumento<DatosReporte> = {
   clave: "reporte",
@@ -50,6 +58,22 @@ export const moduloReportes: ModuloDocumento<DatosReporte> = {
     { id: "cliente", tipo: "texto", resaltar: "cliente", pregunta: "¿Para qué cliente es el reporte?", sugerencias: clientes.map((c) => c.nombre), ayuda: "Elige uno del directorio para autocompletar sus datos, o escribe uno nuevo." },
     { id: "tipoReporte", tipo: "select", resaltar: "tipoReporte", pregunta: "¿Qué tipo de reporte es?", opciones: [...TIPOS_REPORTE] },
     { id: "fecha", tipo: "fecha", resaltar: "fecha", pregunta: "¿En qué fecha se hizo la visita?", sugerencias: [hoy] },
+    {
+      id: "horaLlegada",
+      tipo: "hora",
+      resaltar: "horaLlegada",
+      pregunta: "¿A qué hora llegaste al sitio?",
+      sugerencias: Array.from(new Set(["08:00", "13:00", ahoraHHMM()])),
+      ayuda: "Con la llegada y la salida el tablero calcula el tiempo de cada servicio.",
+    },
+    {
+      id: "horaSalida",
+      tipo: "hora",
+      resaltar: "horaSalida",
+      pregunta: "¿A qué hora terminaste el servicio?",
+      sugerencias: datos.horaLlegada ? Array.from(new Set([hhmm(minutos(datos.horaLlegada) + 120), ahoraHHMM()])).filter((h) => h > datos.horaLlegada!) : [ahoraHHMM()],
+      validar: (v) => (datos.horaLlegada && v && v <= datos.horaLlegada ? "La hora de salida debe ser posterior a la de llegada." : null),
+    },
     {
       id: "personaContactada",
       tipo: "texto",

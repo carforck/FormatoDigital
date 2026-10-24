@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { EstadoBadge } from "@/components/ui/badges";
 import { puede, puedeCrearTipo, puedeEditarDoc, puedeRevisarDoc, puedeVerDoc } from "@/nucleo/permisos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
-import { abrirImpresion } from "@/nucleo/impresion";
+import { abrirImpresion, tituloArchivo } from "@/nucleo/impresion";
 import { rutaCuenta, rutaEquipo, rutaProyecto, urlPublica } from "@/nucleo/rutas";
 import { equiposAtendidos, equiposIdsDe } from "@/modulos/equipos/logica";
 import { IconoEquipo } from "@/modulos/equipos/piezas";
@@ -201,7 +201,7 @@ function Detalle() {
               <Receipt className="h-4 w-4" /> Crear cuenta de cobro
             </Button>
           )}
-          <Button variant="outline" onClick={() => abrirImpresion(router, { doc: doc.id })}>
+          <Button variant="outline" onClick={() => abrirImpresion(router, { doc: doc.id, titulo: tituloArchivo([doc.codigo, infoDoc(doc.tipo).formato.corto, clienteDoc(doc)]) })}>
             <Printer className="h-4 w-4" /> PDF
           </Button>
           {editable && doc.estado === "borrador" && (

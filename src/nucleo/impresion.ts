@@ -26,6 +26,8 @@ export interface ParamsImpresion {
   cuenta?: string;
   /** Contenido actual del generador (puede no estar guardado). */
   borrador?: Documento;
+  /** Nombre del PDF (consecutivo · formato · cliente): va en ?t= para que el servidor lo ponga de título. */
+  titulo?: string;
 }
 
 /** Ruta + query de la página actual, sin el prefijo de la ruta pública (el router lo agrega). */
@@ -72,6 +74,7 @@ export function abrirImpresion(router: Navegador, p: ParamsImpresion): string | 
     q.set("tipo", p.borrador.tipo);
     q.set("id", p.borrador.id);
   }
+  if (p.titulo) q.set("t", tituloArchivo([p.titulo]));
   q.set("volver", volver);
   // Cada apertura imprime una vez sola (la marca evita repetirlo al volver con «adelante»)
   q.set("n", Date.now().toString(36));

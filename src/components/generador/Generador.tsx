@@ -19,10 +19,10 @@ import { etiquetaServicio, type ServicioCatalogo } from "@/modulos/cotizaciones/
 import { equiposAtendidos, puedeEditarEquipos } from "@/modulos/equipos/logica";
 import { SelectorEquipos } from "@/modulos/equipos/SelectorEquipos";
 import type { EquipoMinimo } from "@/modulos/equipos/tipos";
-import { clienteDoc, empresaDe, infoDoc, moduloDe } from "@/modulos/registro";
+import { clienteDoc, empresaDe, infoDoc, moduloDe, prefijoDe } from "@/modulos/registro";
 import { ETIQUETA_ESTADO_PROYECTO } from "@/nucleo/catalogos";
 import { hoy, useDemo } from "@/nucleo/datos/DemoProvider";
-import { CLAVE_RETORNO_GENERADOR, abrirImpresion, leerBorradorImpresion } from "@/nucleo/impresion";
+import { CLAVE_RETORNO_GENERADOR, abrirImpresion, leerBorradorImpresion, tituloArchivo } from "@/nucleo/impresion";
 import { rutaDoc } from "@/nucleo/rutas";
 import type { Cliente, Documento, Proyecto, TipoDoc } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
@@ -307,8 +307,11 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
 
   /** Imprime lo que hay en pantalla, guardado o no (la página de impresión lo recibe en memoria). */
   function imprimir() {
-    if (existente && !sucio) return abrirImpresion(router, { doc: existente.id });
-    const clave = abrirImpresion(router, { borrador: doc });
+    // Nombre del PDF: el consecutivo (sin guardar, uno provisional como en la página de impresión)
+    const codigo = existente ? doc.codigo : `${prefijoDe(demo.config, doc.tipo)}-borrador-${hoy()}`;
+    const titulo = tituloArchivo([codigo, info.formato.corto, clienteDoc(doc)]);
+    if (existente && !sucio) return abrirImpresion(router, { doc: existente.id, titulo });
+    const clave = abrirImpresion(router, { borrador: doc, titulo });
     // Un documento ya guardado no tiene guardado automático: al volver se recupera de aquí
     if (existente && clave) {
       try {

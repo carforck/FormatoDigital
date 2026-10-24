@@ -64,6 +64,9 @@
      a una altura fija que pueda dejar una página en blanco; WebKit no pagina bien un flex */
   .doc-print { display: block !important; overflow: visible !important; min-height: 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0.8cm 1cm !important; box-shadow: none !important; border: 0 !important; --tw-ring-shadow: 0 0 #0000 !important; }
   .doc-print + .doc-print { break-before: page; page-break-before: always; }
+  /* Cotización: pie repetido en cada hoja (posición fija) con su espacio reservado abajo */
+  .doc-print.doc-pie-fijo { padding-bottom: 1.7cm !important; }
+  .doc-pie-fijo .pie-cotizacion { position: fixed; left: 1cm; right: 1cm; bottom: 0.6cm; background: #fff; }
   .break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
   .break-after-avoid { break-after: avoid; page-break-after: avoid; }
   /* Si una hoja ocupa más de una página, la continuación conserva el margen interior */

@@ -18,7 +18,7 @@ import { EstadoCuentaBadge } from "@/components/ui/estado-cuenta";
 import { PlantillaCuentaCobro } from "@/modulos/cobros/PlantillaCuentaCobro";
 import { totales } from "@/modulos/cobros/tipos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
-import { abrirImpresion } from "@/nucleo/impresion";
+import { abrirImpresion, tituloArchivo } from "@/nucleo/impresion";
 import { cop } from "@/nucleo/letras";
 import { puede, puedeVerCuenta } from "@/nucleo/permisos";
 import { rutaDoc, rutaProyecto } from "@/nucleo/rutas";
@@ -110,7 +110,7 @@ function Ver() {
               </Button>
             </>
           )}
-          <Button variant="outline" onClick={() => abrirImpresion(router, { cuenta: c.id })}>
+          <Button variant="outline" onClick={() => abrirImpresion(router, { cuenta: c.id, titulo: tituloArchivo([c.codigo, "Cuenta de cobro", cliente?.nombre]) })}>
             <Printer className="h-4 w-4" /> PDF
           </Button>
         </div>

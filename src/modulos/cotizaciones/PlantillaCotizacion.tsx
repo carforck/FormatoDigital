@@ -78,7 +78,7 @@ export function PlantillaCotizacion({ datos, codigoDoc, editar, firmar, resaltar
     <div className="doc-zona space-y-4">
       <article
         className={cn(
-          "doc-print mx-auto flex w-full max-w-[816px] flex-col overflow-hidden bg-white px-5 pb-6 text-[11px] leading-snug text-slate-800 shadow-sm ring-1 ring-slate-200 sm:min-h-[1056px] sm:px-10 sm:pb-8 sm:text-[12px]",
+          "doc-print doc-pie-fijo mx-auto flex w-full max-w-[816px] flex-col overflow-hidden bg-white px-5 pb-6 text-[11px] leading-snug text-slate-800 shadow-sm ring-1 ring-slate-200 sm:min-h-[1056px] sm:px-10 sm:pb-8 sm:text-[12px]",
           // En papel, la hoja ocupa la carta completa para que el pie quede abajo como en el original
           "print:min-h-[27.5cm]",
           pk("print:text-[10px] print:leading-tight"),
@@ -240,117 +240,122 @@ export function PlantillaCotizacion({ datos, codigoDoc, editar, firmar, resaltar
           )}
         </div>
 
-        {/* Totales */}
-        <div className={cn("break-inside-avoid mt-0 flex justify-end", marca("total"))}>
-          <table className="w-full border-collapse sm:w-1/2 print:w-1/2">
-            <tbody>
-              <tr className="border-b border-slate-200" style={{ background: GRIS_FILA }}>
-                <td className={cn("px-2 py-2", pk("print:py-1"))}>Subtotal (base sin impuestos)</td>
-                <td className={cn("px-2 py-2 text-right tabular-nums", pk("print:py-1"))}>{cop(subtotal)}</td>
-              </tr>
-              {conIva.length === 0 && (
-                <tr className="border-b border-slate-200">
-                  <td className={cn("px-2 py-2", pk("print:py-1"))}>IVA</td>
-                  <td className={cn("px-2 py-2 text-right tabular-nums", pk("print:py-1"))}>{cop(0)}</td>
+        {/* Cierre: total, valor en letras, condiciones y aceptación van juntos en la última hoja
+            (si no caben después de los ítems, pasan completos a la hoja siguiente) */}
+        <div className="break-inside-avoid">
+          {/* Totales */}
+          <div className={cn("break-inside-avoid mt-0 flex justify-end", marca("total"))}>
+            <table className="w-full border-collapse sm:w-1/2 print:w-1/2">
+              <tbody>
+                <tr className="border-b border-slate-200" style={{ background: GRIS_FILA }}>
+                  <td className={cn("px-2 py-2", pk("print:py-1"))}>Subtotal (base sin impuestos)</td>
+                  <td className={cn("px-2 py-2 text-right tabular-nums", pk("print:py-1"))}>{cop(subtotal)}</td>
                 </tr>
-              )}
-              {conIva.map((t) => (
-                <tr key={t.pct} className="border-b border-slate-200">
-                  <td className={cn("px-2 py-2", pk("print:py-1"))}>
-                    IVA {t.pct} %{tarifas.length > 1 && <span className="text-slate-500"> sobre {cop(t.base)}</span>}
-                  </td>
-                  <td className={cn("px-2 py-2 text-right tabular-nums", pk("print:py-1"))}>{cop(t.iva)}</td>
+                {conIva.length === 0 && (
+                  <tr className="border-b border-slate-200">
+                    <td className={cn("px-2 py-2", pk("print:py-1"))}>IVA</td>
+                    <td className={cn("px-2 py-2 text-right tabular-nums", pk("print:py-1"))}>{cop(0)}</td>
+                  </tr>
+                )}
+                {conIva.map((t) => (
+                  <tr key={t.pct} className="border-b border-slate-200">
+                    <td className={cn("px-2 py-2", pk("print:py-1"))}>
+                      IVA {t.pct} %{tarifas.length > 1 && <span className="text-slate-500"> sobre {cop(t.base)}</span>}
+                    </td>
+                    <td className={cn("px-2 py-2 text-right tabular-nums", pk("print:py-1"))}>{cop(t.iva)}</td>
+                  </tr>
+                ))}
+                {exento && (
+                  <tr className="border-b border-slate-200">
+                    <td className={cn("px-2 py-2", pk("print:py-1"))}>Excluido / exento de IVA</td>
+                    <td className={cn("px-2 py-2 text-right tabular-nums", pk("print:py-1"))}>{cop(exento.base)}</td>
+                  </tr>
+                )}
+                <tr className="border-b border-slate-200" style={{ background: GRIS_FILA, color: VERDE }}>
+                  <td className={cn("px-2 py-2", pk("print:py-1"))}>Total</td>
+                  <td className={cn("px-2 py-2 text-right font-semibold tabular-nums", pk("print:py-1"))}>{cop(total)}</td>
                 </tr>
-              ))}
-              {exento && (
-                <tr className="border-b border-slate-200">
-                  <td className={cn("px-2 py-2", pk("print:py-1"))}>Excluido / exento de IVA</td>
-                  <td className={cn("px-2 py-2 text-right tabular-nums", pk("print:py-1"))}>{cop(exento.base)}</td>
-                </tr>
-              )}
-              <tr className="border-b border-slate-200" style={{ background: GRIS_FILA, color: VERDE }}>
-                <td className={cn("px-2 py-2", pk("print:py-1"))}>Total</td>
-                <td className={cn("px-2 py-2 text-right font-semibold tabular-nums", pk("print:py-1"))}>{cop(total)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p className="break-inside-avoid mt-2 text-[10.5px] sm:text-[11px]">
-          <span style={{ color: VERDE_ETIQUETA }}>Son: </span>
-          <span className="font-semibold uppercase">{pesosEnLetras(total)}</span>
-          {iva > 0 && <span className="text-slate-500"> · IVA incluido</span>}
-        </p>
-
-        {/* Condiciones comerciales */}
-        <section className={cn("break-inside-avoid mt-5", pk("print:mt-3"))}>
-          <h2 className="border-b pb-1 text-[12.5px] sm:text-[13px]" style={{ color: VERDE, borderColor: VERDE }}>
-            Condiciones comerciales
-          </h2>
-          <dl className={cn("mt-2 grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2 print:grid-cols-2", pk("print:mt-1 print:grid-cols-4 print:gap-x-3"))}>
-            {(
-              [
-                ["Forma de pago", "formaPago"],
-                ["Tiempo de entrega", "tiempoEntrega"],
-                ["Garantía", "garantia"],
-                ["Validez de la oferta", "validez"],
-              ] as const
-            ).map(([t, k]) => (
-              <div key={k} className="min-w-0">
-                <dt className={etiqueta} style={{ color: VERDE_ETIQUETA }}>
-                  {t}
-                </dt>
-                <dd className={cn(k === "validez" && marca("vencimiento"))}>
-                  {campo(k, k === "validez" ? { placeholder: validezAuto || " ", display: datos.validez || validezAuto || undefined } : { placeholder: editar ? "Por definir" : " " })}
-                </dd>
-              </div>
-            ))}
-          </dl>
-          {(editar || datos.observaciones.trim()) && (
-            <div className="mt-2">
-              <p className={etiqueta} style={{ color: VERDE_ETIQUETA }}>
-                Observaciones
-              </p>
-              {campo("observaciones", { multiline: true, placeholder: editar ? "Alcance, exclusiones, requisitos de acceso al sitio…" : " " })}
-            </div>
-          )}
-          <p className="mt-2 text-[10px] text-slate-500">Precios en pesos colombianos (COP). Los valores de IVA se liquidan según la tarifa vigente en la fecha de facturación.</p>
-        </section>
-
-        {/* Aceptación del cliente: con su firma la cotización queda aceptada */}
-        <section className={cn("break-inside-avoid mt-5 rounded border border-slate-300 p-3", pk("print:mt-3 print:p-2"), marca("firmaCliente"))}>
-          <h2 className="text-[12.5px] sm:text-[13px]" style={{ color: VERDE }}>
-            Aceptación del cliente
-          </h2>
-          <p className="mt-0.5 text-[10.5px] text-slate-600 sm:text-[11px]">Acepto la presente cotización con sus ítems, valores y condiciones comerciales.</p>
-          <div className="mt-2 grid grid-cols-2 items-end gap-x-4 gap-y-2 sm:grid-cols-[1.3fr_1fr_1fr_0.8fr] print:grid-cols-[1.3fr_1fr_1fr_0.8fr]">
-            <div className="col-span-2 sm:col-span-1 print:col-span-1">
-              <Firma src={datos.firmaCliente} etiqueta="cliente" onFirmar={firmar ? () => firmar("firmaCliente") : undefined} />
-              <p className="border-t border-slate-500 pt-0.5 text-[10px] text-slate-500">Firma</p>
-            </div>
-            {(
-              [
-                ["Nombre", "aceptaNombre", "text"],
-                ["Cargo", "aceptaCargo", "text"],
-                ["Fecha", "aceptaFecha", "date"],
-              ] as const
-            ).map(([t, k, type]) => (
-              <div key={k} className="min-w-0">
-                <div className="min-h-[1.4em] break-words">{campo(k, { type, display: type === "date" ? fechaCorta(datos[k]) || undefined : undefined })}</div>
-                <p className="border-t border-slate-500 pt-0.5 text-[10px] text-slate-500">{t}</p>
-              </div>
-            ))}
+              </tbody>
+            </table>
           </div>
-        </section>
+          <p className="break-inside-avoid mt-2 text-[10.5px] sm:text-[11px]">
+            <span style={{ color: VERDE_ETIQUETA }}>Son: </span>
+            <span className="font-semibold uppercase">{pesosEnLetras(total)}</span>
+            {iva > 0 && <span className="text-slate-500"> · IVA incluido</span>}
+          </p>
 
-        {/* Pie como el de Odoo, sin «Página X de Y»: el total depende del papel */}
-        <div aria-hidden="true" className={cn("min-h-8 flex-1", pk("print:min-h-3"))} />
-        <footer className="break-inside-avoid flex items-end gap-3 border-t border-slate-400 pt-2 text-[9.5px] text-slate-700 sm:text-[10.5px]">
+          {/* Condiciones comerciales */}
+          <section className={cn("break-inside-avoid mt-5", pk("print:mt-3"))}>
+            <h2 className="border-b pb-1 text-[12.5px] sm:text-[13px]" style={{ color: VERDE, borderColor: VERDE }}>
+              Condiciones comerciales
+            </h2>
+            <dl className={cn("mt-2 grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2 print:grid-cols-2", pk("print:mt-1 print:grid-cols-4 print:gap-x-3"))}>
+              {(
+                [
+                  ["Forma de pago", "formaPago"],
+                  ["Tiempo de entrega", "tiempoEntrega"],
+                  ["Garantía", "garantia"],
+                  ["Validez de la oferta", "validez"],
+                ] as const
+              ).map(([t, k]) => (
+                <div key={k} className="min-w-0">
+                  <dt className={etiqueta} style={{ color: VERDE_ETIQUETA }}>
+                    {t}
+                  </dt>
+                  <dd className={cn(k === "validez" && marca("vencimiento"))}>
+                    {campo(k, k === "validez" ? { placeholder: validezAuto || " ", display: datos.validez || validezAuto || undefined } : { placeholder: editar ? "Por definir" : " " })}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            {(editar || datos.observaciones.trim()) && (
+              <div className="mt-2">
+                <p className={etiqueta} style={{ color: VERDE_ETIQUETA }}>
+                  Observaciones
+                </p>
+                {campo("observaciones", { multiline: true, placeholder: editar ? "Alcance, exclusiones, requisitos de acceso al sitio…" : " " })}
+              </div>
+            )}
+            <p className="mt-2 text-[10px] text-slate-500">Precios en pesos colombianos (COP). Los valores de IVA se liquidan según la tarifa vigente en la fecha de facturación.</p>
+          </section>
+
+          {/* Aceptación del cliente: con su firma la cotización queda aceptada */}
+          <section className={cn("break-inside-avoid mt-5 rounded border border-slate-300 p-3", pk("print:mt-3 print:p-2"), marca("firmaCliente"))}>
+            <h2 className="text-[12.5px] sm:text-[13px]" style={{ color: VERDE }}>
+              Aceptación del cliente
+            </h2>
+            <p className="mt-0.5 text-[10.5px] text-slate-600 sm:text-[11px]">Acepto la presente cotización con sus ítems, valores y condiciones comerciales.</p>
+            <div className="mt-2 grid grid-cols-2 items-end gap-x-4 gap-y-2 sm:grid-cols-[1.3fr_1fr_1fr_0.8fr] print:grid-cols-[1.3fr_1fr_1fr_0.8fr]">
+              <div className="col-span-2 sm:col-span-1 print:col-span-1">
+                <Firma src={datos.firmaCliente} etiqueta="cliente" onFirmar={firmar ? () => firmar("firmaCliente") : undefined} />
+                <p className="border-t border-slate-500 pt-0.5 text-[10px] text-slate-500">Firma</p>
+              </div>
+              {(
+                [
+                  ["Nombre", "aceptaNombre", "text"],
+                  ["Cargo", "aceptaCargo", "text"],
+                  ["Fecha", "aceptaFecha", "date"],
+                ] as const
+              ).map(([t, k, type]) => (
+                <div key={k} className="min-w-0">
+                  <div className="min-h-[1.4em] break-words">{campo(k, { type, display: type === "date" ? fechaCorta(datos[k]) || undefined : undefined })}</div>
+                  <p className="border-t border-slate-500 pt-0.5 text-[10px] text-slate-500">{t}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+        </div>
+
+        {/* Pie de página: en pantalla al final de la hoja; al imprimir se repite en cada hoja
+            (posición fija: Chrome y Safari la dibujan en todas las páginas; el margen inferior
+            de la hoja deja su espacio, ver .doc-pie-fijo en globals.css) */}
+        <div aria-hidden="true" className="min-h-8 flex-1 print:hidden" />
+        <footer className="pie-cotizacion flex items-end gap-3 border-t border-slate-400 pt-2 text-[9.5px] text-slate-700 sm:text-[10.5px]">
           <p className="flex-1 text-center">
             {empresa.telefonos} · {empresa.correo} · {empresa.web} · {empresa.nit}
           </p>
-          <p className="shrink-0 text-slate-500">
-            Hoja 1 · {FORMATO_COTIZACION.codigo}
-          </p>
+          <p className="shrink-0 text-slate-500">{FORMATO_COTIZACION.codigo}</p>
         </footer>
       </article>
     </div>

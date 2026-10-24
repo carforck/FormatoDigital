@@ -31,7 +31,7 @@ create or replace function public.espacios_al_guardar()
 returns trigger language plpgsql as $$
 begin
   if new.version <> old.version + 1 then
-    raise exception 'version_invalida' using errcode = '40001';
+    raise exception 'version_invalida';
   end if;
   new.actualizado_por := auth.uid();
   new.updated_at := now();

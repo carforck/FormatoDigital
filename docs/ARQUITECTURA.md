@@ -1,4 +1,8 @@
-# Arquitectura de FormatoDigital
+# Arquitectura de ControlOne (antes FormatoDigital)
+
+> Guía de entrada, instalación, estructura de carpetas, modos demo/empresa, migraciones,
+> API, despliegue y pruebas: [`README.md`](../README.md). Este documento detalla las reglas de
+> diseño de cada módulo y de la seguridad.
 
 Plataforma multiempresa para digitalizar los formatos del sistema de gestión
 (calidad y SG-SST). **SOTEC** es la primera organización (piloto con sus
@@ -212,7 +216,7 @@ proyectos y equipos siguen igual (el técnico legaliza sus gastos).
   enlace sin cuenta, lee el reporte y firma. Es de un solo uso y vence a los
   7 días. En la demo los datos están en `localStorage`, así que el enlace solo
   funciona en el mismo navegador donde se generó.
-- **Envío por correo o WhatsApp** (modal `src/components/EnviarDocumento.tsx`):
+- **Envío por correo o WhatsApp** (modal `src/components/docs/EnviarDocumento.tsx`):
   destinatario, asunto y mensaje editables, con el enlace de firma si aplica.
   En la demo abre `mailto:` o `wa.me`; con la plataforma conectada, el correo
   saldrá por Resend con el PDF adjunto.
@@ -295,7 +299,7 @@ proyectos y equipos siguen igual (el técnico legaliza sus gastos).
   promedio de aprobación, en revisión ahora y % con firma del cliente.
   Gráficas con leyenda, tooltip y vista de tabla; colores de serie validados
   para daltonismo en claro y oscuro (`--serie-a/b/c` en `globals.css`).
-- **Barra lateral** (`AppShell`): riel de 72 px que se abre al pasar el mouse
+- **Barra lateral** (`AppShell`, `src/components/shell/`): riel de 72 px que se abre al pasar el mouse
   o con foco, y se puede fijar (`fd-sidebar` en `localStorage`).
 - **Modo oscuro:** claro / oscuro / sistema (`fd-tema`), con la clase `dark`
   en la raíz del shell. Los formatos siempre se ven blancos, como el papel.
@@ -311,31 +315,8 @@ anteriores.
 
 ## Estructura del código
 
-```
-src/
-├── app/                      Rutas (landing, /acceso, /firmar, /app/...)
-├── components/               UI compartida: shell, chat del asistente, firma, EnviarDocumento, ui/
-├── nucleo/                   Lo transversal
-│   ├── tipos.ts              Tipos comunes (Documento, Usuario, Rol, Estado…)
-│   ├── permisos.ts           Matriz rol → acción y visibilidad de documentos y cuentas
-│   ├── catalogos.ts          Formatos, estados, roles (etiquetas y colores)
-│   ├── validar.ts            Pendientes y % de avance (delegan en cada módulo)
-│   ├── letras.ts             Valor en letras (COP)
-│   ├── imagenes.ts           Compresión de fotos antes de guardarlas
-│   ├── rutas.ts              basePath, assets, rutas del detalle de documento, cuenta y proyecto
-│   ├── proyectos.ts          Indicadores de un proyecto (resumenProyecto)
-│   └── datos/                Proveedor de datos de la demo (localStorage) y semilla
-└── modulos/
-    ├── contrato.ts           Contrato que implementa cada módulo de documento
-    ├── registro.ts           Registro central: MODULOS, DOCUMENTOS, TIPOS_DOC, infoDoc, formatoDe, tituloDoc, clienteDoc
-    ├── reportes/             tipos · catálogo · validación · asistente (index) · plantilla
-    ├── permisos/             tipos · catálogo · validación · asistente (index) · plantilla
-    ├── gastos/               tipos · catálogo · validación · asistente (index) · plantilla
-    ├── cotizaciones/         tipos · catálogo · cálculos · validación · asistente (index) · plantilla
-    ├── cobros/               tipos y plantilla de la cuenta de cobro
-    ├── ordenes/              tipos alineados con la base de datos
-    └── equipos/              tipos · catálogo de sistemas · reglas · selector del reporte · semilla
-```
+El mapa de carpetas, con una línea por carpeta y archivo clave, está en el
+[`README.md`](../README.md#estructura-de-carpetas).
 
 ### Registro genérico de documentos
 
@@ -370,7 +351,7 @@ aporta en `ModuloDocumento` lo que el resto lee del registro con
    registrarlo en `DOCUMENTOS`, `TIPOS_DOC` y `MODULOS`
    (`src/modulos/registro.ts`), crear `src/app/app/nuevo/<clave>/page.tsx`
    con `PaginaGenerador`, su ícono en `IconoDoc` y la entrada del menú en
-   `AppShell`.
+   `AppShell` (`src/components/shell/AppShell.tsx`).
 3. En base de datos solo se agrega una fila en `formatos` para la
    organización (con `visible_cliente = false` si es interno): los documentos
    guardan su contenido en `documentos.datos` (jsonb), así que no hace falta
@@ -388,23 +369,8 @@ versión optimista (`src/nucleo/datos/empresa.ts`) y lo sincroniza entre equipos
 la demo sigue en `localStorage`. Los permisos por rol se aplican en la app; la
 fase 2 pasa cada módulo a sus tablas con RLS y retira `espacios`.
 
-Migraciones en `supabase/migrations/`:
-
-| Archivo | Contenido |
-|---|---|
-| `0001_nucleo.sql` | organizaciones, perfiles, miembros (rol por empresa), clientes, sitios, consecutivos, auditoría, notificaciones, funciones de RLS |
-| `0002_operacion.sql` | formatos, órdenes de servicio, documentos + historial, reglas del flujo, firmas, enlaces de firma remota, archivos |
-| `0003_finanzas.sql` | gastos (provisional, eliminada en 0007), cuentas de cobro e ítems |
-| `0004_storage.sql` | bucket privado `archivos` con acceso por organización (solo Supabase) |
-| `0005_auth_perfiles.sql` | perfil automático al registrarse (trigger en `auth.users`); registrarse no da acceso: el admin asigna la organización y el rol en `miembros` |
-| `0006_endurecer_funciones.sql` | endurecimiento: revoca `EXECUTE` de las funciones de trigger; los consecutivos solo se reservan vía `crear_documento` / `crear_cuenta_cobro`, que pasan a `SECURITY DEFINER` con verificación de rol y pertenencia |
-| `0007_gastos_como_formato.sql` | gastos como formato FO-GSST-25 (prefijo LG) en `documentos`; se elimina la tabla provisional `gastos`; columna `formatos.visible_cliente` y política `documentos_ver` que oculta los formatos internos al cliente |
-| `0008_separacion_funciones.sql` | separación de funciones: solo el autor edita y envía su documento, nadie aprueba ni rechaza lo propio; los enlaces de firma solo se crean sobre reportes aprobados sin firma del cliente, y `firmar_con_enlace` invalida los demás enlaces del documento y nunca sobrescribe una firma |
-| `0009_proyectos.sql` | tabla `proyectos` (código PRY por consecutivos, `crear_proyecto` solo admin y SST, RLS: el equipo ve los de su empresa y el cliente los suyos); `documentos.proyecto_id` y `cuentas_cobro.proyecto_id` (misma organización y mismo cliente, se bloquean al enviar o emitir); `crear_documento` y `crear_cuenta_cobro` reciben el proyecto (el cliente sale de él; no en proyectos cerrados); formato `cotizacion` (COT, visible para el cliente); `firmar_como_cliente`: el cliente firma en su portal un reporte o cotización aprobados y eso lo cierra |
-| `0010_equipos.sql` | tabla `equipos` (nombre único por organización, cliente y sistema; trigger `equipos_coherencia`: cliente y proyecto de la misma organización, el cliente no cambia, auditoría al registrar y al cambiar de estado; RLS: el equipo interno ve, crea y edita, admin y SST borran, el cliente ve los de su empresa) y `documento_equipos` (equipos atendidos en un documento: solo el autor, solo en borrador o rechazado y solo equipos del cliente del documento; visible si el documento lo es; FK `restrict`: un equipo con historial no se borra, se retira) |
-| `0011_comercial_solo_admin.sql` | lo comercial es solo de la administración: `formato_comercial(formato)` (hoy `cotizacion`); `documentos_ver`/`crear`/`editar` dejan esos documentos solo al `admin` (el cliente sigue viendo los suyos aprobados o aceptados); `documentos_flujo`: la cotización pasa de borrador o rechazado a aprobado por el admin autor en un paso («Aprobó y envió al cliente»), no va a revisión, y SST o técnico no la tocan; `crear_documento('cotizacion')`, `crear_cuenta_cobro` y `crear_enlace_firma` (sobre lo comercial) exigen admin; cuentas de cobro e ítems: ver, crear y editar solo `admin` (el cliente, las suyas emitidas); `notif_ver` solo muestra avisos de documentos visibles; `proyectos_borrar` cuenta documentos y cuentas sin RLS (`proyecto_vacio`) |
-| `0012_espacio_empresa.sql` | `espacios`: estado del modo empresa por organización (fase 1), RLS para el equipo interno y versión que solo avanza de a uno |
-| `seed.sql` | organización SOTEC, sus formatos y un cliente ficticio |
+La lista de migraciones (0001 … 0012) con su contenido está en el
+[`README.md`](../README.md#backend-supabase).
 
 `supabase/instalar.sql` une migraciones y semilla para instalar un proyecto
 nuevo de una vez (SQL Editor → Run). Se regenera, no se edita a mano.
@@ -465,35 +431,10 @@ bash scripts/armar-instalador.sh                                # 3. regenera su
   API) con `SUPABASE_ACCESS_TOKEN` y `SUPABASE_PROJECT_REF` de `.env.local`.
   Ese archivo **nunca** se sube al repositorio.
 
-## Pruebas
+## Pruebas y stack
 
-| Comando | Qué prueba |
-|---|---|
-| `npm run test:db` | Migraciones, RLS y flujo en PostgreSQL desechable |
-| `npm run test:unit` | Valor en letras, 22 casos (`tests/unit/letras.test.ts`) |
-| `npm run test:e2e` | Demo en el navegador (`tests/e2e/demo.cjs`): secciones `flujo`, `responsive`, `controles`, `magno`, `proyectos`, `crud`, `equipos`, `navegacion`, `comercial` |
-
-- `SOLO=<sección> npm run test:e2e` corre una sola sección.
-- `BASE=https://formato-digital-nine.vercel.app npm run test:e2e` prueba el
-  sitio publicado (por defecto usa `http://localhost:3100`).
-- `bash scripts/reiniciar-dev.sh` reinicia el servidor de desarrollo con la
-  caché limpia (útil si la página carga sin estilos o con «Cannot find
-  module»).
-
-## Stack de la versión funcional
-
-| Capa | Tecnología |
-|---|---|
-| App y PDF | Next.js 14 (App Router) en Vercel |
-| Datos, login, archivos | Supabase (PostgreSQL + Auth + Storage + RLS) |
-| Correo | Resend |
-
-Las cuentas van a nombre del **proveedor (FormatoDigital)**: la plataforma es
-de ustedes y cada empresa es una organización cliente.
-
-La demo actual funciona sin servidor con datos en `localStorage`
-(`src/nucleo/datos/`). Al conectar Supabase se reemplaza ese proveedor de
-datos; los módulos y las pantallas no cambian.
+Comandos de prueba, opciones de la e2e (`SOLO`, `BASE`, `CHROME`) y stack: ver el
+[`README.md`](../README.md#pruebas).
 
 ## Marca
 
@@ -525,8 +466,9 @@ datos; los módulos y las pantallas no cambian.
 ### Pendiente
 
 - Fase 2 de Supabase: cada módulo en sus tablas con RLS (hoy el modo empresa
-  guarda el estado completo en `espacios`), fotos en Storage, alta de usuarios
-  con login desde la app y firma remota por enlace en el modo empresa.
+  guarda el estado completo en `espacios`), fotos en Storage, usuarios con rol cliente
+  (portal con login) y firma remota por enlace en el modo empresa. El alta de
+  usuarios internos con login ya está (`/api/usuarios`).
 - Envío de correo desde la plataforma con Resend (PDF adjunto y enlace de
   firma).
 - Órdenes de servicio en la interfaz.

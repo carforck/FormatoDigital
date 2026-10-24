@@ -1,47 +1,446 @@
 # ControlOne by SOTEC
 
 **Toda tu empresa, un solo control.** ControlOne (antes FormatoDigital) es la plataforma de SOTEC
-para el control digital de todas las áreas de una empresa: formatos, reportes, aprobaciones, firmas,
-proyectos, equipos y facturación. Se publica en https://controlone.sotecse.com. Primeros formatos
-digitalizados (calidad y SG-SST):
-FO-GSST-22 Reporte técnico (con registro fotográfico), F-GSST-13 Permiso de trabajo,
-FO-GSST-25 Legalización de gastos y cuentas de cobro. Asistente conversacional por pasos,
-vista previa en vivo editable, firmas, roles y flujo de aprobación.
+para el control digital de una empresa de servicios técnicos: formatos del sistema de gestión
+(calidad y SG-SST), reportes, aprobaciones, firmas, proyectos, equipos, cotizaciones y cuentas de
+cobro. Cada formato se diligencia con un asistente conversacional por pasos o con el formulario,
+con vista previa en vivo editable, firmas en el celular, flujo de aprobación por roles y PDF fiel al
+formato aprobado.
 
-Arquitectura, módulos, base de datos y pendientes: [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
+- Producción: **https://controlone.sotecse.com** (landing en `/`, aplicativo en `/app`).
+- Repositorio: GitHub `carforck/FormatoDigital` (rama `main` → Vercel).
+- Diseño detallado (reglas de cada módulo, impresión, seguridad, pedidos de SOTEC):
+  [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
 
-## Publicación
+Primeros formatos digitalizados: **FO-GSST-22** Reporte técnico (con registro fotográfico),
+**F-GSST-13** Permiso de trabajo, **FO-GSST-25** Legalización de gastos, Cotización y Cuenta de
+cobro.
 
-- **Vercel:** https://formato-digital-nine.vercel.app — se despliega solo con cada push a `main`
-  de GitHub `carforck/FormatoDigital`. Es el único despliegue (GitHub Pages ya no se usa).
+---
 
-## Desarrollo
+## Contenido
+
+1. [Stack](#stack)
+2. [Correr en local](#correr-en-local)
+3. [Los dos modos: demo y empresa](#los-dos-modos-demo-y-empresa)
+4. [Estructura de carpetas](#estructura-de-carpetas)
+5. [Rutas](#rutas)
+6. [Módulos](#módulos)
+7. [Roles y permisos](#roles-y-permisos)
+8. [Backend: Supabase](#backend-supabase)
+9. [API `/api/usuarios`](#api-apiusuarios)
+10. [Despliegue](#despliegue)
+11. [Scripts](#scripts)
+12. [Pruebas](#pruebas)
+13. [Pendientes y hoja de ruta](#pendientes-y-hoja-de-ruta)
+
+---
+
+## Stack
+
+| Capa | Tecnología |
+|---|---|
+| Aplicación | Next.js 14 (App Router) + React 18 + TypeScript |
+| Estilos | Tailwind CSS 3 (+ `tailwindcss-animate`), íconos `lucide-react`, componentes base estilo shadcn (`src/components/ui/`) |
+| Datos y login | Supabase (PostgreSQL + Auth + RLS) con `@supabase/supabase-js` |
+| Mapa del sistema | `@xyflow/react` + `@dagrejs/dagre` |
+| Animaciones | `lottie-react` (archivos en `public/lottie/`, generados por scripts) |
+| Hosting | Vercel (despliegue automático desde `main`) |
+| Pruebas | `tsx` (unitarias), `puppeteer-core` + Chrome (e2e), PostgreSQL desechable (base de datos) |
+
+---
+
+## Correr en local
+
+Requisitos: Node 20+ y npm. Para las pruebas e2e, Google Chrome; para `test:db`, Podman o Docker.
 
 ```bash
 npm install
-npm run dev                      # http://localhost:3100
-bash scripts/reiniciar-dev.sh    # reinicia el dev con la caché limpia
+cp .env.example .env.local     # opcional: solo para el modo empresa
+npm run dev                    # http://localhost:3100
 ```
 
-| Comando | Qué hace |
-|---|---|
-| `npm run test:db` | Migraciones y RLS en un PostgreSQL desechable (`scripts/probar-db.sh`) |
-| `npm run test:unit` | Valor en letras de las cuentas de cobro |
-| `npm run test:e2e` | Demo en el navegador; `SOLO=flujo\|responsive\|controles\|magno`, `BASE=<url>` para el sitio publicado |
-| `python3 scripts/aplicar-migracion.py <archivo.sql>` | Aplica SQL a Supabase (lee `.env.local`, que no se sube) |
-| `bash scripts/armar-instalador.sh` | Regenera `supabase/instalar.sql` |
-| `python3 scripts/generar-lottie.py` | Regenera la animación `public/lottie/digitaliza.json` |
-| `python3 scripts/generar-mapa-db.py` | Regenera el esquema del «Mapa del sistema» (`src/components/mapa/esquema.json`) desde `supabase/migrations/`; `--check` falla si está desactualizado |
+- **Sin variables de entorno** la app funciona completa en **modo demo** (datos ficticios en el
+  navegador). Es lo más rápido para desarrollar.
+- **Con Supabase**, completa `.env.local` (nunca se sube al repositorio):
+
+| Variable | Dónde se usa | Pública |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Navegador y servidor | Sí |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Navegador (la protege RLS) | Sí |
+| `SUPABASE_SECRET_KEY` | Solo servidor: `/api/usuarios` (`src/servidor/supabase-admin.ts`) | **No** |
+| `NEXT_PUBLIC_SITE_URL` | Metadatos / Open Graph (`src/app/layout.tsx`); opcional, por defecto la URL de producción | Sí |
+| `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF` | Solo `scripts/aplicar-migracion.py` | **No** |
+| `RESEND_API_KEY` | Reservada para el correo con Resend (aún no se usa) | **No** |
+
+Otros comandos útiles:
+
+```bash
+bash scripts/reiniciar-dev.sh   # reinicia el dev con la caché limpia (página sin estilos o "Cannot find module")
+npm run build && npm start      # compilación de producción en el puerto 3100
+npm run lint                    # ESLint (next lint)
+```
+
+---
+
+## Los dos modos: demo y empresa
+
+Toda la app lee y escribe sus datos a través de **un solo proveedor**,
+`src/nucleo/datos/DemoProvider.tsx` (hook `useDemo()`). Las pantallas y los módulos no saben en qué
+modo están: llaman a acciones como guardar, enviar, aprobar o crear un proyecto, y el proveedor
+aplica los permisos, revalida el estado más reciente y guarda.
+
+```
+                     /acceso
+         ┌──────────────┴───────────────┐
+  Demo (elige un perfil)        Empresa (usuario + contraseña)
+         │                              │  src/nucleo/datos/empresa.ts
+         │                              │  Supabase Auth → miembros/perfiles → espacios
+         ▼                              ▼
+  localStorage                   public.espacios (un JSON por organización)
+  "sotec-demo-v9"                + respaldo local "fd-empresa-respaldo"
+         └──────────────┬───────────────┘
+                        ▼
+          DemoProvider (useDemo)  →  pantallas de /app, generador, PDF
+```
+
+| | Demo | Empresa |
+|---|---|---|
+| Entrada | `/acceso` → tarjeta de un rol, sin contraseña («Ver como» cambia de rol en vivo) | `/acceso` → usuario o correo y contraseña de Supabase Auth (`admin` = `admin@sotecse.com`) |
+| Datos | Ficticios (`src/nucleo/datos/seed.ts`, `src/modulos/equipos/seed.ts`) | Los reales de la organización; parte vacío |
+| Dónde viven | `localStorage` (`sotec-demo-v9`); se restablecen en Configuración | `public.espacios.estado` (jsonb) en Supabase |
+| Varias pestañas / equipos | Se sincronizan con el evento `storage` | Guardado agrupado (700 ms) con **versión optimista**; cada 15 s y al volver a la pestaña se buscan cambios de otros equipos |
+| Conflictos | — | Si otro guardó antes, la actualización no encuentra la versión y se recarga lo más reciente con un aviso |
+| Rol del usuario | El perfil elegido | El de `miembros.rol` en Supabase (manda sobre lo guardado en el espacio) |
+
+El modo elegido se recuerda en `localStorage` (`fd-modo`). **Fase 1** del modo empresa: el estado
+completo de la app se guarda como un documento JSON por organización; los permisos por rol se
+aplican en la app y RLS limita `espacios` al equipo interno. La **fase 2** pasa cada módulo a sus
+tablas relacionales con RLS (ya existen en las migraciones) y retira `espacios`.
+
+---
+
+## Estructura de carpetas
+
+```
+.
+├── src/
+│   ├── app/                          Rutas de Next.js (App Router)
+│   │   ├── page.tsx                  Landing pública (/)
+│   │   ├── layout.tsx                Layout raíz: fuentes, metadatos, DemoProvider
+│   │   ├── globals.css               Tailwind, colores (claro/oscuro, series) y reglas de impresión
+│   │   ├── acceso/                   /acceso: login de la empresa y perfiles de la demo
+│   │   ├── firmar/                   /firmar?t=: firma remota del cliente por enlace (sin cuenta)
+│   │   ├── imprimir/                 /imprimir: hojas listas para imprimir o guardar en PDF
+│   │   ├── api/usuarios/route.ts     Backend: usuarios con login del modo empresa (solo admin)
+│   │   └── app/                      El aplicativo (/app), dentro del shell
+│   │       ├── layout.tsx            Monta AppShell (barra lateral, barra superior, menú móvil)
+│   │       ├── page.tsx              Tablero de indicadores
+│   │       ├── nuevo/<tipo>/         Generador de cada formato (reporte, permiso, gasto, cotizacion)
+│   │       ├── documentos/           Lista y detalle (/ver?id=) de documentos
+│   │       ├── revision/             Bandeja de revisión y aprobación
+│   │       ├── proyectos/            Lista, detalle (/ver) y formulario (/editar)
+│   │       ├── equipos/              Inventario por cliente y sistema; ficha e historial (/ver)
+│   │       ├── cobros/               Cuentas de cobro: lista, nueva y detalle
+│   │       ├── clientes/             Directorio de clientes
+│   │       ├── usuarios/             Usuarios y roles (demo) o usuarios con login (empresa)
+│   │       ├── config/               Configuración: consecutivos, módulos, restablecer la demo
+│   │       ├── auditoria/            Registro de auditoría
+│   │       └── mapa/                 Mapa del sistema: módulos, base de datos y matriz de roles
+│   │
+│   ├── servidor/                     Código SOLO del servidor
+│   │   └── supabase-admin.ts         Cliente con la llave secreta + verificación del admin que llama
+│   │
+│   ├── nucleo/                       Lo transversal (sin pantallas)
+│   │   ├── datos/                    Capa de datos
+│   │   │   ├── DemoProvider.tsx      Proveedor único de datos y acciones (modos demo y empresa)
+│   │   │   ├── empresa.ts            Modo empresa: modo, sesión y lectura/guardado de `espacios`
+│   │   │   ├── supabase.ts           Cliente de Supabase del navegador (llave publishable)
+│   │   │   ├── usuarios-contrato.ts  Contrato de /api/usuarios (tipos, roles, validaciones), compartido
+│   │   │   ├── usuarios-api.ts       Cliente tipado de /api/usuarios
+│   │   │   └── seed.ts               Datos ficticios de la demo
+│   │   ├── tipos.ts                  Tipos comunes (Documento, Usuario, Rol, Estado, Proyecto, Cliente…)
+│   │   ├── permisos.ts               Matriz rol → acción; visibilidad de documentos, cuentas y proyectos
+│   │   ├── catalogos.ts              Etiquetas y colores de estados y roles
+│   │   ├── perfiles.ts               Tarjetas de los perfiles de la demo (acceso y landing)
+│   │   ├── validar.ts                Pendientes y % de avance (delegan en cada módulo)
+│   │   ├── indicadores.ts            Cálculos del tablero (períodos, KPIs, series)
+│   │   ├── proyectos.ts              Indicadores de un proyecto (resumenProyecto)
+│   │   ├── impresion.ts              Enlaces y datos de la ruta /imprimir
+│   │   ├── rutas.ts                  basePath, assets y rutas de detalle
+│   │   ├── letras.ts                 Valor en letras y formato de pesos (cop)
+│   │   └── imagenes.ts               Compresión de fotos antes de guardarlas
+│   │
+│   ├── modulos/                      Un módulo por formato o área de negocio
+│   │   ├── contrato.ts               Contrato ModuloDocumento que implementa cada formato
+│   │   ├── registro.ts               Registro central: MODULOS, DOCUMENTOS, TIPOS_DOC, infoDoc…
+│   │   ├── reportes/                 FO-GSST-22: tipos · catálogo · validación · asistente (index) · plantilla
+│   │   ├── permisos/                 F-GSST-13: ídem
+│   │   ├── gastos/                   FO-GSST-25: ídem
+│   │   ├── cotizaciones/             Cotización: ídem + cálculos de IVA
+│   │   ├── cobros/                   Cuentas de cobro: tipos, flujo y plantilla
+│   │   ├── equipos/                  Equipos: tipos, sistemas, reglas, lógica, selector y semilla
+│   │   └── ordenes/                  Órdenes de servicio: tipos alineados con la base (falta la interfaz)
+│   │
+│   ├── components/                   Componentes de interfaz
+│   │   ├── shell/AppShell.tsx        Shell del aplicativo: barras, menú móvil, avisos, «Ver como»
+│   │   ├── generador/                Generador de formatos (asistente + formulario + vista previa)
+│   │   ├── chat/                     Asistente conversacional por pasos
+│   │   ├── docs/                     Piezas de los formatos: encabezado, firma, texto editable, envío
+│   │   ├── tablero/                  Gráficas y KPIs del tablero
+│   │   ├── proyectos/                Piezas de las pantallas de proyectos
+│   │   ├── usuarios/                 Panel de usuarios con login (modo empresa)
+│   │   ├── mapa/                     Mapa del sistema (esquema.json se genera desde las migraciones)
+│   │   ├── landing/                  Secciones de la landing
+│   │   ├── acceso/                   Animación de /acceso
+│   │   ├── fx/                       Efectos (aparición, contadores, fondo interactivo)
+│   │   └── ui/                       Botones, campos, insignias, modal, «Volver»…
+│   │
+│   └── lib/utils.ts                  `cn()`: une clases de Tailwind
+│
+├── supabase/
+│   ├── migrations/                   Migraciones SQL (0001 … 0012), en orden
+│   ├── seed.sql                      Organización SOTEC, sus formatos y un cliente ficticio
+│   ├── instalar.sql                  Migraciones + semilla en un solo archivo (generado)
+│   └── tests/                        Pruebas de RLS y flujo para el PostgreSQL desechable
+├── scripts/                          Utilidades (ver «Scripts»)
+├── tests/
+│   ├── unit/                         Valor en letras y cálculos de la cotización
+│   └── e2e/demo.cjs                  Recorrido completo de la demo en Chrome
+├── public/                           Logos, fotos de la landing, og.jpg, animaciones Lottie
+└── docs/                             Arquitectura, marca y créditos de imágenes
+```
+
+Convenciones:
+
+- Alias de importación `@/` → `src/`.
+- Código y comentarios en español. Cada archivo empieza con un comentario que dice para qué sirve.
+- `src/servidor/` nunca se importa desde el navegador. Lo que comparten servidor y navegador (por
+  ejemplo `usuarios-contrato.ts`) es puro: sin React, sin `window`, sin Supabase.
+- Un módulo de documento (`src/modulos/<clave>/index.ts`) no importa `@/modulos/registro` (ciclo).
+
+---
 
 ## Rutas
 
-- `/` landing · `/acceso` entrar por rol sin credenciales · `/app` aplicativo
-- `/app/nuevo/reporte`, `/app/nuevo/permiso`, `/app/nuevo/gasto` · `/app/cobros` cuentas de cobro
-- `/firmar?t=<token>` firma remota del cliente por enlace (sin cuenta)
+| Ruta | Qué es |
+|---|---|
+| `/` | Landing de ControlOne |
+| `/acceso` | Entrar a la empresa (login) o a la demo por rol |
+| `/app` | Tablero (período y filtros por tipo, estado, cliente, técnico, proyecto y mes) |
+| `/app/nuevo/reporte` · `permiso` · `gasto` · `cotizacion` | Generador de cada formato (`?id=` continúa; `?proyecto=`, `?cliente=`, `?equipo=` preseleccionan) |
+| `/app/documentos`, `/app/documentos/ver?id=` | Lista y detalle |
+| `/app/revision` | Revisión y aprobación |
+| `/app/proyectos`, `/ver?id=`, `/editar` | Proyectos |
+| `/app/equipos`, `/ver?id=` | Equipos e historial |
+| `/app/cobros`, `/nueva`, `/ver?id=` | Cuentas de cobro |
+| `/app/clientes`, `/app/usuarios`, `/app/config`, `/app/auditoria`, `/app/mapa` | Administración |
+| `/firmar?t=<token>` | Firma remota del cliente (sin cuenta; en la demo, solo en el mismo navegador) |
+| `/imprimir?doc=` · `?cuenta=` · `?borrador=&tipo=` | Hojas para imprimir o guardar en PDF |
+| `/api/usuarios` | API del servidor (ver abajo) |
 
-## Demo
+`?desde=` indica de dónde se abrió una pantalla para que «← Volver a …» regrese al lugar correcto.
 
-- Roles: Técnico de campo, Coordinador SST, Administrador, Cliente (cambio en vivo con «Ver como»).
-- Flujo: borrador → en revisión → aprobado → cerrado (rechazado vuelve al autor con motivo).
-- Datos ficticios en `localStorage` (`src/nucleo/datos/`); se restablecen en Configuración.
-  Al conectar Supabase se reemplaza ese proveedor de datos.
+---
+
+## Módulos
+
+Cada formato es un **módulo de documento**: implementa `ModuloDocumento`
+(`src/modulos/contrato.ts`) y se registra en `src/modulos/registro.ts`. El resto de la app (menú,
+listas, tablero, generador, PDF, permisos) lo lee del registro con `infoDoc(tipo)`: nada fuera del
+módulo pregunta «¿es reporte o permiso?».
+
+| Módulo | Carpeta | Prefijo | Qué hace |
+|---|---|---|---|
+| Reportes técnicos (FO-GSST-22) | `src/modulos/reportes/` | RT | Servicio en sitio, equipos atendidos, registro fotográfico como hoja anexa, firma del cliente |
+| Permisos de trabajo (F-GSST-13) | `src/modulos/permisos/` | PT | Peligros, EPP, verificación, ejecutores y cierre del permiso |
+| Legalización de gastos (FO-GSST-25) | `src/modulos/gastos/` | LG | Ítems con la foto de la factura (hoja «Soportes»); interno, el cliente no lo ve |
+| Cotizaciones | `src/modulos/cotizaciones/` | COT | Ítems del catálogo e IVA por tarifa; la administración aprueba y envía en un paso; el cliente acepta con su firma |
+| Cuentas de cobro | `src/modulos/cobros/` | CC | Ítems desde reportes aprobados, IVA y valor en letras; borrador → emitida → enviada → pagada / anulada |
+| Proyectos | `src/nucleo/proyectos.ts`, `/app/proyectos` | PRY | Reúne documentos, cotizaciones y cuentas de un cliente; presupuesto contra gastado |
+| Equipos | `src/modulos/equipos/` | — | Inventario cliente → sistema → equipo con historial de reportes |
+| Órdenes de servicio | `src/modulos/ordenes/` | — | Tabla lista en la base; falta la interfaz |
+
+Flujo de los documentos: **borrador → en revisión → aprobado → cerrado** (rechazado vuelve al autor
+con motivo). Nadie aprueba lo propio; solo el autor edita, envía o borra su borrador. La cotización
+no pasa por revisión (la aprueba y envía la administración). Los consecutivos son por tipo y año y
+nunca se reutilizan.
+
+Para **agregar un formato nuevo**, ver «Agregar un formato nuevo» en
+[`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
+
+---
+
+## Roles y permisos
+
+Matriz en `src/nucleo/permisos.ts`; la base de datos aplica las mismas reglas con RLS y triggers
+(migraciones 0008 y 0011).
+
+| Acción | Técnico | Coordinador SST (`supervisor`) | Administrador | Cliente |
+|---|---|---|---|---|
+| Crear reportes, permisos y gastos | ✔ | ✔ | ✔ | — |
+| Ver documentos | Solo los suyos | Todo el equipo | Todo el equipo | Los suyos aprobados o cerrados (nunca gastos) |
+| Revisar (aprobar / rechazar) | — | ✔ | ✔ | — |
+| Cerrar permisos de trabajo | — | ✔ | ✔ | — |
+| Cotizaciones y cuentas de cobro (comercial) | — | — | ✔ | Consulta las suyas; acepta cotizaciones con su firma |
+| Clientes | — | ✔ | ✔ | — |
+| Proyectos | Ve los activos y los suyos | ✔ | ✔ | Los de su empresa |
+| Equipos | ✔ (no elimina) | ✔ | ✔ | Los de su empresa (solo lectura) |
+| Usuarios, configuración, auditoría, mapa | — | — | ✔ | — |
+| Firmar como cliente | — | — | — | ✔ |
+
+En el modo empresa solo inician sesión los roles internos (`admin`, `supervisor`, `tecnico`); el
+portal del cliente con login llega en la fase 2.
+
+---
+
+## Backend: Supabase
+
+El proyecto de Supabase está en línea (las migraciones pendientes de aplicar, si las hay, se
+anotan en «Pendiente» de `docs/ARQUITECTURA.md`). El esquema es multiempresa:
+cada tabla tiene `organizacion_id` y RLS.
+
+| Migración | Contenido |
+|---|---|
+| `0001_nucleo.sql` | Organizaciones, perfiles, miembros (rol por empresa), clientes, sitios, consecutivos, auditoría, notificaciones, funciones de RLS |
+| `0002_operacion.sql` | Formatos, órdenes de servicio, documentos + historial, reglas del flujo, firmas, enlaces de firma remota, archivos |
+| `0003_finanzas.sql` | Cuentas de cobro e ítems (y una tabla `gastos` provisional que retira 0007) |
+| `0004_storage.sql` | Bucket privado `archivos` con acceso por organización |
+| `0005_auth_perfiles.sql` | Perfil automático al registrarse (trigger en `auth.users`); el acceso lo da el admin en `miembros` |
+| `0006_endurecer_funciones.sql` | Revoca `EXECUTE` de funciones de trigger; consecutivos solo vía `crear_documento` / `crear_cuenta_cobro` |
+| `0007_gastos_como_formato.sql` | Gastos como formato FO-GSST-25 en `documentos`; `formatos.visible_cliente` |
+| `0008_separacion_funciones.sql` | Solo el autor edita y envía; nadie aprueba lo propio; reglas de la firma por enlace |
+| `0009_proyectos.sql` | Tabla `proyectos` (PRY), proyecto en documentos y cuentas, formato `cotizacion`, firma del cliente en su portal |
+| `0010_equipos.sql` | Tablas `equipos` y `documento_equipos` con sus reglas y RLS |
+| `0011_comercial_solo_admin.sql` | Cotizaciones y cuentas de cobro solo para `admin` |
+| `0012_espacio_empresa.sql` | **`espacios`**: estado del modo empresa por organización (fase 1), RLS para el equipo interno y versión que solo avanza de a uno |
+
+Qué usa hoy la app (fase 1):
+
+- **Auth**: `signInWithPassword` desde `/acceso` (`src/nucleo/datos/empresa.ts`). Un usuario sin
+  `@` se completa con `@sotecse.com`.
+- **`miembros` y `perfiles`**: organización, rol, cargo y nombre de quien inicia sesión. Solo entra
+  quien tiene una membresía activa con rol interno.
+- **`espacios`**: lectura y guardado del estado con versión optimista. RLS (`espacios_ver`,
+  `espacios_guardar`) solo deja al equipo interno de la organización; el trigger
+  `espacios_al_guardar` exige que la versión suba de a uno y registra quién guardó.
+- **`/api/usuarios`** (servidor, llave secreta): crea y administra las cuentas.
+
+Las demás tablas (documentos, firmas, proyectos, equipos, cuentas…) ya existen con sus reglas y
+pruebas, y las usará la fase 2. Detalle de seguridad (RLS, firma por enlace, consecutivos,
+advertencias intencionales del Security Advisor): [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
+
+Flujo para cambiar la base de datos:
+
+```bash
+npm run test:db                                                       # 1. migraciones y RLS en PostgreSQL desechable
+python3 scripts/aplicar-migracion.py supabase/migrations/00NN_x.sql   # 2. aplica en Supabase (lee .env.local)
+bash scripts/armar-instalador.sh                                      # 3. regenera supabase/instalar.sql
+python3 scripts/generar-mapa-db.py                                    # 4. actualiza el «Mapa del sistema»
+```
+
+---
+
+## API `/api/usuarios`
+
+Route Handler en `src/app/api/usuarios/route.ts`. El contrato tipado y compartido está en
+`src/nucleo/datos/usuarios-contrato.ts`; el navegador la llama con `src/nucleo/datos/usuarios-api.ts`
+(`listarUsuarios`, `crearUsuario`, `actualizarUsuario`, `eliminarUsuario`) desde
+`src/components/usuarios/PanelUsuariosEmpresa.tsx` (pantalla `/app/usuarios` en modo empresa).
+
+**Autenticación y permisos:** cabecera `Authorization: Bearer <access_token>` de la sesión de
+Supabase. El servidor valida el token con la llave secreta y exige que sea `admin` activo de una
+organización; todo se limita a esa organización y a los roles internos.
+
+| Método | Entrada | Respuesta 200 | Reglas |
+|---|---|---|---|
+| `GET` | — | `{ usuarios: UsuarioEmpresa[], yo }` | Miembros internos (no clientes), unidos con su perfil |
+| `POST` | `{ email, nombre, cargo, rol, clave }` | `{ usuario }` | Correo válido, nombre, rol interno, clave de 8 o más caracteres. Crea la cuenta con el correo confirmado y la membresía; si la membresía falla, borra la cuenta |
+| `PATCH` | `{ id, nombre?, cargo?, rol?, activo?, clave? }` | `{ ok: true }` | Solo cambia lo enviado. El admin no puede quitarse el rol ni desactivarse |
+| `DELETE` | `?id=` | `{ ok: true }` | Nadie se elimina a sí mismo. Si la persona está en otra organización solo pierde el acceso a esta; si no, se borra su cuenta |
+
+`UsuarioEmpresa = { id, email, nombre, cargo, rol: "tecnico" | "supervisor" | "admin", activo }`.
+
+Errores: `{ error: "<mensaje para mostrar>" }` con el estado HTTP —
+`400` datos inválidos · `401` sin sesión o sesión vencida · `403` no es admin · `404` el usuario no
+es de la organización · `409` no se pudo eliminar (tiene historial: desactivarlo) · `500` falla de
+Supabase · `503` despliegue sin `SUPABASE_SECRET_KEY`.
+
+---
+
+## Despliegue
+
+- **Vercel** despliega solo cada push a `main` de `carforck/FormatoDigital`. Dominio:
+  **controlone.sotecse.com**; el sitio se sirve desde la raíz (`NEXT_PUBLIC_BASE_PATH` vacío en
+  `next.config.mjs`).
+- Variables en Vercel (Settings → Environment Variables): `NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` (solo servidor) y
+  `NEXT_PUBLIC_SITE_URL`.
+- **Autor de los commits:** Vercel rechaza los despliegues de autores que no pertenecen al equipo.
+  Antes de hacer commit, configura el autor del equipo en el repositorio:
+  `git config user.name "carlos carranza"` y `git config user.email asistenteti@alzakfoundation.org`.
+- Los secretos viven en `.env.local` (ignorado por git) y en Vercel; nunca en el código.
+
+---
+
+## Scripts
+
+| Script | Qué hace |
+|---|---|
+| `npm run dev` · `build` · `start` · `lint` | Desarrollo (puerto 3100), compilación, servidor de producción y ESLint |
+| `bash scripts/reiniciar-dev.sh` | Reinicia el dev en el 3100 con la caché `.next` limpia |
+| `npm run test:unit` · `test:e2e` · `test:db` | Pruebas (ver abajo) |
+| `bash scripts/probar-db.sh` | Lo que corre `test:db`: PostgreSQL 16 desechable (Podman o Docker) con migraciones, semilla (dos veces) y `supabase/tests/` |
+| `python3 scripts/aplicar-migracion.py <archivo.sql>…` | Aplica SQL a Supabase en una transacción (Management API; lee `SUPABASE_ACCESS_TOKEN` y `SUPABASE_PROJECT_REF` de `.env.local`). **Toca producción** |
+| `bash scripts/armar-instalador.sh` | Regenera `supabase/instalar.sql` (migraciones + semilla) |
+| `python3 scripts/generar-mapa-db.py [--check]` | Regenera `src/components/mapa/esquema.json` desde las migraciones; `--check` falla si está desactualizado |
+| `python3 scripts/generar-og.py` | Genera `public/og.jpg` (imagen para compartir, 1200×630) |
+| `python3 scripts/generar-lottie.py` | Genera `public/lottie/digitaliza.json` (papel → escáner → celular → check) |
+| `python3 scripts/generar-lottie-control.py` | Genera `public/lottie/control.json` (ControlOne conectado con las áreas) |
+
+---
+
+## Pruebas
+
+| Comando | Qué prueba |
+|---|---|
+| `npm run test:unit` | Valor en letras (`tests/unit/letras.test.ts`) y cálculos de la cotización (`tests/unit/cotizacion.test.ts`) |
+| `npm run test:e2e` | La demo completa en Chrome (`tests/e2e/demo.cjs`), contra `http://localhost:3100` |
+| `npm run test:db` | Migraciones, RLS y flujo en PostgreSQL desechable |
+
+Opciones de la e2e (variables de entorno):
+
+- `SOLO=<sección>`: una sola sección (`flujo`, `responsive`, `controles`, `magno`, `proyectos`,
+  `crud`, `equipos`, `navegacion`, `comercial`, `impresion`).
+- `BASE=<url>`: otro servidor (por ejemplo `https://controlone.sotecse.com`).
+- `CHROME=<ruta>`: ejecutable de Chrome si no está en la ruta por defecto.
+
+```bash
+CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" npm run test:e2e   # termina en «Todo en verde»
+```
+
+---
+
+## Pendientes y hoja de ruta
+
+**Fase 2 de Supabase**
+
+- Pasar cada módulo a sus tablas relacionales con RLS (documentos, firmas, proyectos, equipos,
+  cuentas de cobro) y retirar `espacios`.
+- Fotos y soportes en Supabase Storage (bucket `archivos`) en lugar de dentro del estado.
+- Firma remota por enlace (`/firmar`) en el modo empresa (hoy solo funciona en la demo, en el mismo
+  navegador).
+- Usuarios con rol `cliente` en el modo empresa (portal del cliente con login).
+
+**Otros**
+
+- Envío de correo desde la plataforma con Resend (PDF adjunto y enlace de firma).
+- Órdenes de servicio en la interfaz.
+- Gastos reembolsables dentro de las cuentas de cobro.
+- Requerimiento de materiales (planeado).
+
+## Datos de la demo
+
+Todos los nombres, cédulas, correos y empresas de la demo son **ficticios** (dominios `.example`);
+SOTEC es la única empresa real y aparece con su permiso. No se deben agregar datos reales de
+clientes ni de personas al código, a las pruebas ni a la semilla.

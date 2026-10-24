@@ -22,6 +22,7 @@ import { asset } from "@/nucleo/rutas";
 import { FondoInteractivo } from "@/components/fx/FondoInteractivo";
 import { Contador, Icono, ProgresoScroll, Reveal, TextoRotativo } from "@/components/fx/Reveal";
 import { GraficasImpacto } from "@/components/landing/GraficasImpacto";
+import { AvisoApp, DescargaApp } from "@/components/landing/DescargaApp";
 import { AccesoRoles, Contacto, Faq, VitrinaFormatos } from "@/components/landing/Interactivos";
 import { CalculadoraROI } from "@/components/landing/CalculadoraROI";
 import { ChatEnVivo } from "@/components/landing/ChatEnVivo";
@@ -67,6 +68,7 @@ export default function Landing() {
             <a href="#impacto" className="hover:text-white">Impacto</a>
             <a href="#funciones" className="hover:text-white">Funcionalidades</a>
             <a href="#roles" className="hover:text-white">Roles</a>
+            <a href="#app" className="hover:text-white">App</a>
             <a href="#ahorro" className="hover:text-white">Ahorro</a>
             <a href="#planes" className="hover:text-white">Planes</a>
             <a href="#faq" className="hover:text-white">Preguntas</a>
@@ -247,6 +249,9 @@ export default function Landing() {
           </Reveal>
         </div>
       </section>
+
+      {/* Llévala como app (PWA) */}
+      <DescargaApp />
 
       {/* Roles */}
       <section id="roles" className="relative scroll-mt-16 overflow-hidden bg-sotec py-20 text-white">
@@ -462,6 +467,8 @@ export default function Landing() {
           </div>
         </div>
       </footer>
+
+      <AvisoApp />
     </div>
   );
 }

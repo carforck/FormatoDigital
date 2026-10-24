@@ -11,7 +11,8 @@
     "0008_separacion_funciones.sql",
     "0009_proyectos.sql",
     "0010_equipos.sql",
-    "0011_comercial_solo_admin.sql"
+    "0011_comercial_solo_admin.sql",
+    "0012_espacio_empresa.sql"
   ],
   "tablas": [
     {
@@ -2268,6 +2269,67 @@
       "externa": false
     },
     {
+      "nombre": "espacios",
+      "esquema": "public",
+      "columnas": [
+        {
+          "nombre": "organizacion_id",
+          "tipo": "uuid",
+          "pk": true,
+          "nulo": false,
+          "unico": false,
+          "fk": {
+            "tabla": "organizaciones",
+            "columna": "id",
+            "alBorrar": "cascade"
+          }
+        },
+        {
+          "nombre": "estado",
+          "tipo": "jsonb",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "'{}'::jsonb"
+        },
+        {
+          "nombre": "version",
+          "tipo": "bigint",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "0"
+        },
+        {
+          "nombre": "actualizado_por",
+          "tipo": "uuid",
+          "pk": false,
+          "nulo": true,
+          "unico": false,
+          "fk": {
+            "tabla": "auth.users",
+            "columna": "id",
+            "alBorrar": "set null"
+          }
+        },
+        {
+          "nombre": "updated_at",
+          "tipo": "timestamptz",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "now()"
+        }
+      ],
+      "migracion": "0012_espacio_empresa.sql",
+      "descripcion": "Concurrencia optimista: quien guarda envía la versión que leyó; si otro guardó antes, la actualización no encuentra la fila y la app recarga lo más reciente.",
+      "rls": true,
+      "externa": false
+    },
+    {
       "nombre": "auth.users",
       "esquema": "auth",
       "columnas": [
@@ -2799,6 +2861,24 @@
       "columnaDestino": "id",
       "alBorrar": "restrict",
       "nulo": false
+    },
+    {
+      "id": "espacios.organizacion_id->organizaciones.id",
+      "desde": "espacios",
+      "columna": "organizacion_id",
+      "hacia": "organizaciones",
+      "columnaDestino": "id",
+      "alBorrar": "cascade",
+      "nulo": false
+    },
+    {
+      "id": "espacios.actualizado_por->auth.users.id",
+      "desde": "espacios",
+      "columna": "actualizado_por",
+      "hacia": "auth.users",
+      "columnaDestino": "id",
+      "alBorrar": "set null",
+      "nulo": true
     }
   ]
 }

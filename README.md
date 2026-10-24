@@ -29,10 +29,11 @@ cobro.
 7. [Roles y permisos](#roles-y-permisos)
 8. [Backend: Supabase](#backend-supabase)
 9. [API `/api/usuarios`](#api-apiusuarios)
-10. [Despliegue](#despliegue)
-11. [Scripts](#scripts)
-12. [Pruebas](#pruebas)
-13. [Pendientes y hoja de ruta](#pendientes-y-hoja-de-ruta)
+10. [App instalable y sin conexión (PWA)](#app-instalable-y-sin-conexión-pwa)
+11. [Despliegue](#despliegue)
+12. [Scripts](#scripts)
+13. [Pruebas](#pruebas)
+14. [Pendientes y hoja de ruta](#pendientes-y-hoja-de-ruta)
 
 ---
 
@@ -111,6 +112,7 @@ aplica los permisos, revalida el estado más reciente y guarda.
 | Dónde viven | `localStorage` (`sotec-demo-v9`); se restablecen en Configuración | `public.espacios.estado` (jsonb) en Supabase |
 | Varias pestañas / equipos | Se sincronizan con el evento `storage` | Guardado agrupado (700 ms) con **versión optimista**; cada 15 s y al volver a la pestaña se buscan cambios de otros equipos |
 | Conflictos | — | Si otro guardó antes, la actualización no encuentra la versión y se recarga lo más reciente con un aviso |
+| Sin conexión | Funciona igual (todo es local) | Abre con la sesión y la última copia guardadas en el equipo; los cambios quedan pendientes y se sincronizan al volver la red (ver [PWA](#app-instalable-y-sin-conexión-pwa)) |
 | Rol del usuario | El perfil elegido | El de `miembros.rol` en Supabase (manda sobre lo guardado en el espacio) |
 
 El modo elegido se recuerda en `localStorage` (`fd-modo`). **Fase 1** del modo empresa: el estado
@@ -127,7 +129,9 @@ tablas relacionales con RLS (ya existen en las migraciones) y retira `espacios`.
 ├── src/
 │   ├── app/                          Rutas de Next.js (App Router)
 │   │   ├── page.tsx                  Landing pública (/)
-│   │   ├── layout.tsx                Layout raíz: fuentes, metadatos, DemoProvider
+│   │   ├── layout.tsx                Layout raíz: fuentes, metadatos (también los de la PWA), RegistroPWA, DemoProvider
+│   │   ├── manifest.ts               Manifiesto de la app instalable (/manifest.webmanifest)
+│   │   ├── offline/                  /offline: lo que muestra el service worker si la página no está guardada
 │   │   ├── globals.css               Tailwind, colores (claro/oscuro, series) y reglas de impresión
 │   │   ├── acceso/                   /acceso: login de la empresa y perfiles de la demo
 │   │   ├── firmar/                   /firmar?t=: firma remota del cliente por enlace (sin cuenta)
@@ -193,6 +197,7 @@ tablas relacionales con RLS (ya existen en las migraciones) y retira `espacios`.
 │   │   ├── mapa/                     Mapa del sistema (esquema.json se genera desde las migraciones)
 │   │   ├── landing/                  Secciones de la landing
 │   │   ├── acceso/                   Animación de /acceso
+│   │   ├── pwa/                      Registro del service worker y botón «Instalar app»
 │   │   ├── fx/                       Efectos (aparición, contadores, fondo interactivo)
 │   │   └── ui/                       Botones, campos, insignias, modal, «Volver»…
 │   │
@@ -207,7 +212,7 @@ tablas relacionales con RLS (ya existen en las migraciones) y retira `espacios`.
 ├── tests/
 │   ├── unit/                         Valor en letras y cálculos de la cotización
 │   └── e2e/demo.cjs                  Recorrido completo de la demo en Chrome
-├── public/                           Logos, fotos de la landing, og.jpg, animaciones Lottie
+├── public/                           Logos, fotos de la landing, og.jpg, Lottie, íconos de la app (iconos/) y sw.js
 └── docs/                             Arquitectura, marca y créditos de imágenes
 ```
 
@@ -238,6 +243,8 @@ Convenciones:
 | `/firmar?t=<token>` | Firma remota del cliente (sin cuenta; en la demo, solo en el mismo navegador) |
 | `/imprimir?doc=` · `?cuenta=` · `?borrador=&tipo=` | Hojas para imprimir o guardar en PDF |
 | `/api/usuarios` | API del servidor (ver abajo) |
+| `/offline` | Página sin conexión (la sirve el service worker cuando la ruta no está guardada) |
+| `/manifest.webmanifest`, `/sw.js` | Manifiesto y service worker de la app instalable |
 
 `?desde=` indica de dónde se abrió una pantalla para que «← Volver a …» regrese al lugar correcto.
 
@@ -368,6 +375,105 @@ Supabase · `503` despliegue sin `SUPABASE_SECRET_KEY`.
 
 ---
 
+## App instalable y sin conexión (PWA)
+
+ControlOne se instala como una app (ícono propio, ventana sin barra del navegador) y abre sin
+conexión. Todo está hecho a mano, sin librerías de PWA:
+
+| Pieza | Archivo |
+|---|---|
+| Manifiesto (nombre, colores, `start_url` `/app`, atajos) | `src/app/manifest.ts` → `/manifest.webmanifest` |
+| Íconos (192, 512, maskable 512, apple-touch-icon 180) | `public/iconos/`, generados con `scripts/generar-iconos-pwa.py` |
+| Metadatos de iOS y `theme-color` | `src/app/layout.tsx` (`appleWebApp`, `icons`, `viewport`) |
+| Service worker | `public/sw.js` |
+| Registro (solo en producción) | `src/components/pwa/RegistroPWA.tsx` |
+| Botón «Instalar app» | `src/components/pwa/BotonInstalar.tsx` (menú de perfil del aplicativo y `/acceso`) |
+| Página sin conexión | `src/app/offline/` |
+| Datos sin conexión del modo empresa | `src/nucleo/datos/empresa.ts` y `DemoProvider.tsx` |
+
+### Instalarla
+
+- **Android (Chrome) y escritorio (Chrome, Edge):** botón **Instalar app** en `/acceso` o en el
+  menú de perfil (arriba a la derecha) del aplicativo. También desde el menú del navegador
+  («Instalar ControlOne» / ícono de instalar en la barra de direcciones). En Android, mantener
+  presionado el ícono muestra los atajos (Nuevo reporte, Documentos, Revisión).
+- **iPhone y iPad (Safari):** el botón muestra cómo hacerlo: **Compartir → Agregar a pantalla de
+  inicio**. iOS no permite lanzar la instalación desde la página.
+- Si la app ya corre instalada, el botón no aparece.
+
+### Qué funciona sin conexión
+
+- **Abrir la app:** la landing, `/acceso`, `/app` y todas las pantallas de `/app/*` quedan
+  guardadas al instalar el service worker (la primera visita en línea). Las rutas con `?id=`
+  usan la misma página guardada. Una ruta que no esté guardada muestra `/offline`.
+- **Demo:** funciona completa (sus datos ya viven en el navegador).
+- **Empresa:** después de **al menos un ingreso en línea** en ese equipo. Cada carga y guardado
+  exitoso deja en el equipo la sesión (`fd-empresa-sesion`) y la última copia del espacio (estado
+  en `fd-empresa-respaldo`; versión y si tiene cambios pendientes en `fd-empresa-copia`). Sin red
+  la app abre con esa copia, los cambios se guardan en el equipo y la franja superior dice
+  **«Sin conexión · tus cambios se guardan en este equipo»**.
+- **Al volver la conexión** (evento `online`, el sondeo de 15 s o al volver a la pestaña) se
+  confirma la sesión con Supabase y se envían los cambios con la misma versión optimista de
+  siempre. Si mientras tanto otra persona guardó, gana lo más reciente del servidor: se cargan
+  esos datos con un aviso (como cualquier conflicto) y los cambios propios que perdieron quedan
+  aparte en `fd-empresa-conflicto` por si hay que rescatarlos a mano.
+
+Límites:
+
+- Sin conexión no se puede **iniciar sesión** por primera vez ni cambiar de usuario; **cerrar
+  sesión** borra la sesión guardada (sin red ya no se puede volver a entrar). La copia del espacio
+  se conserva y, si quedó algo pendiente, se envía cuando la misma persona vuelva a entrar.
+- La copia vive en `localStorage` (≈5 MB por sitio): con muchas fotos puede no caber; entonces se
+  avisa que no hay espacio en el equipo y no conviene cerrar la app hasta recuperar la conexión.
+- Lo que depende del servidor no funciona sin red: `/api/usuarios` (usuarios con login), enviar
+  por correo, y ver lo que otros guardaron después de la última sincronización.
+- Si la sesión de Supabase venció mientras no había red, al volver se pide iniciar sesión de nuevo;
+  los cambios siguen en el equipo y se envían después del ingreso.
+- Conflictos: el estado es un solo documento por organización, así que el último en llegar
+  sin conexión pierde sus cambios frente a lo guardado entre tanto (fase 1; la fase 2 con tablas
+  por módulo lo resuelve por registro).
+
+### Qué guarda en caché el service worker
+
+| Petición | Estrategia |
+|---|---|
+| `/_next/static/*` (JS, CSS, fuentes con hash) | Primero el caché (inmutables); caché `co-static-<versión>`, hasta 400 archivos |
+| Páginas (navegación) | Primero la red (si ya hay copia, espera hasta 5 s); si falla, la copia de esa ruta; si no hay, `/offline`. Caché `co-app-<versión>-<despliegue>` |
+| Otros archivos de `public/` (íconos, Lottie, imágenes, manifiesto) | La copia al instante y se renueva en segundo plano |
+| `/api/*`, Supabase (`*.supabase.co`), otros dominios, peticiones que no son GET, autenticación, peticiones RSC de Next | **Nunca** pasan por el caché |
+
+`/api/*` lleva además `Cache-Control: no-store` y `/sw.js` se sirve sin caché
+(`next.config.mjs`).
+
+### Actualizaciones
+
+Silenciosas, sin interrumpir a nadie:
+
+1. Cada despliegue tiene su versión (`NEXT_PUBLIC_VERSION_APP` en `next.config.mjs`: el commit en
+   Vercel). `RegistroPWA` registra `/sw.js?v=<versión>`, así que el navegador detecta el service
+   worker nuevo al abrir la app (y cada hora o al volver a la pestaña si quedó abierta).
+2. El nuevo se instala **en segundo plano** (guarda las páginas y archivos de la versión nueva),
+   se activa solo (`skipWaiting` + `clients.claim`) y borra los cachés de páginas viejos. Los JS
+   viejos se conservan por si una pestaña abierta todavía los pide.
+3. **No recarga la página:** lo que se está diligenciando sigue intacto. La versión nueva se ve
+   en la próxima apertura de la app o navegación completa (las páginas van primero a la red).
+
+**Subir la versión del caché a mano** (cambiar la estrategia o vaciar todo en los equipos): en
+`public/sw.js` cambia `VERSION_CACHE = "v1"` por `"v2"`. Al activarse borra todos los cachés
+`co-*` anteriores. Si agregas una pantalla nueva en `/app`, súmala a `PAGINAS` en el mismo archivo
+para que abra sin conexión desde la instalación (si no, se guarda la primera vez que se visita).
+
+### Desarrollo y pruebas
+
+- En `npm run dev` el service worker **no se registra** (y si quedó uno de una prueba de
+  producción en el mismo puerto, se elimina con sus cachés), así no interfiere con la recarga en
+  caliente ni con la e2e.
+- Para probarlo: `npm run build && npm start`, abrir Chrome → DevTools → Application (Manifest,
+  Service workers, Cache storage) y en Network marcar «Offline».
+- Íconos nuevos: `python3 scripts/generar-iconos-pwa.py` (necesita Pillow).
+
+---
+
 ## Despliegue
 
 - **Vercel** despliega solo cada push a `main` de `carforck/FormatoDigital`. Dominio:
@@ -397,6 +503,7 @@ Supabase · `503` despliegue sin `SUPABASE_SECRET_KEY`.
 | `python3 scripts/generar-og.py` | Genera `public/og.jpg` (imagen para compartir, 1200×630) |
 | `python3 scripts/generar-lottie.py` | Genera `public/lottie/digitaliza.json` (papel → escáner → celular → check) |
 | `python3 scripts/generar-lottie-control.py` | Genera `public/lottie/control.json` (ControlOne conectado con las áreas) |
+| `python3 scripts/generar-iconos-pwa.py` | Genera los íconos de la app instalable en `public/iconos/` (192, 512, maskable 512 y apple-touch-icon 180; requiere Pillow) |
 
 ---
 

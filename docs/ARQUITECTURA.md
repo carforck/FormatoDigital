@@ -474,7 +474,5 @@ Comandos de prueba, opciones de la e2e (`SOLO`, `BASE`, `CHROME`) y stack: ver e
 - Órdenes de servicio en la interfaz.
 - Incluir los gastos reembolsables en las cuentas de cobro.
 - Requerimiento de materiales: planeado.
-- Equipos: aplicar `0010_equipos.sql` en Supabase (probada solo en local).
-- Comercial solo admin: aplicar `0011_comercial_solo_admin.sql` en Supabase
-  (probada solo en local). Los archivos del bucket `archivos` siguen con
-  acceso por organización (0004), no por documento.
+- Los archivos del bucket `archivos` siguen con acceso por organización (0004),
+  no por documento. (0010 y 0011 ya están aplicadas en Supabase: verificado.)

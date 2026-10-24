@@ -48,7 +48,12 @@ const pct = (n: number | null) => (n === null ? "—" : `${Math.round(n * 100)} 
 /** Colores de la dona por estado (mismos tonos de los badges). */
 const COLOR_ESTADO: Record<Estado, string> = { borrador: "#94A3B8", en_revision: "#D9963A", aprobado: "var(--serie-a)", cerrado: "var(--serie-b)", rechazado: "#E11D48" };
 /** Horas decimales como «X h MM min»; «—» si no hay datos. */
-const duracion = (h: number | null) => (h === null ? "—" : `${Math.floor(h)} h ${String(Math.round((h % 1) * 60)).padStart(2, "0")} min`);
+// Se redondea a minutos antes de separar horas y minutos (evita «1 h 60 min»)
+const duracion = (h: number | null) => {
+  if (h === null) return "—";
+  const min = Math.round(h * 60);
+  return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")} min`;
+};
 /** Horas legibles: en horas por debajo de un día, en días desde 24 h. */
 const horas = (h: number | null) => (h === null ? "—" : h < 24 ? `${h.toLocaleString("es-CO", { maximumFractionDigits: 1 })} h` : `${(h / 24).toLocaleString("es-CO", { maximumFractionDigits: 1 })} días`);
 

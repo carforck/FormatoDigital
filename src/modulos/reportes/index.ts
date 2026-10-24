@@ -38,7 +38,7 @@ const ahoraHHMM = () => {
 export const moduloReportes: ModuloDocumento<DatosReporte> = {
   clave: "reporte",
   vacio: (hoy, u) => ({ ...reporteVacio(hoy), nombreTecnico: u.nombre }),
-  totalComprobaciones: 10,
+  totalComprobaciones: 11,
   titulo: (d) => d.asunto,
   faltantes: faltantesReporte,
   formato: { codigo: "FO-GSST-22", nombre: "Formato de reporte técnico", version: "01", fecha: "01/03/2020", corto: "Reporte técnico", el: "el", nuevo: "Nuevo", plural: "reportes" },

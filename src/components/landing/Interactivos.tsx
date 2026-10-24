@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Bloques interactivos de la landing (src/app/page.tsx): vitrina de los
+ * formatos digitalizados, acceso a la demo por rol, preguntas frecuentes y
+ * formulario de contacto. Usan el DemoProvider (datos ficticios en el navegador).
+ */
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -12,7 +17,11 @@ import { PERFILES } from "@/nucleo/perfiles";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { cn } from "@/lib/utils";
 
-/** Muestra los dos formatos reales de SOTEC ya digitalizados. */
+/**
+ * Muestra los dos formatos reales de SOTEC ya digitalizados, renderizando la
+ * plantilla con los documentos de ejemplo `d-rt-clay` y `d-pt-clay` de la demo
+ * (a escala reducida, sin interacción).
+ */
 export function VitrinaFormatos() {
   const demo = useDemo();
   const [tab, setTab] = useState<"reporte" | "permiso">("reporte");
@@ -85,7 +94,7 @@ export function VitrinaFormatos() {
   );
 }
 
-/** Tarjetas para entrar a la app con un rol, sin credenciales. */
+/** Tarjetas para entrar a la app con un rol, sin credenciales; cada rol aterriza en su pantalla principal. */
 export function AccesoRoles() {
   const demo = useDemo();
   const router = useRouter();
@@ -130,6 +139,7 @@ const PREGUNTAS = [
   ["¿Cuánto tarda la implementación?", "Un formato típico queda listo en una o dos semanas: levantamiento, digitalización fiel, reglas de validación, roles y pruebas con tu equipo."],
 ] as const;
 
+/** Acordeón de preguntas frecuentes (una abierta a la vez; la primera abierta al cargar). */
 export function Faq() {
   const [abierta, setAbierta] = useState<number | null>(0);
   return (

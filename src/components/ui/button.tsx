@@ -1,9 +1,15 @@
+/**
+ * Botón base de shadcn/ui (variantes con `cva`). Usado en el generador, chat,
+ * firma, envío de documentos, usuarios, configuración, cobros y `/firmar`.
+ * Con `asChild` presta sus estilos al hijo (p. ej. un `<Link>`) vía Radix Slot.
+ */
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+/** Clases por variante (`default`, `destructive`, `outline`, `secondary`, `ghost`, `link`) y tamaño. */
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
   {
@@ -37,9 +43,11 @@ const buttonVariants = cva(
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
+  /** Renderiza el hijo en lugar de `<button>`, con las mismas clases. */
   asChild?: boolean;
 }
 
+/** Botón con variantes de estilo; reenvía la ref al elemento DOM. */
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";

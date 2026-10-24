@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * Pestaña «Roles y permisos» del Mapa del sistema (src/app/app/mapa/page.tsx):
+ * tabla acción × rol generada en vivo desde la matriz de permisos del núcleo.
+ */
 import { Check, Minus } from "lucide-react";
 
 import { ETIQUETA_ROL } from "@/nucleo/catalogos";

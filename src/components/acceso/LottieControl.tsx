@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * Animación Lottie decorativa de la pantalla de acceso (`/acceso`). Carga el
+ * JSON en el cliente; si falla, el contenedor queda vacío con su proporción.
+ */
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import type { LottieRefCurrentProps } from "lottie-react";

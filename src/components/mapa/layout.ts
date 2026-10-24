@@ -1,5 +1,11 @@
+/**
+ * Distribución automática de los diagramas del Mapa del sistema con dagre.
+ * Independiente de React Flow: recibe cajas medidas y aristas guía; lo usa
+ * `useDistribucion` (lienzo.tsx).
+ */
 import dagre from "@dagrejs/dagre";
 
+/** Arista que guía las capas; `peso` alto la mantiene más corta y recta. */
 export interface AristaLayout {
   desde: string;
   hacia: string;
@@ -8,6 +14,7 @@ export interface AristaLayout {
   etiqueta?: string;
 }
 
+/** Nodo a ubicar con su tamaño real en píxeles. */
 export interface CajaLayout {
   id: string;
   ancho: number;
@@ -16,7 +23,8 @@ export interface CajaLayout {
 
 /**
  * Distribución automática por capas (dagre). Devuelve la esquina superior
- * izquierda de cada caja, como la espera React Flow.
+ * izquierda de cada caja, como la espera React Flow. Ignora aristas con
+ * extremos desconocidos o en bucle; es multigrafo para admitir aristas paralelas.
  */
 export function distribuir(
   cajas: CajaLayout[],

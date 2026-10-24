@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Pantalla de diligenciamiento de un formato (`/app/nuevo/<tipo>`, vía
+ * PaginaGenerador): chat guiado (ChatAsistente) a la izquierda y la plantilla
+ * editable a la derecha (pestañas en móvil). Guarda borradores en localStorage,
+ * avisa antes de salir con cambios y guarda/envía con `useDemo`.
+ */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Cctv, CheckCircle2, Eye, FolderKanban, MessageSquare, Printer, Save, SendHorizonal } from "lucide-react";
@@ -39,7 +45,8 @@ const etiquetaProyecto = (p: Proyecto) => `${p.codigo} · ${p.nombre}`;
 /**
  * Generador genérico: asistente conversacional + vista previa editable.
  * Lo propio de cada formato (pasos, autollenado, reglas) lo aporta su módulo
- * en src/modulos/<clave>/.
+ * en src/modulos/<clave>/. El generador intercala dos pasos comunes: el
+ * proyecto (justo después del cliente) y, si el formato los registra, los equipos.
  */
 export function Generador({ tipo, existente, proyectoInicial, clienteInicial, equipoInicial }: Props) {
   const demo = useDemo();
@@ -180,6 +187,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     return [`Proyecto ${etiquetaProyecto(p)}${c ? ` de ${c.nombre}` : ""}.`, r?.mensaje].filter(Boolean).join(" ");
   }
 
+  /** Aplica la respuesta de un paso del chat; devuelve el mensaje de confirmación del asistente. */
   function aplicar(id: string, v: ValorPaso): string | void {
     if (id.startsWith("firma")) return;
     if (id === "cliente") return elegirCliente(demo.clientesActivos.find((x) => x.nombre === v), v as string);
@@ -251,6 +259,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     editar(info.aplicarFirma(campo, url, doc.datos));
   }
 
+  /** Guarda (y con `enviar`, envía a revisión o aprueba según el flujo del formato) y abre el detalle. */
   function guardar(enviar: boolean) {
     if (guardando) return; // un solo envío aunque se haga doble clic
     if (enviar && pendientes.length) {

@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Diálogo para enviar un documento o cuenta de cobro por correo (mailto:) o
+ * WhatsApp (wa.me) con asunto y mensaje editables. Usado en
+ * `/app/documentos/ver` y `/app/cobros/ver`.
+ */
 import { useId, useState } from "react";
 import { Check, Copy, ExternalLink, Mail, MessageCircle, X } from "lucide-react";
 

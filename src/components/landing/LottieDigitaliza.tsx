@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Animación Lottie del hero de la landing (src/app/page.tsx): el formato en
+ * papel se escanea y pasa al celular. El JSON se descarga en el cliente
+ * (/lottie/digitaliza.json) y una píldora muestra la etapa según el cuadro actual.
+ */
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { asset } from "@/nucleo/rutas";
@@ -36,6 +41,7 @@ export function LottieDigitaliza() {
           loop
           autoplay
           className="h-full w-full"
+          // Cortes de etapa en cuadros, atados a la línea de tiempo de digitaliza.json
           onEnterFrame={(e) => {
             const f = (e as unknown as { currentTime: number }).currentTime;
             const k = f < 34 ? 0 : f < 72 ? 1 : f < 112 ? 2 : 3;

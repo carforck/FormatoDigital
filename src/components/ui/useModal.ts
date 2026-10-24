@@ -1,9 +1,15 @@
 "use client";
 
+/**
+ * Accesibilidad de diálogos modales: atrapa el foco, cierra con Esc y con
+ * toque en el fondo. Usado por FirmaPad, EnviarDocumento y
+ * `/app/documentos/ver`.
+ */
 import { useEffect, useRef } from "react";
 
 const ENFOCABLES = 'a[href], area[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), iframe, [contenteditable="true"], [tabindex]:not([tabindex="-1"])';
 
+/** Elementos enfocables visibles (o el activo, aunque esté oculto) dentro de `raiz`. */
 function enfocables(raiz: HTMLElement): HTMLElement[] {
   return Array.from(raiz.querySelectorAll<HTMLElement>(ENFOCABLES)).filter((el) => el.getClientRects().length > 0 || el === document.activeElement);
 }

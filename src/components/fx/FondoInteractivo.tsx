@@ -1,11 +1,17 @@
 "use client";
 
+/**
+ * Fondo animado del hero de la landing (`src/app/page.tsx`). Se monta como
+ * `absolute inset-0` y escucha el puntero en su contenedor padre (el canvas
+ * no recibe eventos para no tapar el contenido).
+ */
 import { useEffect, useRef } from "react";
 
 /**
  * Red de partículas en canvas: los nodos se mueven lento, se conectan entre sí
  * y se iluminan / apartan alrededor del cursor. Se pausa fuera de pantalla y
  * queda estática con prefers-reduced-motion.
+ * `densidad`: partículas por px² (acotado a 28–110); `rgb`: color "r,g,b".
  */
 export function FondoInteractivo({ densidad = 0.00009, rgb = "146,208,80" }: { densidad?: number; rgb?: string }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -22,6 +28,7 @@ export function FondoInteractivo({ densidad = 0.00009, rgb = "146,208,80" }: { d
     type P = { x: number; y: number; vx: number; vy: number; r: number };
     let ps: P[] = [];
 
+    // Ajusta el lienzo al tamaño y DPR (máx. 2) y vuelve a sembrar las partículas
     const medir = () => {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       w = c.offsetWidth;

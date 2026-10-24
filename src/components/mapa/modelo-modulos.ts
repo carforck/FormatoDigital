@@ -1,7 +1,5 @@
-import type { EstadoModulo, InfoModulo } from "@/modulos/registro";
-
 /**
- * Modelo del diagrama «Módulos y flujo».
+ * Modelo del diagrama «Módulos y flujo» (MapaModulos, pestaña del Mapa del sistema).
  *
  * Se arma en tiempo de ejecución a partir de `MODULOS` (src/modulos/registro.ts):
  * cada módulo registrado aparece solo, con su estado (activo, en construcción,
@@ -10,11 +8,13 @@ import type { EstadoModulo, InfoModulo } from "@/modulos/registro";
  * opcionales por clave (etiqueta de la relación, flujo de estados): si un
  * módulo no está registrado, no se dibuja.
  */
+import type { EstadoModulo, InfoModulo } from "@/modulos/registro";
 
 /** El estilo «planeado» (borde punteado) sale de `estado`, no del tipo. */
 export type TipoNodo = "plataforma" | "entidad" | "eje" | "documento";
 export type TipoArista = "jerarquia" | "relacion" | "firma";
 
+/** Un estado del flujo de un nodo (valor interno + etiqueta visible). */
 export interface Paso {
   estado: string;
   etiqueta: string;
@@ -22,6 +22,7 @@ export interface Paso {
   rama?: boolean;
 }
 
+/** Nodo del diagrama: plataforma, entidad fija o módulo registrado. */
 export interface NodoModulo {
   id: string;
   tipo: TipoNodo;
@@ -51,11 +52,13 @@ export interface AristaModulo {
   planeada: boolean;
 }
 
+/** Resultado de `armarGrafoModulos`, listo para dibujar o listar. */
 export interface GrafoModulos {
   nodos: NodoModulo[];
   aristas: AristaModulo[];
 }
 
+/** Flujo por defecto de los documentos con formato (reporte, permiso, gasto…). */
 const FLUJO_DOCUMENTO: Paso[] = [
   { estado: "borrador", etiqueta: "Borrador" },
   { estado: "en_revision", etiqueta: "En revisión" },
@@ -64,6 +67,7 @@ const FLUJO_DOCUMENTO: Paso[] = [
   { estado: "rechazado", etiqueta: "Rechazado", rama: true },
 ];
 
+/** Descripción opcional de un módulo conocido (contenedor, textos, flujo propio). */
 interface Meta {
   /** Contenedor preferido (si está registrado). */
   padre?: string[];
@@ -151,6 +155,7 @@ const RELACIONES: Record<string, string> = {
 /** Contenedores posibles de un documento, en orden de preferencia. */
 const CONTENEDORES = ["proyectos", "ordenes"];
 
+/** Documento = tiene formato oficial o su clave empieza por una clave de DOCUMENTOS. */
 const esDocumento = (m: InfoModulo, claves: string[]) => !!m.formato || claves.some((c) => m.clave.startsWith(c));
 
 /**
@@ -267,6 +272,7 @@ export function armarGrafoModulos(modulos: InfoModulo[], clavesDocumento: string
   return { nodos, aristas };
 }
 
+/** Texto visible de cada estado de módulo. */
 export const ETIQUETA_ESTADO_MODULO: Record<EstadoModulo, string> = {
   activo: "Activo",
   en_construccion: "En construcción",

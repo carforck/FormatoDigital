@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Calculadora de retorno (caso de negocio) de digitalizar los formatos del SGC,
+ * sección «#ahorro» de la landing (src/app/page.tsx). Todos los supuestos son
+ * visibles y editables, con su fuente; el resultado se descarga en PDF con
+ * `window.print()`, que solo imprime la hoja `.doc-zona` (ver globals.css).
+ */
 import { useMemo, useState } from "react";
 import { ArrowRight, Building, Building2, Calculator, ChevronDown, Download, Factory, Info, ShieldAlert } from "lucide-react";
 
@@ -7,14 +13,9 @@ import { Contador } from "@/components/fx/Reveal";
 import { cn } from "@/lib/utils";
 import { cop } from "@/nucleo/letras";
 
-/**
- * Calculadora de retorno (caso de negocio) de digitalizar los formatos del SGC.
- * Todos los supuestos son visibles y editables, con su fuente; el resultado se
- * puede descargar en PDF para presentarlo internamente.
- */
-
 const HORAS_MES = Math.round((42 * 52) / 12); // 182 h: jornada de 42 h/semana (Ley 2101 de 2021, desde julio de 2026)
 
+/** Minutos por formato en cada etapa, en papel y digital (referencia de piloto; GraficasImpacto usa los mismos). */
 type Etapa = { clave: string; nombre: string; papel: number; digital: number };
 const ETAPAS_BASE: Etapa[] = [
   { clave: "diligenciar", nombre: "Diligenciar el formato", papel: 15, digital: 6 },
@@ -23,6 +24,7 @@ const ETAPAS_BASE: Etapa[] = [
   { clave: "busqueda", nombre: "Buscarlo para el cliente o la auditoría", papel: 20, digital: 1 },
 ];
 
+/** Entradas del cálculo: operación de la empresa, tiempos, reprocesos, papel e inversión. */
 interface Supuestos {
   formatos: number;
   tecnicos: number;
@@ -59,6 +61,11 @@ const INICIAL: Supuestos = {
 
 const num = (n: number, d = 0) => n.toLocaleString("es-CO", { maximumFractionDigits: d, minimumFractionDigits: d });
 
+/**
+ * Ahorro mensual/anual = tiempo de gestión + reprocesos evitados + papel.
+ * Las diferencias papel − digital se recortan a 0 para no dar ahorros negativos;
+ * ROI y días de pago son `null` sin inversión (no hay contra qué compararlos).
+ */
 function calcular(s: Supuestos) {
   const costoHora = (s.salario * s.factor) / HORAS_MES;
   const minPapel = s.etapas.reduce((a, e) => a + e.papel, 0);
@@ -101,6 +108,7 @@ function Campo({ label, ayuda, children }: { label: string; ayuda?: string; chil
   );
 }
 
+/** Rango + campo numérico sincronizados: el deslizador para explorar, el número para el dato exacto. */
 function Deslizador({ valor, min, max, paso, onChange, formato }: { valor: number; min: number; max: number; paso: number; onChange: (n: number) => void; formato: (n: number) => string }) {
   return (
     <div className="flex items-center gap-3">
@@ -118,6 +126,10 @@ function Deslizador({ valor, min, max, paso, onChange, formato }: { valor: numbe
   );
 }
 
+/**
+ * Calculadora completa: escenarios de ejemplo, entradas, resultados animados,
+ * metodología y la versión imprimible. Tocar una entrada desmarca el escenario.
+ */
 export function CalculadoraROI() {
   const [s, setS] = useState<Supuestos>(INICIAL);
   const [escenario, setEscenario] = useState("Mediana");

@@ -1,3 +1,7 @@
+/**
+ * Piezas visuales de proyectos. Usado en `/app/proyectos` (lista) y
+ * `/app/proyectos/ver` (ficha).
+ */
 import { cn } from "@/lib/utils";
 import { cop } from "@/nucleo/letras";
 

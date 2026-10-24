@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Piezas de visualización del tablero (`/app`, `src/app/app/page.tsx`): KPI,
+ * variación, minigráfica, barras por mes, barras de filtro y dona. Todas
+ * accesibles: el texto lleva el dato y el color solo refuerza; las gráficas
+ * clicables filtran la lista del tablero.
+ */
 import { useState } from "react";
 import { ArrowDownRight, ArrowUpRight, Minus, Table2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -15,7 +21,11 @@ const SERIE = (t: TipoDoc) => infoDoc(t).color;
 
 const fmt = (n: number, d = 0) => n.toLocaleString("es-CO", { maximumFractionDigits: d, minimumFractionDigits: d });
 
-/** Variación contra el período anterior: flecha + texto; el color solo refuerza. */
+/**
+ * Variación contra el período anterior: flecha + texto; el color solo refuerza.
+ * `valor` es una fracción (0.12 = +12 %); `mejorSi` define si subir es bueno;
+ * `null` o no finito = sin base de comparación. Menos de 0,5 cuenta como «sin cambio».
+ */
 export function Variacion({ valor, mejorSi = "sube", unidad = "%" }: { valor: number | null; mejorSi?: "sube" | "baja"; unidad?: "%" | "pp" }) {
   if (valor === null || !Number.isFinite(valor)) return <span className="text-[11px] text-slate-400">sin base de comparación</span>;
   const n = unidad === "pp" ? valor * 100 : valor * 100;
@@ -61,7 +71,7 @@ export function Sparkline({ valores, etiquetas, formato = (n) => fmt(n) }: { val
   );
 }
 
-/** Indicador clicable: valor, contexto relativo, variación y tendencia. */
+/** Indicador clicable: valor, contexto relativo, variación y tendencia. Con `onClick` es un botón conmutador (`aria-pressed`). */
 export function Kpi({
   titulo,
   valor,
@@ -111,6 +121,7 @@ export function Kpi({
   );
 }
 
+/** Conteo de documentos de un mes por tipo (los tipos ausentes cuentan 0). */
 export type Mes = { etiqueta: string } & Partial<Record<TipoDoc, number>>;
 const NOMBRE = (t: TipoDoc) => formatoDe(t).plural.replace(/^./, (x) => x.toUpperCase());
 
@@ -214,7 +225,7 @@ export function BarrasMes({ meses: crudos, tipos }: { meses: Mes[]; tipos: TipoD
   );
 }
 
-/** Barras horizontales clicables (estados, clientes): etiqueta, valor y % del total. */
+/** Barras horizontales clicables (estados, clientes): etiqueta, valor y % del total. Clic de nuevo en la activa quita el filtro (`onElegir(null)`). */
 export function BarrasFiltro({
   filas,
   activo,
@@ -259,7 +270,10 @@ export function BarrasFiltro({
   );
 }
 
-/** Dona de proporciones con leyenda clicable (estados del documento). */
+/**
+ * Dona de proporciones con leyenda clicable (estados del documento). Cada
+ * segmento es un círculo con `strokeDasharray` desplazado por lo acumulado.
+ */
 export function Dona({
   filas,
   activo,

@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Indicadores e infografías de impacto de la landing (src/app/page.tsx): KPIs
+ * animados, barras papel vs. digital por etapa y la línea de calidad mes a mes.
+ * Gráficas en SVG a mano (sin librería), con tooltip, foco por teclado y vista de tabla.
+ */
 import { useState } from "react";
 import { Clock, CloudOff, FileCheck2, ShieldCheck, Table2 } from "lucide-react";
 
@@ -12,6 +17,7 @@ const DIGITAL = "#4E9A2A";
 const REJILLA = "#E7E9E4";
 const TINTA_TENUE = "#71717A";
 
+/** Minutos por etapa; deben coincidir con ETAPAS_BASE de CalculadoraROI (total 50 → 9 min). */
 const ETAPAS = [
   { etapa: "Diligenciar", papel: 15, digital: 6 },
   { etapa: "Firmar y aprobar", papel: 8, digital: 2 },
@@ -19,6 +25,7 @@ const ETAPAS = [
   { etapa: "Buscar para auditoría", papel: 20, digital: 1 },
 ];
 
+/** % de formatos completos al primer intento: línea base en papel y seis meses digitales (ilustrativo). */
 const CALIDAD = [
   { mes: "Papel", v: 62 },
   { mes: "Mes 1", v: 84 },
@@ -37,6 +44,7 @@ interface Tip {
   color?: string;
 }
 
+/** Tooltip flotante posicionado en coordenadas de la tarjeta (`figure`). */
 function Tooltip({ tip }: { tip: Tip | null }) {
   if (!tip) return null;
   return (
@@ -50,6 +58,7 @@ function Tooltip({ tip }: { tip: Tip | null }) {
   );
 }
 
+/** Barras agrupadas papel/digital por etapa; un valor 0 se pinta con 2 px para que se vea. */
 function BarrasEtapas() {
   const { ref, visible } = useVisible<HTMLDivElement>("0px", true);
   const [tip, setTip] = useState<Tip | null>(null);
@@ -169,6 +178,7 @@ function BarrasEtapas() {
   );
 }
 
+/** Línea con área; el eje Y va de 50 % a 100 % y el puntero elige el mes más cercano. */
 function LineaCalidad() {
   const { ref, visible } = useVisible<HTMLDivElement>("0px", true);
   const [i, setI] = useState<number | null>(null);
@@ -258,6 +268,7 @@ function LineaCalidad() {
   );
 }
 
+/** Sección completa: fila de KPIs y las dos gráficas. Los KPIs son cifras fijas del piloto. */
 export function GraficasImpacto() {
   const kpis = [
     { v: 82, suf: "%", t: "menos tiempo por formato", d: "de 50 a 9 minutos", icon: Clock },

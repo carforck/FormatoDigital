@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Navegación de regreso: enlace «← Volver a …», origen por `?desde=` y la
+ * marca en sessionStorage que evita duplicar el detalle en el historial al
+ * salir de un formulario. Usado por AppShell, el generador y las páginas de
+ * documentos, proyectos, equipos y cobros.
+ */
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -16,6 +22,7 @@ type Router = ReturnType<typeof useRouter>;
  * `equipo:<id>`, `doc:<id>`, `cuenta:<id>`, `revision` o `tablero`; si no, a
  * la lista padre. Las etiquetas siguen un solo patrón: «Volver a <Lista>» y
  * «Volver al proyecto PRY-…», «Volver al documento RT-…», «Volver a la cuenta CC-…».
+ * `query` es el `desde=` que la página debe propagar a sus enlaces hijos.
  */
 export function useOrigen(lista: { href: string; label: string }) {
   const params = useSearchParams();

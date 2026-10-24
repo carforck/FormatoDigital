@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Piezas compartidas por los dos diagramas del Mapa del sistema (MapaModulos y
+ * MapaBaseDatos): tema oscuro, distribución con medida real de nodos, selector
+ * Diagrama/Lista, marco del lienzo y elementos de la leyenda.
+ */
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useNodesInitialized, useReactFlow, type Edge, type Node } from "@xyflow/react";
 import { LayoutGrid, List } from "lucide-react";
@@ -105,6 +110,7 @@ export function MarcoLienzo({ children, etiqueta }: { children: React.ReactNode;
   );
 }
 
+/** Fila de la leyenda: muestra gráfica (decorativa) + texto. */
 export function ItemLeyenda({ muestra, texto }: { muestra: React.ReactNode; texto: string }) {
   return (
     <li className="flex items-center gap-2">

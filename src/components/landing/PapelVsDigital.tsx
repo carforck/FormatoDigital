@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Comparación «Hoy, en papel» vs. «Con ControlOne» de la landing (src/app/page.tsx).
+ * Escritorio: filas pareadas que se resaltan en ciclo (o al pasar el mouse).
+ * Celular: interruptor Antes/Después. Cierra con un enlace a la calculadora (#ahorro).
+ */
 import { useEffect, useState } from "react";
 import { ArrowRight, BarChart3, FileCheck2, FileX2, HardHat, Search, ShieldCheck, Smartphone } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -7,6 +12,7 @@ import type { LucideIcon } from "lucide-react";
 import { Icono, useVisible } from "@/components/fx/Reveal";
 import { cn } from "@/lib/utils";
 
+/** Pares problema en papel → solución digital, con el dato que lo respalda. */
 const PARES: { icon: LucideIcon; papel: string; digital: string; dato: string }[] = [
   { icon: ShieldCheck, papel: "Campos en blanco o mal diligenciados que se detectan tarde", digital: "El asistente valida cada respuesta antes de avanzar", dato: "99 % completos" },
   { icon: Smartphone, papel: "El técnico vuelve a la oficina para entregar y escanear", digital: "Se diligencia y firma en campo, desde el celular", dato: "0 viajes a la oficina" },

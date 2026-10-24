@@ -1,6 +1,11 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+/**
+ * Fotografías de la landing (src/app/page.tsx): el marco reutilizable `Foto`,
+ * el mosaico de servicios en campo y la banda de firma digital. Las imágenes
+ * van con <img> + `asset()` (prefijo NEXT_PUBLIC_BASE_PATH), sin next/image.
+ */
 import { Cable, Camera, HardHat, PenLine, ShieldCheck, Sun } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -47,6 +52,7 @@ export function Foto({
   );
 }
 
+/** Tarjetas del mosaico; `clase` fija su lugar en la rejilla (sin huecos en sm y lg). */
 const SERVICIOS: { src: string; alt: string; ancho: number; alto: number; icon: LucideIcon; t: string; d: string; clase: string }[] = [
   {
     src: "/landing/sala-monitoreo-cctv.webp",

@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Efectos de movimiento ligeros basados en IntersectionObserver: aparición al
+ * hacer scroll, contadores, inclinación 3D, barra de progreso, texto rotativo e
+ * íconos animados. Usado en la landing (`src/app/page.tsx`, `components/landing`)
+ * y en el tablero y cobros del aplicativo. Respetan prefers-reduced-motion.
+ */
 import { cloneElement, useEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 

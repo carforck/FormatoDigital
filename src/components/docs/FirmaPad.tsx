@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Modal de firma manuscrita sobre `<canvas>`; entrega la firma como PNG en
+ * data URL. Usado en el generador, `/app/documentos/ver` y `/firmar`
+ * (firma del cliente por enlace).
+ */
 import { useEffect, useId, useRef, useState } from "react";
 import { Eraser, PenLine, X } from "lucide-react";
 
@@ -21,6 +26,7 @@ export function FirmaPad({ titulo, onGuardar, onCerrar }: Props) {
   const fondo = fondoQueCierra(onCerrar);
   const idTitulo = useId();
 
+  // Lienzo a la densidad de la pantalla para que el trazo no salga borroso en retina
   useEffect(() => {
     const c = ref.current;
     if (!c) return;

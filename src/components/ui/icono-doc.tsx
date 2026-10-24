@@ -1,3 +1,7 @@
+/**
+ * Ícono por tipo de documento. Usado en tablero, documentos, revisión y
+ * proyectos (`src/app/app/**`). Tipos desconocidos caen en `FileText`.
+ */
 import { FileSignature, FileText, HardHat, Wallet } from "lucide-react";
 
 import type { TipoDoc } from "@/nucleo/tipos";

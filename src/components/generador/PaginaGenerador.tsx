@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Envoltura de página del generador para `/app/nuevo/{reporte,permiso,gasto,cotizacion}`.
+ * Lee los parámetros de la URL (`id`, `proyecto`, `cliente`, `equipo`) y
+ * decide entre crear un documento nuevo, continuar uno editable o bloquear.
+ */
 import Link from "next/link";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -47,6 +52,7 @@ function Contenido({ tipo }: { tipo: TipoDoc }) {
   return <Generador key={id} tipo={tipo} existente={doc} />;
 }
 
+/** Generador del `tipo` dado, dentro de `Suspense` porque `useSearchParams` lo exige al prerenderizar la página. */
 export function PaginaGenerador({ tipo }: { tipo: TipoDoc }) {
   return (
     <Suspense>

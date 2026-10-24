@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Administración de cuentas con login en el modo empresa, en `/app/usuarios`.
+ * Habla con la API de usuarios (`@/nucleo/datos/usuarios-api`) y, tras cada
+ * cambio, sincroniza la persona en el estado local de la demo (`useDemo`).
+ */
 import { useCallback, useEffect, useState } from "react";
 import { KeyRound, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 
@@ -17,6 +22,7 @@ const VACIO: NuevoUsuario = { nombre: "", email: "", cargo: "", rol: "tecnico", 
  * Usuarios con login del modo empresa (solo admin): crear con contraseña, editar
  * nombre, cargo y rol, cambiar contraseña, activar o desactivar y eliminar.
  * Cada cambio se refleja también en la lista de personas de los formatos.
+ * El admin no puede desactivarse, eliminarse ni cambiarse el rol a sí mismo.
  */
 export function PanelUsuariosEmpresa() {
   const demo = useDemo();
@@ -50,6 +56,7 @@ export function PanelUsuariosEmpresa() {
     demo.actualizarUsuario({ ...previo, id: u.id, nombre: u.nombre, email: u.email, cargo: u.cargo, rol: u.rol, activo: u.activo });
   };
 
+  // Envoltura común: bloquea la UI, muestra aviso o error y recarga la lista
   const ejecutar = async (fn: () => Promise<string | void>) => {
     setOcupado(true);
     setError(null);

@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Sección de funciones de la landing (src/app/page.tsx) en formato bento:
+ * tres tarjetas estrella con mini-animaciones y una rejilla con el resto.
+ * Cada tarjeta entra a la demo con un rol y abre la pantalla real de esa función.
+ */
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -27,6 +32,7 @@ import { useDemo } from "@/nucleo/datos/DemoProvider";
 import type { Rol } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 
+/** Rol con el que se entra a la demo y ruta que se abre. */
 interface Destino {
   rol: Rol;
   ruta: string;
@@ -42,6 +48,7 @@ function useIrADemo() {
   };
 }
 
+/** Enlace «Verlo en la demo» de las tarjetas estrella. */
 function VerEnDemo({ destino, className }: { destino: Destino; className?: string }) {
   const ir = useIrADemo();
   return (
@@ -63,6 +70,7 @@ function useCiclo(pasos: number, ms: number) {
   return { ref, paso };
 }
 
+/** Mini-chat: pregunta, respuesta y el campo del formato que se llena. */
 function AnimAsistente() {
   const { ref, paso } = useCiclo(5, 1300);
   return (
@@ -84,6 +92,7 @@ function AnimAsistente() {
   );
 }
 
+/** Regla SST: el permiso queda bloqueado hasta marcar el arnés. */
 function AnimReglas() {
   const { ref, paso } = useCiclo(4, 1500);
   const arnes = paso >= 2;
@@ -106,6 +115,7 @@ function AnimReglas() {
   );
 }
 
+/** Trazo de firma que se dibuja y queda con fecha y hora. */
 function AnimFirma() {
   const { ref, paso } = useCiclo(3, 1800);
   return (
@@ -151,6 +161,7 @@ const RESTO: { icon: LucideIcon; t: string; d: string; destino: Destino }[] = [
   { icon: Smartphone, t: "PDF y celular", d: "Idéntico al formato aprobado.", destino: { rol: "admin", ruta: rutaDoc("d-pt-clay") } },
 ];
 
+/** Bento de funciones: `ESTRELLAS` arriba (con animación) y `RESTO` como accesos directos a la demo. */
 export function FuncionesBento() {
   const ir = useIrADemo();
   return (

@@ -1,4 +1,9 @@
 /* eslint-disable @next/next/no-img-element */
+/**
+ * Piezas comunes de las plantillas imprimibles de formato (reporte, permiso,
+ * gasto, cotización en `src/modulos/<tipo>/Plantilla….tsx`): encabezado con control
+ * documental y casilla de firma. Usa `<img>` simple para que salga en el PDF/impresión.
+ */
 import { asset } from "@/nucleo/rutas";
 import { formatoDe } from "@/modulos/registro";
 import type { TipoDoc } from "@/nucleo/tipos";

@@ -1,9 +1,14 @@
+/**
+ * Área de texto base de shadcn/ui. Usada en la edición de proyectos, nueva
+ * cuenta de cobro, el chat del asistente y el envío de documentos.
+ */
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
 export type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement>;
 
+/** `<textarea>` con los estilos del sistema (alto mínimo 80 px). */
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ className, ...props }, ref) => {
     return (

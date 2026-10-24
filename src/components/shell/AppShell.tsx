@@ -1,6 +1,12 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+/**
+ * Marco del aplicativo para todas las rutas `/app/**` (montado en
+ * `src/app/app/layout.tsx`): franja demo/empresa, barra lateral (riel que se
+ * abre al pasar el mouse o fijada), barra superior con búsqueda, tema,
+ * notificaciones y perfil, navegación inferior en celular y control de acceso por rol.
+ */
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -45,6 +51,7 @@ import type { TipoDoc } from "@/nucleo/tipos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { cn } from "@/lib/utils";
 
+/** Entrada del menú lateral. `req`: permiso necesario para verla; `contador`: insignia numérica. */
 interface Item {
   href: string;
   label: string;
@@ -102,7 +109,7 @@ const RUTAS: [string, Accion][] = [
   ["/app/mapa", "mapa"],
 ];
 
-/** Título de la barra superior según la ruta. */
+/** Título de la barra superior según la ruta (se toma el primer prefijo que coincide: lo más específico va antes). */
 const TITULOS: [string, string][] = [
   ["/app/nuevo/reporte", "Nuevo reporte técnico"],
   ["/app/nuevo/permiso", "Nuevo permiso de trabajo"],
@@ -127,6 +134,7 @@ const TITULOS: [string, string][] = [
   ["/app", "Tablero"],
 ];
 
+/** Ref para un menú desplegable: un toque fuera de él llama a `cerrar` mientras esté abierto. */
 function useFueraDe<T extends HTMLElement>(abierto: boolean, cerrar: () => void) {
   const ref = useRef<T | null>(null);
   useEffect(() => {
@@ -140,6 +148,12 @@ function useFueraDe<T extends HTMLElement>(abierto: boolean, cerrar: () => void)
   return ref;
 }
 
+/**
+ * Shell del aplicativo. Mientras carga o sin sesión muestra un indicador y
+ * redirige a `/acceso`; si el rol no puede ver la ruta (tabla `RUTAS` o el
+ * permiso del generador) muestra «Acceso restringido» en lugar de `children`.
+ * Preferencias de barra lateral y tema en localStorage (`fd-sidebar`, `fd-tema`).
+ */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const demo = useDemo();
   const { usuario, listo } = demo;

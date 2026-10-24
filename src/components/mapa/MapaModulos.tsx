@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Pestaña «Módulos y flujo» del Mapa del sistema (src/app/app/mapa/page.tsx,
+ * cargada con dynamic sin SSR). Dibuja con React Flow el grafo que arma
+ * `armarGrafoModulos` desde MODULOS; al pasar o tocar un nodo resalta sus vecinos.
+ * La vista Lista muestra la misma información de forma accesible.
+ */
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
@@ -31,6 +37,7 @@ type NodoRF = Node<{ nodo: NodoModulo }, "modulo">;
 const ICONO: Record<TipoNodo, typeof FileText> = { plataforma: Layers, entidad: Building2, eje: Workflow, documento: FileText };
 const TIPO: Record<TipoNodo, string> = { plataforma: "Plataforma", entidad: "Entidad", eje: "Eje de trabajo", documento: "Documento" };
 
+/** Flujo de estados de un nodo: camino principal con flechas y ramas (rechazo, anulación) aparte. */
 function Flujo({ nodo, compacto }: { nodo: NodoModulo; compacto?: boolean }) {
   const principal = nodo.flujo.filter((p) => !p.rama);
   const ramas = nodo.flujo.filter((p) => p.rama);
@@ -64,6 +71,7 @@ function Flujo({ nodo, compacto }: { nodo: NodoModulo; compacto?: boolean }) {
   );
 }
 
+/** Tarjeta del nodo en el lienzo; los no activos van punteados con su estado. */
 const NodoModuloVista = memo(function NodoModuloVista({ data, selected }: NodeProps<NodoRF>) {
   const n = data.nodo;
   const Icono = ICONO[n.tipo];
@@ -103,6 +111,10 @@ const NodoModuloVista = memo(function NodoModuloVista({ data, selected }: NodePr
 
 const TIPOS_NODO = { modulo: NodoModuloVista };
 
+/**
+ * Convierte las aristas del modelo a React Flow. Con `foco`, solo quedan nítidas
+ * (y animadas) las que unen nodos del foco; el resto se atenúa por CSS.
+ */
 function aristasRF(aristas: AristaModulo[], foco: Set<string> | null): Edge[] {
   return aristas.map((a) => {
     const color = a.tipo === "firma" ? "var(--m-firma)" : a.tipo === "relacion" ? "var(--m-rel)" : "var(--m-linea)";
@@ -126,6 +138,7 @@ function aristasRF(aristas: AristaModulo[], foco: Set<string> | null): Edge[] {
   });
 }
 
+/** El nodo y los que tocan alguna de sus aristas. */
 function vecinos(id: string, aristas: AristaModulo[]): Set<string> {
   const s = new Set([id]);
   for (const a of aristas) {
@@ -135,6 +148,7 @@ function vecinos(id: string, aristas: AristaModulo[]): Set<string> {
   return s;
 }
 
+/** Lienzo interactivo: hover enfoca temporalmente, clic fija el nodo y abre su panel de detalle. */
 function Diagrama({ nodos, aristas }: { nodos: NodoModulo[]; aristas: AristaModulo[] }) {
   const ref = useRef<HTMLDivElement>(null);
   const oscuro = useOscuro(ref);
@@ -209,12 +223,14 @@ function Diagrama({ nodos, aristas }: { nodos: NodoModulo[]; aristas: AristaModu
   );
 }
 
+/** Arista como frase [sujeto, verbo, objeto] para leerla en texto. */
 function frase(a: AristaModulo, nodos: NodoModulo[]) {
   const t = (id: string) => nodos.find((n) => n.id === id)?.titulo ?? id;
   // Jerarquía: se lee del hijo al contenedor
   return a.tipo === "jerarquia" ? [t(a.hacia), a.etiqueta, t(a.desde)] : [t(a.desde), a.etiqueta, t(a.hacia)];
 }
 
+/** Relaciones de un nodo en texto (panel de detalle y vista Lista). */
 function Relaciones({ id, nodos, aristas }: { id: string; nodos: NodoModulo[]; aristas: AristaModulo[] }) {
   const propias = aristas.filter((a) => a.desde === id || a.hacia === id);
   if (!propias.length) return null;
@@ -233,6 +249,7 @@ function Relaciones({ id, nodos, aristas }: { id: string; nodos: NodoModulo[]; a
   );
 }
 
+/** Vista Lista: alternativa accesible del diagrama con la misma información. */
 function Lista({ nodos, aristas }: { nodos: NodoModulo[]; aristas: AristaModulo[] }) {
   return (
     <ul id="lista-modulos" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -259,6 +276,7 @@ function Lista({ nodos, aristas }: { nodos: NodoModulo[]; aristas: AristaModulo[
   );
 }
 
+/** Pestaña completa: resumen, selector de vista, diagrama o lista y leyenda. */
 export default function MapaModulos() {
   const [lista, setLista] = useState(false);
   // Se lee el registro en cada carga: un módulo nuevo en MODULOS aparece solo

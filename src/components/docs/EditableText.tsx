@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Texto editable en sitio para las plantillas de formato (reporte, permiso,
+ * gasto, cotización en `src/modulos/<tipo>/Plantilla….tsx`). Clic o Enter abre el
+ * campo; Enter (Ctrl/⌘+Enter si es multilínea) o perder el foco confirma, Esc cancela.
+ */
 import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
@@ -18,6 +23,10 @@ interface EditableTextProps {
   displayValue?: string;
 }
 
+/**
+ * Muestra `value` como texto y lo cambia por un input/textarea al editar.
+ * Solo llama `onCommit` si el borrador cambió. Con `disabled` es texto plano.
+ */
 export function EditableText({
   value,
   onCommit,
@@ -34,6 +43,7 @@ export function EditableText({
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
+  // Mientras no se edita, el borrador sigue al valor externo (p. ej. lo cambió el asistente)
   useEffect(() => {
     if (!editing) setDraft(value);
   }, [value, editing]);

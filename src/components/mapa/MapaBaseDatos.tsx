@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Pestaña «Base de datos» del Mapa del sistema (src/app/app/mapa/page.tsx,
+ * cargada con dynamic sin SSR): diagrama entidad-relación con React Flow a
+ * partir de esquema.json (generado desde las migraciones), con búsqueda,
+ * filtros de relaciones, panel de detalle y vista Lista accesible.
+ */
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
@@ -26,16 +32,25 @@ import { ItemLeyenda, Linea, MarcoLienzo, SelectorVista, useDistribucion, useOsc
 
 type NodoTabla = Node<{ tabla: TablaDb; resaltadas: Set<string> | null }, "tabla">;
 
-/** Columnas multiempresa y de usuario: se pueden ocultar para despejar el diagrama. */
+/**
+ * Tablas multiempresa y de usuario que casi todo referencia: se pueden ocultar
+ * para despejar el diagrama (de `organizaciones` solo se ocultan las relaciones;
+ * `auth.users` se quita entera).
+ */
 const ORG = "organizaciones";
 const AUTH = "auth.users";
 
+/** Icono de la columna: llave primaria, foránea o un hueco para alinear. */
 function IconoColumna({ c }: { c: ColumnaDb }) {
   if (c.pk) return <KeyRound aria-label="Llave primaria" className="h-3 w-3 text-amber-600" />;
   if (c.fk) return <Link2 aria-label="Llave foránea" className="h-3 w-3 text-sotec-greenDeep" />;
   return <span aria-hidden className="h-3 w-3" />;
 }
 
+/**
+ * Nodo tabla: una fila por columna con un handle por lado, para que cada FK
+ * salga de su columna (izquierda) y llegue a la columna referenciada (derecha).
+ */
 const TablaVista = memo(function TablaVista({ data, selected }: NodeProps<NodoTabla>) {
   const { tabla: t, resaltadas } = data;
   return (
@@ -77,6 +92,7 @@ interface Filtros {
   auth: boolean;
 }
 
+/** Tablas y relaciones que quedan tras aplicar los filtros. */
 function visibles(f: Filtros) {
   const tablas = ESQUEMA.tablas.filter((t) => f.auth || t.nombre !== AUTH);
   const nombres = new Set(tablas.map((t) => t.nombre));
@@ -84,6 +100,10 @@ function visibles(f: Filtros) {
   return { tablas, relaciones };
 }
 
+/**
+ * Lienzo ER. Prioridad del foco: tabla bajo el cursor, luego la fijada con clic,
+ * luego las coincidencias de la búsqueda. `alElegir` avisa al padre para el panel de detalle.
+ */
 function Diagrama({ filtros, buscar, alElegir }: { filtros: Filtros; buscar: string; alElegir: (t: string | null) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const oscuro = useOscuro(ref);
@@ -187,6 +207,7 @@ function Diagrama({ filtros, buscar, alElegir }: { filtros: Filtros; buscar: str
   );
 }
 
+/** Panel bajo el diagrama: FK que salen de la tabla y FK que llegan a ella (sin filtros). */
 function Detalle({ tabla, onCerrar }: { tabla: TablaDb; onCerrar: () => void }) {
   const salen = ESQUEMA.relaciones.filter((r) => r.desde === tabla.nombre);
   const llegan = ESQUEMA.relaciones.filter((r) => r.hacia === tabla.nombre);
@@ -214,6 +235,7 @@ function Detalle({ tabla, onCerrar }: { tabla: TablaDb; onCerrar: () => void }) 
   );
 }
 
+/** Lista de FK en una dirección (`sale`: columna → destino; `llega`: origen → columna). */
 function RelacionesTexto({ titulo, relaciones, sentido }: { titulo: string; relaciones: RelacionDb[]; sentido: "sale" | "llega" }) {
   return (
     <div>
@@ -234,6 +256,7 @@ function RelacionesTexto({ titulo, relaciones, sentido }: { titulo: string; rela
   );
 }
 
+/** Vista Lista: cada tabla con sus columnas en una tabla HTML, filtrada por la búsqueda. */
 function Lista({ buscar }: { buscar: string }) {
   const q = buscar.trim().toLowerCase();
   const tablas = ESQUEMA.tablas.filter((t) => !q || t.nombre.toLowerCase().includes(q));
@@ -281,6 +304,7 @@ function Lista({ buscar }: { buscar: string }) {
   );
 }
 
+/** Pestaña completa: búsqueda, filtros, selector de vista, diagrama o lista, detalle y leyenda. */
 export default function MapaBaseDatos() {
   const [lista, setLista] = useState(false);
   const [filtros, setFiltros] = useState<Filtros>({ org: true, auth: true });

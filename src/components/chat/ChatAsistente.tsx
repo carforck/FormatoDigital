@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Asistente conversacional guiado (sin IA): recorre una lista de `Paso` que
+ * aporta cada módulo de formato, muestra el control adecuado a cada tipo y
+ * entrega las respuestas con `aplicar`. Lo usa el Generador; los tipos `Paso`
+ * y `ValorPaso` forman parte del contrato de módulos (`src/modulos/contrato.ts`).
+ */
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Bot, Camera, Check, CheckCircle2, PenLine, Plus, Send, Sparkles, Trash2, User } from "lucide-react";
 
@@ -11,8 +17,10 @@ import { comprimirImagen } from "@/nucleo/imagenes";
 import type { Ejecutor, FotoReporte, ItemGasto } from "@/nucleo/tipos";
 import { TIPOS_GASTO } from "@/modulos/gastos/catalogo";
 
+/** Control que muestra el asistente para responder el paso. */
 export type TipoPaso = "texto" | "textarea" | "fecha" | "hora" | "email" | "tel" | "select" | "multi" | "firma" | "ejecutores" | "verificacion" | "fotos" | "gastos" | "componente";
 
+/** Una pregunta del asistente; los módulos la construyen en su función `pasos`. */
 export interface Paso {
   id: string;
   pregunta: string;
@@ -27,11 +35,13 @@ export interface Paso {
   inicial?: () => string[];
   /** Genera un borrador del texto (redacción asistida). */
   generar?: () => string;
+  /** Valida respuestas de texto: devuelve el mensaje de error o `null`. No se aplica si el paso es opcional y vino vacío. */
   validar?: (v: string) => string | null;
   /** Paso «componente»: control propio (p. ej. el selector de equipos) que llama a `avanzar` al terminar. */
   render?: (avanzar: (v: ValorPaso, eco: string) => void) => React.ReactNode;
 }
 
+/** Respuesta de un paso: texto, lista (multi / verificación) o colecciones (ejecutores, fotos, gastos). */
 export type ValorPaso = string | string[] | Ejecutor[] | FotoReporte[] | ItemGasto[];
 
 interface Props {
@@ -55,9 +65,15 @@ interface Msg {
   texto: string;
 }
 
+// Id incremental de módulo para las `key` de los mensajes
 let seq = 0;
 const m = (rol: Msg["rol"], texto: string): Msg => ({ id: ++seq, rol, texto });
 
+/**
+ * Chat paso a paso con barra de avance. Con `retomando` arranca ya completo
+ * (documento existente o recuperado) y solo muestra las acciones y el atajo
+ * «Volver a una pregunta». Las respuestas largas se recortan en el eco (140).
+ */
 export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFirmar, firmado, ejecutoresIniciales = [], bienvenida, retomando, acciones }: Props) {
   const [i, setI] = useState(retomando ? pasos.length : 0);
   const [hist, setHist] = useState<Msg[]>(() =>
@@ -101,6 +117,7 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i]);
 
+  /** Valida, aplica la respuesta, deja el eco del usuario y pasa a la siguiente pregunta. */
   function avanzar(v: ValorPaso, eco: string) {
     if (!paso) return;
     if (typeof v === "string" && paso.validar && !(paso.opcional && !v.trim())) {
@@ -489,6 +506,7 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
   );
 }
 
+/** Mensaje del chat; los del bot que empiezan con «⚠️» se pintan como alerta. */
 function Burbuja({ msg }: { msg: Msg }) {
   const bot = msg.rol === "bot";
   const alerta = msg.texto.startsWith("⚠️");

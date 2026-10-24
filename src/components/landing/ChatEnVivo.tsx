@@ -1,6 +1,10 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+/**
+ * Demo animada del asistente conversacional para la landing (src/app/page.tsx):
+ * a la izquierda el chat, a la derecha el formato FO-GSST-22 que se llena a la par.
+ */
 import { useEffect, useRef, useState } from "react";
 import { Bot, Check, PenLine, Send, User } from "lucide-react";
 
@@ -27,8 +31,14 @@ interface Msg {
   texto: string;
 }
 
+/** Pausa para el guion (`await espera(ms)`). */
 const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Reproduce el guion en bucle mientras la tarjeta está visible; al salir de
+ * pantalla se corta (`vivo = false`) y al volver empieza de cero. Con
+ * «reducir movimiento» las pausas son 0 y todo aparece de una vez.
+ */
 export function ChatEnVivo() {
   const { ref, visible } = useVisible<HTMLDivElement>("0px", true);
   const [msgs, setMsgs] = useState<Msg[]>([]);

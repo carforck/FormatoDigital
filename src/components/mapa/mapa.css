@@ -1,4 +1,9 @@
-/* Mapa del sistema: lienzos de React Flow con la paleta del aplicativo (claro y oscuro). */
+/*
+ * Mapa del sistema: lienzos de React Flow con la paleta del aplicativo (claro y oscuro).
+ * Lo importan MapaModulos y MapaBaseDatos. Las variables --m-* se definen en `.mapa-lienzo`
+ * (también en la leyenda, que reutiliza la clase) y se mapean a las --xy-* de React Flow.
+ * `.atenuada` / `.atenuado` son las clases que ponen los diagramas al enfocar un nodo.
+ */
 .mapa-lienzo {
   --m-fondo: #f7f9f5;
   --m-punto: #d3dacf;

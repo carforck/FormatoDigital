@@ -1,7 +1,14 @@
+/**
+ * Permisos por rol en la app: matriz de acciones y reglas de quién ve, edita o
+ * revisa cada documento, cuenta y proyecto. Replican las políticas RLS y los
+ * triggers de la base (0008 separación de funciones, 0009 proyectos, 0011 lo
+ * comercial solo admin); `DemoProvider` los vuelve a aplicar en cada acción.
+ */
 import type { CuentaCobro } from "@/modulos/cobros/tipos";
 import { infoDoc } from "@/modulos/registro";
 import type { Documento, Proyecto, Rol, TipoDoc, Usuario } from "@/nucleo/tipos";
 
+/** Acciones que un rol puede tener (ver `MATRIZ` y `DESCRIPCION_ACCION`). */
 export type Accion =
   | "crear"
   | "cotizar"
@@ -31,6 +38,7 @@ const MATRIZ: Record<Rol, Accion[]> = {
   cliente: ["firmar_cliente", "ver_cobros"],
 };
 
+/** Texto de cada acción para la pantalla de usuarios y roles. */
 export const DESCRIPCION_ACCION: Record<Accion, string> = {
   crear: "Crear reportes, permisos y legalizaciones de gastos",
   cotizar: "Crear, aprobar y enviar cotizaciones al cliente (comercial)",
@@ -49,8 +57,10 @@ export const DESCRIPCION_ACCION: Record<Accion, string> = {
   mapa: "Ver el mapa del sistema (módulos, base de datos y permisos)",
 };
 
+/** Todas las acciones, en el orden de `DESCRIPCION_ACCION`. */
 export const ACCIONES = Object.keys(DESCRIPCION_ACCION) as Accion[];
 
+/** Si el rol tiene la acción en la matriz. */
 export function puede(rol: Rol, accion: Accion): boolean {
   return MATRIZ[rol].includes(accion);
 }

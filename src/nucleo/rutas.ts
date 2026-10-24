@@ -5,6 +5,7 @@
  */
 export const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
+/** Ruta de un archivo de /public con el prefijo (para <img> y fetch). */
 export const asset = (ruta: string) => `${BASE}${ruta}`;
 
 /** Ruta del detalle de un documento (sin rutas dinámicas: compatible con exportación estática). */
@@ -18,8 +19,11 @@ export function urlPublica(ruta: string, query = ""): string {
   return `${origen}${BASE}${r}${query ? `?${query}` : ""}`;
 }
 
+/** Ruta del detalle de una cuenta de cobro. */
 export const rutaCuenta = (id: string) => `/app/cobros/ver?id=${id}`;
 
+/** Ruta del detalle de un proyecto. */
 export const rutaProyecto = (id: string) => `/app/proyectos/ver?id=${id}`;
 
+/** Ruta de la ficha de un equipo. */
 export const rutaEquipo = (id: string) => `/app/equipos/ver?id=${id}`;

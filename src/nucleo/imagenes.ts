@@ -1,7 +1,8 @@
 /**
  * Reduce una foto del celular antes de guardarla: máximo `lado` px en el lado
  * mayor y JPEG con `calidad`. Una foto de 4 MB queda en ~100-200 KB, suficiente
- * para el registro fotográfico impreso.
+ * para el registro fotográfico impreso y los soportes de gastos. Devuelve un
+ * data URL JPEG (fondo blanco para las PNG con transparencia). Solo en el navegador.
  */
 export async function comprimirImagen(archivo: File, lado = 1280, calidad = 0.72): Promise<string> {
   const url = URL.createObjectURL(archivo);

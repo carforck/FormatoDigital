@@ -1,3 +1,8 @@
+/**
+ * KPIs de un proyecto (documentos por tipo, cotizado, gastado, facturado,
+ * cobrado y ejecución del presupuesto) para /app/proyectos y su detalle.
+ * Funciones puras: reciben solo lo que el usuario puede ver.
+ */
 import { totales, type CuentaCobro } from "@/modulos/cobros/tipos";
 import { TIPOS_DOC, valorDoc } from "@/modulos/registro";
 
@@ -16,6 +21,7 @@ export interface ResumenProyecto {
   gastado: number;
   /** Cuentas de cobro emitidas, enviadas o pagadas. */
   facturado: number;
+  /** Cuentas de cobro pagadas. */
   cobrado: number;
   /** Gastado / presupuesto (null sin presupuesto). */
   ejecucion: number | null;
@@ -23,6 +29,7 @@ export interface ResumenProyecto {
 
 const aprobadoOCerrado = (d: Documento) => d.estado === "aprobado" || d.estado === "cerrado";
 
+/** Resume los documentos y cuentas de un proyecto (los valores salen de `valorDoc` y `totales`). */
 export function resumenProyecto(p: Proyecto, documentos: Documento[], cuentas: CuentaCobro[]): ResumenProyecto {
   const docs = documentos.filter((d) => d.proyectoId === p.id);
   const cs = cuentas.filter((c) => c.proyectoId === p.id);

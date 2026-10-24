@@ -1,3 +1,7 @@
+/**
+ * Perfiles de prueba que /acceso ofrece para entrar a la demo con un clic
+ * (uno por rol). Las personas son ficticias y coinciden con `USUARIOS_SEED`.
+ */
 import { ClipboardCheck, HardHat, ShieldCheck, Building2 } from "lucide-react";
 
 import type { Rol } from "@/nucleo/tipos";

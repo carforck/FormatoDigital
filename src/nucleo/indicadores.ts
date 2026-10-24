@@ -5,6 +5,7 @@
  */
 import type { Documento, Estado } from "./tipos";
 
+/** Períodos del filtro del tablero. */
 export type Periodo = "30d" | "90d" | "6m" | "12m";
 export const PERIODOS: { clave: Periodo; nombre: string; dias: number }[] = [
   { clave: "30d", nombre: "30 días", dias: 30 },
@@ -16,6 +17,7 @@ export const PERIODOS: { clave: Periodo; nombre: string; dias: number }[] = [
 const DIA = 864e5;
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
+/** Fechas [desde, hasta) del período (hoy incluido) y del período anterior de igual duración, en AAAA-MM-DD. */
 export function rango(periodo: Periodo, hoy = new Date()) {
   const dias = PERIODOS.find((p) => p.clave === periodo)!.dias;
   const hasta = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 1);
@@ -24,6 +26,7 @@ export function rango(periodo: Periodo, hoy = new Date()) {
   return { desde: iso(desde), hasta: iso(hasta), prevDesde: iso(prevDesde), prevHasta: iso(desde), dias };
 }
 
+/** El documento se creó dentro de [desde, hasta). */
 export const enRango = (d: Documento, desde: string, hasta: string) => d.creado.slice(0, 10) >= desde && d.creado.slice(0, 10) < hasta;
 
 const evento = (d: Documento, accion: string) => d.historial.find((h) => h.accion === accion);
@@ -31,12 +34,14 @@ const evento = (d: Documento, accion: string) => d.historial.find((h) => h.accio
 /** Documentos que ya pasaron por revisión (aprobados, cerrados o rechazados alguna vez). */
 const revisados = (docs: Documento[]) => docs.filter((d) => d.estado === "aprobado" || d.estado === "cerrado" || d.estado === "rechazado" || evento(d, "Rechazó"));
 
+/** Fracción de los revisados que se aprobaron sin ningún rechazo; null si no hay revisados. */
 export function tasaPrimerIntento(docs: Documento[]): number | null {
   const r = revisados(docs);
   if (!r.length) return null;
   return r.filter((d) => !evento(d, "Rechazó") && d.estado !== "rechazado").length / r.length;
 }
 
+/** Horas promedio entre el primer envío a revisión y la primera aprobación; null sin datos. */
 export function horasAprobacion(docs: Documento[]): number | null {
   const t = docs
     .map((d) => {
@@ -48,6 +53,7 @@ export function horasAprobacion(docs: Documento[]): number | null {
   return t.length ? t.reduce((a, b) => a + b, 0) / t.length : null;
 }
 
+/** Documentos en revisión y los días que lleva esperando el más antiguo. */
 export function pendientes(docs: Documento[], hoy = new Date()) {
   const p = docs.filter((d) => d.estado === "en_revision");
   const dias = p.map((d) => {
@@ -57,6 +63,7 @@ export function pendientes(docs: Documento[], hoy = new Date()) {
   return { cantidad: p.length, diasMax: dias.length ? Math.max(...dias) : 0 };
 }
 
+/** Fracción de reportes aprobados o cerrados que ya cerró el cliente con su firma; null si no hay. */
 export function tasaFirmaCliente(docs: Documento[]): number | null {
   const r = docs.filter((d) => d.tipo === "reporte" && (d.estado === "aprobado" || d.estado === "cerrado"));
   if (!r.length) return null;
@@ -80,6 +87,7 @@ export function meses(docs: Documento[], n = 6, hoy = new Date()) {
   });
 }
 
+/** Orden de los estados y de los tipos en gráficos y filtros. */
 export const ESTADOS_ORDEN: Estado[] = ["borrador", "en_revision", "aprobado", "cerrado", "rechazado"];
 export { TIPOS_DOC as TIPOS_ORDEN } from "@/modulos/registro";
 

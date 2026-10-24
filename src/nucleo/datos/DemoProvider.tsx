@@ -1,5 +1,26 @@
 "use client";
 
+/**
+ * Proveedor único de datos del aplicativo (`DemoProvider` + `useDemo`). Guarda
+ * todo el estado (usuarios, clientes, documentos, cuentas, proyectos, equipos,
+ * avisos, auditoría, enlaces de firma y consecutivos) y expone las acciones.
+ *
+ * Dos modos (`Modo`, elegido en /acceso y recordado por `./empresa.ts`):
+ * - «demo»: datos ficticios de `./seed.ts` en localStorage (`KEY`); las
+ *   pestañas se sincronizan con el evento `storage`.
+ * - «empresa»: el estado completo por organización en `public.espacios`
+ *   (`./empresa.ts`) con versión optimista: guardado agrupado, respaldo local,
+ *   sondeo de cambios de otros equipos y estado de sincronización.
+ *
+ * Reglas: cada acción revalida contra el estado más reciente dentro de `setS`
+ * y no hace nada si ya no aplica (doble clic, otra pestaña, rol); los
+ * consecutivos salen de contadores por tipo y año que solo avanzan (no se
+ * reutilizan al borrar); los permisos replican la base de datos (separación de
+ * funciones de 0008, lo comercial solo admin de 0011). Ver docs/ARQUITECTURA.md.
+ *
+ * Exporta: `DemoProvider`, `useDemo`, `ahora`, `hoy`, `KEY_TRAS_LOGIN`, `Sincronizacion`.
+ */
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { SIGUIENTES, type CuentaCobro, type EstadoCuentaCobro } from "@/modulos/cobros/tipos";
@@ -37,7 +58,9 @@ import {
 // Subir la versión al cambiar la semilla: los navegadores cargan los datos nuevos
 const KEY = "sotec-demo-v9";
 
+/** Estado completo de la app: lo que se guarda en localStorage (demo) o en `espacios` (empresa). */
 interface Estado {
+  /** Usuario de esta sesión (no se comparte entre equipos en modo empresa). */
   usuarioId: string | null;
   usuarios: Usuario[];
   clientes: Cliente[];
@@ -56,7 +79,7 @@ interface Estado {
 
 const anioDe = (iso: string) => iso.slice(0, 4);
 
-/** Reconstruye los contadores a partir de los documentos y cuentas existentes. */
+/** Reconstruye los contadores a partir de los documentos y cuentas existentes (semilla y datos guardados sin `consecutivos`). */
 function contadoresDe(docs: Documento[], cuentas: CuentaCobro[], proyectos: Proyecto[] = []): Record<string, number> {
   const c: Record<string, number> = {};
   for (const p of proyectos) c[`proyecto-${anioDe(p.creado)}`] = Math.max(c[`proyecto-${anioDe(p.creado)}`] ?? 0, p.consecutivo);
@@ -65,6 +88,7 @@ function contadoresDe(docs: Documento[], cuentas: CuentaCobro[], proyectos: Proy
   return c;
 }
 
+/** Estado inicial de la demo: datos ficticios de la semilla, sin sesión. */
 function inicial(): Estado {
   const documentos = documentosSeed();
   const cuentas = cuentasSeed();
@@ -103,7 +127,11 @@ function inicialEmpresa(): Estado {
   };
 }
 
-/** Estado de la empresa a partir del espacio guardado y la sesión (el usuario y su rol salen de Supabase). */
+/**
+ * Estado de la empresa a partir del espacio guardado y la sesión (el usuario y su rol salen de Supabase).
+ * Lo que falte en un espacio viejo se completa con el estado vacío; el rol y el correo de Supabase
+ * mandan sobre lo guardado, y en el primer ingreso el usuario se agrega a la lista.
+ */
 function desdeEspacio(e: Espacio, ses: Sesion): Estado {
   const base = inicialEmpresa();
   const g = e.estado as Partial<Estado>;
@@ -118,29 +146,42 @@ function desdeEspacio(e: Espacio, ses: Sesion): Estado {
   };
 }
 
-/** Lo que se comparte: todo menos el usuario de esta sesión. */
+/** Lo que se comparte: todo menos el usuario de esta sesión. También sirve para saber si hay cambios sin guardar. */
 const compartido = (st: Estado) => JSON.stringify({ ...st, usuarioId: null });
+/** Copia local del último estado que se intentó guardar en modo empresa (por si falla la red). */
 const KEY_RESPALDO = "fd-empresa-respaldo";
+/** Perfil de la demo elegido estando en modo empresa: se aplica al montar la demo (sessionStorage). */
 const KEY_ENTRAR_DEMO = "fd-entrar-demo";
 /** Marca que se acaba de iniciar sesión: /acceso lleva al aplicativo cuando el espacio termina de cargar. */
 export const KEY_TRAS_LOGIN = "fd-tras-login";
 
+/** Estado del guardado en modo empresa (indicador en la barra superior). En la demo queda en «guardado». */
 export type Sincronizacion = "guardado" | "guardando" | "sin-conexion";
 
+/** Fecha y hora local «AAAA-MM-DDTHH:mm:ss» (sin zona): marca de tiempo de eventos, avisos y auditoría. */
 export function ahora(): string {
   // Hora local sin zona, suficiente para la demo
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
+/** Fecha local de hoy «AAAA-MM-DD» (define el año de los consecutivos). */
 export function hoy(): string {
   return ahora().slice(0, 10);
 }
+/** Id aleatorio con prefijo («d-…», «n-…»); no es el código visible del documento. */
 function uid(p: string) {
   return `${p}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+/**
+ * Lo que expone `useDemo()`: el estado crudo, vistas ya filtradas por permisos
+ * (`visibles`, `misNotificaciones`, `cuentasVisibles`, `proyectosVisibles`,
+ * `equiposVisibles`) y las acciones. Las acciones validan rol y estado: si no
+ * aplican, no cambian nada (las que devuelven texto, devuelven el motivo).
+ */
 interface Api extends Estado, ApiEquipos {
+  /** Ya se cargaron los datos guardados (y la sesión, en modo empresa). */
   listo: boolean;
   /** demo: datos ficticios en el navegador; empresa: espacio real en Supabase. */
   modo: Modo;
@@ -149,23 +190,40 @@ interface Api extends Estado, ApiEquipos {
   sincronizacion: Sincronizacion;
   /** Login del espacio de la empresa; devuelve el error o null. */
   entrarEmpresa: (correo: string, clave: string) => Promise<string | null>;
+  // Sesión y vistas filtradas
   usuario: Usuario | null;
+  /** Documentos que el usuario puede ver (`puedeVerDoc`). */
   visibles: Documento[];
+  /** Avisos para su rol o su id, solo de lo que puede abrir. */
   misNotificaciones: Notificacion[];
+  /** Entra con un perfil de la demo (el primero activo del rol, o `usuarioId`); desde el modo empresa cambia a la demo. */
   entrarComo: (rol: Rol, usuarioId?: string) => void;
   /** Solo para la demo: el usuario cliente actual pasa a ver el portal de otra empresa. */
   verPortalDe: (clienteId: string) => void;
+  /** Cierra la sesión (en modo empresa también la de Supabase); los datos quedan. */
   salir: () => void;
+  // Documentos y su flujo: borrador → en revisión → aprobado → cerrado (o rechazado)
+  /** Crea (con el consecutivo definitivo) o actualiza el contenido de un documento propio en borrador o rechazado. */
   guardar: (doc: Documento) => Documento;
+  /** Vista previa del siguiente id y código; el definitivo se asigna en `guardar`. */
   nuevoId: (tipo: TipoDoc) => { id: string; codigo: string; consecutivo: number };
+  /** El autor lo envía a revisión (o lo aprueba de una vez si el formato tiene `aprobarAlEnviar`). */
   enviar: (id: string) => void;
+  /** Un revisor con acceso al módulo aprueba lo ajeno en revisión; `firmaAutoriza` va a la casilla del formato. */
   aprobar: (id: string, firmaAutoriza?: string) => void;
+  /** Un revisor devuelve lo ajeno en revisión con motivo obligatorio. */
   rechazar: (id: string, motivo: string) => void;
+  /** Cierra un aprobado: un revisor, o el cliente con su firma si el formato lo cierra el cliente. */
   cerrar: (id: string, cambios: Partial<Documento["datos"]>) => void;
+  /** Copia como borrador propio (el módulo limpia fechas y firmas); devuelve el id nuevo. */
   duplicar: (id: string) => string | null;
+  /** Borra un borrador propio; el consecutivo no se libera. */
   eliminar: (id: string) => void;
   marcarLeidas: () => void;
+  // Directorio y configuración
+  /** Crea o actualiza un usuario (requiere `usuarios`). */
   actualizarUsuario: (u: Usuario) => void;
+  /** Crea o actualiza un cliente (requiere `clientes`). */
   guardarCliente: (c: Cliente) => void;
   /** Activa o desactiva un cliente (sale de los selectores; el historial se conserva). */
   cambiarActivoCliente: (id: string, activo: boolean) => void;
@@ -174,26 +232,36 @@ interface Api extends Estado, ApiEquipos {
   /** Clientes que se pueden elegir en los formularios (activos). */
   clientesActivos: Cliente[];
   actualizarConfig: (c: Config) => void;
+  /** Restablece la demo a la semilla conservando la sesión (no hace nada en modo empresa). */
   reiniciar: () => void;
   // Firma remota y envíos
+  /** Crea un enlace de firma (7 días) para un reporte aprobado sin firma del cliente; devuelve el token o "". */
   crearEnlaceFirma: (docId: string, correo: string) => string;
+  /** Enlace sin usar ni vencer y su reporte aún pendiente de firma, o null. */
   enlaceVigente: (token: string) => { enlace: EnlaceFirma; doc: Documento } | null;
+  /** Firma del cliente sin cuenta: cierra el reporte y anula los demás enlaces del documento. */
   firmarConEnlace: (token: string, nombre: string, imagen: string) => "cerrado" | "firmado" | "invalido";
+  /** Deja en el historial un envío por correo o WhatsApp; una cuenta emitida pasa a «enviada». */
   registrarEnvio: (ref: { docId?: string; cuentaId?: string }, canal: "correo" | "whatsapp", destino: string) => void;
-  // Cuentas de cobro
+  // Cuentas de cobro (solo la administración; el cliente ve las suyas emitidas)
   cuentasVisibles: CuentaCobro[];
+  /** Vista previa del siguiente código; el definitivo se asigna al guardar la cuenta por primera vez. */
   nuevoCodigoCuenta: () => { id: string; codigo: string; consecutivo: number };
   /** Devuelve un mensaje de error si no se puede guardar, o null si se guardó. */
   guardarCuenta: (c: CuentaCobro) => string | null;
+  /** Avanza el estado según `SIGUIENTES` (emitir avisa al portal del cliente). */
   cambiarEstadoCuenta: (id: string, estado: EstadoCuentaCobro) => void;
   /** Cuenta de cobro (no anulada) que ya incluye un reporte, si existe. */
   cuentaDeReporte: (docId: string) => CuentaCobro | undefined;
+  /** Mensaje para el usuario si el último guardado falló (sin espacio, sin conexión o conflicto). */
   errorGuardado: string | null;
   // Proyectos
   proyectosVisibles: Proyecto[];
+  /** Vista previa del siguiente código PRY; el definitivo se asigna al guardar el proyecto por primera vez. */
   nuevoCodigoProyecto: () => { id: string; codigo: string; consecutivo: number };
   /** Crea o actualiza un proyecto (admin y SST). Devuelve un mensaje de error o null. */
   guardarProyecto: (p: Proyecto) => string | null;
+  /** Pausa, reactiva o cierra (al cerrar sin fecha de fin, queda la de hoy). */
   cambiarEstadoProyecto: (id: string, estado: EstadoProyecto) => void;
   /** Elimina un proyecto sin documentos ni cuentas. Devuelve el motivo si no se puede. */
   eliminarProyecto: (id: string) => string | null;
@@ -219,6 +287,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Proveedor de un modo concreto: carga, guarda y sincroniza el estado y arma la API del contexto. */
 function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactNode; modo: Modo | null; cambiarModo: (m: Modo) => void }) {
   const [s, setS] = useState<Estado>(() => (modo === "empresa" ? inicialEmpresa() : inicial()));
   const [listo, setListo] = useState(false);
@@ -226,6 +295,7 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
   const [organizacion, setOrganizacion] = useState<string | null>(null);
   const [sincronizacion, setSincronizacion] = useState<Sincronizacion>("guardado");
   // Modo empresa: organización, versión leída y último estado compartido que quedó guardado
+  // (`ultimo` null = hay algo pendiente de guardar; `guardando` evita dos guardados a la vez)
   const orgId = useRef<string | null>(null);
   const version = useRef(0);
   const ultimo = useRef<string | null>(null);
@@ -272,7 +342,10 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
     };
   }, [modo, adoptar]);
 
-  // Modo empresa: guarda los cambios (agrupados) si nadie más guardó antes
+  // Modo empresa: guarda los cambios (agrupados 700 ms) si nadie más guardó antes.
+  // Primero deja el respaldo local; luego envía la versión leída. Si otro equipo ganó
+  // («conflicto») se adopta lo remoto y el último cambio local se pierde (se avisa).
+  // Sin conexión queda pendiente y el sondeo de abajo lo reintenta.
   useEffect(() => {
     if (modo !== "empresa" || !listo || !orgId.current || !s.usuarioId) return;
     const json = compartido(s);
@@ -333,8 +406,11 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
     };
   }, [modo, listo, adoptar]);
 
+  // Modo demo: carga lo guardado en el navegador y escucha a las demás pestañas
   useEffect(() => {
     if (modo !== "demo") return;
+    // Datos guardados por una versión anterior: lo que falte sale de la semilla y la
+    // configuración se mezcla; sin `consecutivos`, se reconstruyen de lo existente
     const cargar = (raw: string | null) => {
       if (!raw) return;
       const guardado = JSON.parse(raw);
@@ -377,6 +453,7 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
     return () => window.removeEventListener("storage", sincronizar);
   }, [modo]);
 
+  // Modo demo: cada cambio se guarda entero en localStorage (las fotos pueden llenar la cuota)
   useEffect(() => {
     if (!listo || modo !== "demo") return;
     try {
@@ -389,6 +466,7 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
 
   const usuario = s.usuarios.find((u) => u.id === s.usuarioId) ?? null;
 
+  /** Antepone una entrada de auditoría a nombre del usuario de la sesión. */
   const registrar = useCallback(
     (prev: Estado, accion: string, detalle: string): Auditoria[] => [
       { id: uid("a"), fecha: ahora(), usuarioId: prev.usuarioId ?? "anon", accion, detalle },
@@ -402,6 +480,10 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
     ...prev.notificaciones,
   ];
 
+  /**
+   * Aplica un cambio de estado a un documento sobre el estado más reciente: `fn` revalida
+   * y devuelve el documento nuevo más lo que cambie (avisos, auditoría), o null si no aplica.
+   */
   const transicion = useCallback(
     (id: string, fn: (d: Documento, prev: Estado) => (Partial<Estado> & { doc: Documento }) | null) => {
       setS((prev) => {
@@ -417,6 +499,8 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
     [],
   );
 
+  // Las validaciones fuera de setS dan respuesta inmediata con el estado del render;
+  // las de dentro de setS (con `prev`) son las que valen.
   const api = useMemo<Api>(() => {
     const nombre = (id: string | null) => s.usuarios.find((u) => u.id === id)?.nombre.split(" ").slice(0, 2).join(" ") ?? "Alguien";
     const evento = (prev: Estado, accion: string, detalle?: string) => ({ fecha: ahora(), usuarioId: prev.usuarioId ?? "", accion, detalle });
@@ -469,6 +553,7 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
       }
       return r;
     };
+    /** Código visible: PREFIJO-001-26. */
     const codigo = (pref: string, n: number, anio: string) => `${pref}-${String(n).padStart(3, "0")}-${anio.slice(2)}`;
 
     return {
@@ -958,6 +1043,7 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 }
 
+/** Datos y acciones del aplicativo; solo dentro de `DemoProvider` (si no, lanza un error). */
 export function useDemo(): Api {
   const v = useContext(Ctx);
   if (!v) throw new Error("useDemo fuera de DemoProvider");

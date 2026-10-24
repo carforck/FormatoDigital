@@ -1,3 +1,9 @@
+/**
+ * Tipos del núcleo compartidos por todos los módulos: usuarios y roles,
+ * clientes, proyectos, documentos (unión por `tipo`), avisos, auditoría,
+ * configuración y enlaces de firma. Las fechas son texto ISO local
+ * («AAAA-MM-DDTHH:mm:ss», ver `ahora()` en el proveedor de datos).
+ */
 import type { DatosGasto } from "@/modulos/gastos/tipos";
 import type { DatosPermiso } from "@/modulos/permisos/tipos";
 import type { DatosReporte } from "@/modulos/reportes/tipos";
@@ -11,10 +17,13 @@ export type { DatosGasto, ItemGasto } from "@/modulos/gastos/tipos";
 export type { DatosCotizacion, ItemCotizacion } from "@/modulos/cotizaciones/tipos";
 export type { Equipo, EstadoEquipo, SistemaEquipo } from "@/modulos/equipos/tipos";
 
+/** Perfiles: técnico de campo, Coordinador SST («supervisor»), administración y cliente (portal). */
 export type Rol = "tecnico" | "supervisor" | "admin" | "cliente";
 
+/** Estados del flujo de un documento (borrador → en revisión → aprobado → cerrado; o rechazado). */
 export type Estado = "borrador" | "en_revision" | "aprobado" | "rechazado" | "cerrado";
 
+/** Tipos de documento; cada uno es un módulo en src/modulos/registro.ts. */
 export type TipoDoc = "reporte" | "permiso" | "gasto" | "cotizacion";
 
 export interface Usuario {
@@ -70,6 +79,7 @@ export interface Proyecto {
   historial: Evento[];
 }
 
+/** Entrada del historial de un documento, proyecto o cuenta. */
 export interface Evento {
   fecha: string;
   usuarioId: string;
@@ -114,10 +124,12 @@ export interface DocCotizacion extends DocBase {
   datos: DatosCotizacion;
 }
 
+/** Documento de cualquier formato; `tipo` determina la forma de `datos`. */
 export type Documento = DocReporte | DocPermiso | DocGasto | DocCotizacion;
 /** Contenido del formato según el tipo de documento. */
 export type DatosDe<T extends TipoDoc> = Extract<Documento, { tipo: T }>["datos"];
 
+/** Aviso para un rol entero o para un usuario. */
 export interface Notificacion {
   id: string;
   para: Rol | string; // rol o id de usuario
@@ -129,6 +141,7 @@ export interface Notificacion {
   leida: boolean;
 }
 
+/** Registro de auditoría (quién hizo qué y cuándo). */
 export interface Auditoria {
   id: string;
   fecha: string;
@@ -137,6 +150,7 @@ export interface Auditoria {
   detalle: string;
 }
 
+/** Configuración de la organización: datos de la empresa, prefijos de consecutivos y datos de cobro. */
 export interface Config {
   empresa: string;
   nit: string;

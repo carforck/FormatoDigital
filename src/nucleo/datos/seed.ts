@@ -1,3 +1,9 @@
+/**
+ * Semilla de la demo: usuarios, clientes, proyectos, documentos, cuentas de
+ * cobro, avisos y auditoría ficticios (dominios .example) que carga
+ * `DemoProvider` en modo demo. Al cambiarla, subir `KEY` en DemoProvider para
+ * que los navegadores tomen los datos nuevos. El modo empresa no la usa.
+ */
 import { CATALOGO_SERVICIOS, cotizacionVacia } from "@/modulos/cotizaciones/catalogo";
 import { PLANTILLAS_ACTIVIDAD, permisoVacio } from "@/modulos/permisos/catalogo";
 import { reporteVacio } from "@/modulos/reportes/catalogo";
@@ -13,6 +19,7 @@ export function firmaDemo(seed: number): string {
   return `data:image/svg+xml;base64,${typeof btoa === "function" ? btoa(svg) : Buffer.from(svg).toString("base64")}`;
 }
 
+/** Un usuario por perfil (dos técnicos); el cliente pertenece a `c-clay`. */
 export const USUARIOS_SEED: Usuario[] = [
   { id: "u-tec1", nombre: "Andrés Camacho Ruiz", cargo: "Ingeniero de campo", rol: "tecnico", email: "acamacho@sotec.example", cedula: "1.000.000.001", activo: true },
   { id: "u-tec2", nombre: "Julián Herrera Pacheco", cargo: "Técnico electrónico", rol: "tecnico", email: "jherrera@sotec.example", cedula: "1.000.000.002", activo: true },
@@ -21,6 +28,7 @@ export const USUARIOS_SEED: Usuario[] = [
   { id: "u-cli", nombre: "Ing. Daniel Ortega", cargo: "Ing. de sistemas · Ladrillera Arcillas del Caribe", rol: "cliente", email: "sistemas@arcillasdelcaribe.example", clienteId: "c-clay", activo: true },
 ];
 
+/** Clientes ficticios en Cartagena. */
 export const CLIENTES_SEED: Cliente[] = [
   { id: "c-clay", nit: "900.100.200-1", nombre: "Ladrillera Arcillas del Caribe", direccion: "Zona Industrial, Cartagena", contacto: "Ing. Daniel Ortega", cargo: "Ing. sistemas", correo: "sistemas@arcillasdelcaribe.example", telefono: "3000000000", sitio: "Área de hornos" },
   { id: "c-tango", nit: "900.300.400-2", nombre: "Constructora Horizonte Azul", direccion: "Bocagrande, Cartagena", contacto: "Arq. Laura Méndez", cargo: "Residente de obra", correo: "obra@horizonteazul.example", telefono: "3001112233", sitio: "Hotel Brisas del Mar" },
@@ -28,6 +36,7 @@ export const CLIENTES_SEED: Cliente[] = [
   { id: "c-conj", nit: "900.700.800-4", nombre: "Conjunto Residencial Los Robles", direccion: "Barrio Los Robles, Cartagena", contacto: "Patricia Ríos", cargo: "Administradora", correo: "admin@losrobles.example", telefono: "3157778899", sitio: "Portería principal" },
 ];
 
+/** Configuración de SOTEC (prefijos RT, PT, LG, COT, CC, PRY); también es la base del modo empresa. */
 export const CONFIG_SEED: Config = {
   empresa: "SOTEC",
   nit: "900.000.000-0",
@@ -149,6 +158,11 @@ interface Extra {
   estado: Estado;
 }
 
+/**
+ * Documentos de ejemplo en todos los estados: el reporte y el permiso reales del
+ * PDF de la ladrillera, histórico de reportes y permisos para el tablero,
+ * legalizaciones de gastos y cotizaciones; cada uno con su proyecto y equipos.
+ */
 export function documentosSeed(): Documento[] {
   const [tec1, tec2] = USUARIOS_SEED;
   const sup = USUARIOS_SEED[2];
@@ -441,6 +455,7 @@ export function documentosSeed(): Documento[] {
   });
 }
 
+/** Avisos de ejemplo, coherentes con los documentos de la semilla. */
 export function notificacionesSeed(): Notificacion[] {
   return [
     { id: "n1", para: "supervisor", texto: "Andrés Camacho envió el permiso PT-005-26 a revisión", docId: "d-pt-3", fecha: "2026-10-20T07:45:00", leida: false },
@@ -452,6 +467,7 @@ export function notificacionesSeed(): Notificacion[] {
   ];
 }
 
+/** Entradas de auditoría de ejemplo. */
 export function auditoriaSeed(): Auditoria[] {
   return [
     { id: "a1", fecha: "2026-10-20T07:45:00", usuarioId: "u-tec1", accion: "Envió a revisión", detalle: "PT-005-26" },
@@ -461,4 +477,5 @@ export function auditoriaSeed(): Auditoria[] {
   ];
 }
 
+/** Inventario de equipos de ejemplo (vive en el módulo Equipos). */
 export { equiposSeed } from "@/modulos/equipos/seed";

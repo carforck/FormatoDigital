@@ -39,8 +39,10 @@ function hasta999999(n: number): string {
 
 /** Mayor valor que se expresa en letras (999.999.999.999 = novecientos noventa y nueve mil… millones). */
 export const MAXIMO_EN_LETRAS = 999_999_999_999;
+/** Texto que se muestra en lugar del valor en letras cuando supera `MAXIMO_EN_LETRAS`. */
 export const FUERA_DE_RANGO = "VALOR DEMASIADO GRANDE PARA EXPRESAR EN LETRAS";
 
+/** Entero no negativo en letras, en mayúsculas y sin «pesos» (escala larga: MIL MILLONES). */
 export function enLetras(n: number): string {
   if (n === 0) return "CERO";
   if (n > MAXIMO_EN_LETRAS) return FUERA_DE_RANGO;
@@ -51,6 +53,7 @@ export function enLetras(n: number): string {
   return r ? `${millones} ${hasta999999(r)}` : millones;
 }
 
+/** Valor de la cuenta de cobro en letras («… PESOS M/CTE»); redondea al peso y devuelve "" si es inválido o negativo. */
 export function pesosEnLetras(valor: number): string {
   if (!Number.isFinite(valor) || valor < 0) return "";
   const entero = Math.round(valor);
@@ -62,6 +65,7 @@ export function pesosEnLetras(valor: number): string {
   return `${apocopar(enLetras(entero))}${exactoEnMillones ? " DE" : ""} PESOS M/CTE`;
 }
 
+/** Formato de moneda colombiana sin decimales («$ 821.100»); un valor no finito sale como $ 0. */
 export function cop(valor: number): string {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(Number.isFinite(valor) ? valor : 0);
 }

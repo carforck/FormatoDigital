@@ -1,8 +1,13 @@
+/**
+ * Etiquetas en español y clases de color (Tailwind) para estados de documento,
+ * roles y estados de proyecto, compartidas por listas, detalles y filtros.
+ */
 import type { Estado, EstadoProyecto, Rol } from "./tipos";
 
 // El control documental de cada formato (código, versión, nombre) lo aporta su
 // módulo: ver `formatoDe(tipo)` en src/modulos/registro.ts.
 
+/** Nombre visible de cada estado del flujo de documentos. */
 export const ETIQUETA_ESTADO: Record<Estado, string> = {
   borrador: "Borrador",
   en_revision: "En revisión",
@@ -11,6 +16,7 @@ export const ETIQUETA_ESTADO: Record<Estado, string> = {
   cerrado: "Cerrado",
 };
 
+/** Clases de la insignia de cada estado (fondo, texto y anillo). */
 export const COLOR_ESTADO: Record<Estado, string> = {
   borrador: "bg-slate-100 text-slate-700 ring-slate-200",
   en_revision: "bg-amber-50 text-amber-800 ring-amber-200",
@@ -19,6 +25,7 @@ export const COLOR_ESTADO: Record<Estado, string> = {
   cerrado: "bg-sky-50 text-sky-800 ring-sky-200",
 };
 
+/** Nombre visible de cada rol («supervisor» se muestra como Coordinador SST). */
 export const ETIQUETA_ROL: Record<Rol, string> = {
   tecnico: "Técnico de campo",
   supervisor: "Coordinador SST",
@@ -26,12 +33,14 @@ export const ETIQUETA_ROL: Record<Rol, string> = {
   cliente: "Cliente",
 };
 
+/** Nombre visible de cada estado de proyecto. */
 export const ETIQUETA_ESTADO_PROYECTO: Record<EstadoProyecto, string> = {
   activo: "Activo",
   en_pausa: "En pausa",
   cerrado: "Cerrado",
 };
 
+/** Clases de la insignia de cada estado de proyecto. */
 export const COLOR_ESTADO_PROYECTO: Record<EstadoProyecto, string> = {
   activo: "bg-emerald-50 text-emerald-800 ring-emerald-200",
   en_pausa: "bg-amber-50 text-amber-800 ring-amber-200",

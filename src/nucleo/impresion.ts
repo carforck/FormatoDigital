@@ -1,6 +1,3 @@
-import { BASE } from "@/nucleo/rutas";
-import type { Documento } from "@/nucleo/tipos";
-
 /**
  * Impresión y PDF: todos los botones «PDF» / «Imprimir» abren la ruta
  * dedicada `/imprimir` (fuera del shell del aplicativo), en la misma pestaña
@@ -8,6 +5,9 @@ import type { Documento } from "@/nucleo/tipos";
  * hojas del documento en flujo normal, así imprime igual en Safari (iOS),
  * Chrome (Android) y los navegadores de escritorio. Ver docs/ARQUITECTURA.md.
  */
+
+import { BASE } from "@/nucleo/rutas";
+import type { Documento } from "@/nucleo/tipos";
 
 /** Página desde la que se abrió la impresión (para que «Volver» regrese con «atrás»). */
 export const CLAVE_ORIGEN_IMPRESION = "fd-imprimir-origen";
@@ -18,6 +18,7 @@ export const CLAVE_RETORNO_GENERADOR = "fd-generador-retorno";
 
 type Navegador = { push: (href: string) => void };
 
+/** Qué imprimir: un documento guardado, una cuenta de cobro o el borrador actual del generador. */
 export interface ParamsImpresion {
   /** Documento guardado. */
   doc?: string;
@@ -46,6 +47,7 @@ export function guardarBorradorImpresion(doc: Documento): string | null {
   }
 }
 
+/** Lee el borrador que dejó `guardarBorradorImpresion`; null si la clave no es de impresión o ya no está. */
 export function leerBorradorImpresion(clave: string): Documento | null {
   if (!clave.startsWith(PREFIJO_BORRADOR)) return null;
   try {

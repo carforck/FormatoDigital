@@ -1,3 +1,7 @@
+/**
+ * Validación genérica de un documento: delega en las reglas del módulo de su
+ * tipo (`DOCUMENTOS[tipo].faltantes`) para el generador y el envío a revisión.
+ */
 import type { ModuloDocumento } from "@/modulos/contrato";
 import { DOCUMENTOS } from "@/modulos/registro";
 

@@ -28,7 +28,7 @@ export type CampoFirmaGasto = "firmaColaborador" | "firmaVobo";
 interface Props {
   datos: DatosGasto;
   codigoDoc?: string;
-  editar?: (patch: Partial<DatosGasto>) => void;
+  editar?: (patch: Partial<DatosGasto> | ((d: DatosGasto) => Partial<DatosGasto>)) => void;
   firmar?: (campo: CampoFirmaGasto) => void;
   resaltar?: string;
 }
@@ -68,7 +68,9 @@ export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: P
   const item = (id: string, patch: Partial<ItemGasto>) => editar?.({ items: datos.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) });
   const fotoFactura = async (id: string, archivo?: File) => {
     if (!archivo || !editar) return;
-    item(id, { soporte: await comprimirImagen(archivo, 1400, 0.75) });
+    const soporte = await comprimirImagen(archivo, 1400, 0.75);
+    // Sobre los gastos más recientes: mientras se comprimía pudo editarse otra fila
+    editar((d) => ({ items: d.items.map((i) => (i.id === id ? { ...i, soporte } : i)) }));
   };
 
   // Solo se resalta si hay una sección pedida y coincide (en vistas de lectura ambas son undefined)

@@ -6,7 +6,9 @@
  * editable a la derecha (pestañas en móvil). Guarda borradores en localStorage,
  * avisa antes de salir con cambios y guarda/envía con `useDemo`. El cliente escrito a
  * mano que no está en el directorio se guarda allí al GUARDAR el documento (también
- * desde el técnico, ver @/nucleo/clientes); uno desactivado no se recrea: se ofrece usarlo.
+ * desde el técnico, ver @/nucleo/clientes); uno desactivado no se recrea: se ofrece usarlo;
+ * uno que solo se parece («…S.A.S.», sin tildes) se pregunta antes de enlazarlo. Cambiar a
+ * mano el cliente elegido quita los datos que ese cliente había llenado (y su proyecto y equipos).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -30,7 +32,7 @@ import type { Cliente, Documento, Proyecto, TipoDoc } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 import { avance, faltantes } from "@/nucleo/validar";
 import { puede } from "@/nucleo/permisos";
-import { avisoPlan, buscarCliente, claveNombre, dejarAvisoCliente, planCliente } from "@/nucleo/clientes";
+import { avisoPlan, buscarCliente, claveNombre, dejarAvisoCliente, mismoNombre, planCliente, preguntaParecido } from "@/nucleo/clientes";
 
 interface Props {
   tipo: TipoDoc;
@@ -127,6 +129,19 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   const [firmando, setFirmando] = useState<string | null>(null);
   const [vista, setVista] = useState<"chat" | "doc">("chat");
   const [aviso, setAviso] = useState<string | null>(null);
+  // Aviso del cliente escrito a mano en el formato (p. ej. «se quitaron los datos de X»)
+  const [avisoCliente, setAvisoCliente] = useState<string | null>(null);
+  // Nombres que el usuario dijo que NO son el cliente parecido del directorio (no se vuelve a preguntar)
+  const noEsElMismo = useRef(new Set<string>());
+  /** Cliente activo con ese nombre; si solo se parece, pregunta (y recuerda el «no»). */
+  const confirmarCliente = (texto: string): Cliente | undefined => {
+    const c = buscarCliente(demo.clientesActivos, texto);
+    if (!c || mismoNombre(c.nombre, texto)) return c;
+    if (noEsElMismo.current.has(claveNombre(texto) + "|" + c.id)) return undefined;
+    if (confirm(preguntaParecido(texto, c))) return c;
+    noEsElMismo.current.add(claveNombre(texto) + "|" + c.id);
+    return undefined;
+  };
   const [guardando, setGuardando] = useState(false);
   // Lo preseleccionado desde un proyecto no cuenta como cambio sin guardar
   const contenido = (d: Documento) => JSON.stringify([d.datos, d.equiposIds ?? []]);
@@ -157,26 +172,27 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   const pendientes = useMemo(() => faltantes(doc), [doc]);
   const pct = avance(doc);
 
-  /** Mezcla un cambio parcial en el contenido del formato. */
-  const editar = (cambio: object) => setDoc((d) => ({ ...d, datos: { ...d.datos, ...cambio } }) as Documento);
+  /** Mezcla un cambio parcial en el contenido del formato (o calculado sobre los datos más recientes). */
+  const editar = (cambio: object | ((datos: never) => object)) =>
+    setDoc((d) => ({ ...d, datos: { ...d.datos, ...(typeof cambio === "function" ? cambio(d.datos as never) : cambio) } }) as Documento);
 
   /**
    * Edición en línea del formato. Si se escribe el cliente a mano: uno del directorio (activo)
    * autollena sus datos; uno distinto del elegido deja el documento sin cliente del directorio
    * (se registrará al guardar).
    */
-  const editarFormato = (cambio: object) => {
+  const editarFormato = (cambio: object | ((datos: never) => object)) => {
     const c = cambio as Record<string, unknown>;
-    if (info.campoCliente in c && typeof c[info.campoCliente] === "string") {
+    if (typeof cambio !== "function" && info.campoCliente in c && typeof c[info.campoCliente] === "string") {
       const texto = c[info.campoCliente] as string;
       const elegido = demo.clientes.find((x) => x.id === doc.clienteId);
-      const otro = buscarCliente(demo.clientesActivos, texto);
+      const otro = elegido && claveNombre(texto) === claveNombre(elegido.nombre) ? elegido : confirmarCliente(texto);
       if (otro && otro.id !== doc.clienteId) {
-        elegirCliente(otro);
+        setAvisoCliente(elegirCliente(otro) ?? null);
         return;
       }
-      if (elegido && texto.trim() && claveNombre(texto) !== claveNombre(elegido.nombre) && !otro) {
-        elegirCliente(undefined, texto);
+      if (elegido && texto.trim() && !otro) {
+        setAvisoCliente(elegirCliente(undefined, texto) ?? null);
         return;
       }
     }
@@ -193,13 +209,27 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   /** Elige un cliente del directorio (o lo deja escrito a mano); un proyecto de otro cliente se quita. */
   function elegirCliente(c: Cliente | undefined, texto = ""): string | undefined {
     if (!c) {
-      setDoc((d) => ({ ...d, clienteId: "", proyectoId: undefined, equiposIds: undefined, datos: { ...d.datos, [info.campoCliente]: texto } }) as Documento);
+      // Lo que llenó el cliente anterior (y su proyecto) se quita si sigue igual: no pasa al cliente nuevo
+      const anterior = demo.clientes.find((x) => x.id === doc.clienteId);
+      const proyAnterior = demo.proyectos.find((p) => p.id === doc.proyectoId);
+      const quitar = (d: Documento): Record<string, unknown> => {
+        const datos = d.datos as unknown as Record<string, unknown>;
+        const llenado = {
+          ...(anterior ? mod.alElegirCliente(anterior).cambio : {}),
+          ...(proyAnterior ? info.alElegirProyecto?.(proyAnterior, anterior)?.cambio ?? {} : {}),
+        } as Record<string, unknown>;
+        return Object.fromEntries(Object.entries(llenado).filter(([k, v]) => k !== info.campoCliente && typeof v === "string" && datos[k] === v).map(([k]) => [k, ""]));
+      };
+      setDoc((d) => ({ ...d, clienteId: "", proyectoId: undefined, equiposIds: undefined, datos: { ...d.datos, ...quitar(d), [info.campoCliente]: texto } }) as Documento);
+      const quitado = anterior ? `Quité los datos de «${anterior.nombre}»${proyAnterior || doc.equiposIds?.length ? ", su proyecto y sus equipos" : ""}: completa los del cliente nuevo. ` : "";
       // Cliente nuevo escrito en el chat: se guarda en el directorio cuando se guarde el documento (no en cada tecla)
       const nombre = texto.trim();
-      if (!nombre || !registraClientes) return;
+      if (!nombre || !registraClientes) return quitado || undefined;
       const existente = buscarCliente(demo.clientes, nombre);
-      if (existente?.activo === false) return `«${existente.nombre}» está desactivado en el directorio de clientes. Al guardar te pregunto si quieres usarlo (no se crea otro).`;
-      return `«${nombre}» es un cliente nuevo: al guardar ${info.formato.el} ${info.formato.corto.toLowerCase()} lo dejo en el directorio con los datos que escribas, para que la próxima vez se autocomplete.`;
+      if (existente?.activo === false) return `${quitado}«${existente.nombre}» está desactivado en el directorio de clientes. Al guardar te pregunto si quieres usarlo (no se crea otro).`;
+      if (existente && mismoNombre(existente.nombre, nombre)) return `${quitado}Al guardar queda enlazado con «${existente.nombre}» del directorio (mismo nombre).`;
+      if (existente) return `${quitado}«${nombre}» queda escrito a mano: no lo agrego al directorio porque se parece a «${existente.nombre}». Si es otro cliente, escribe un nombre que lo distinga.`;
+      return `${quitado}«${nombre}» es un cliente nuevo: al guardar ${info.formato.el} ${info.formato.corto.toLowerCase()} lo dejo en el directorio con los datos que escribas, para que la próxima vez se autocomplete.`;
     }
     const r = mod.alElegirCliente(c);
     setDoc((d) => {
@@ -239,7 +269,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
       return;
     }
     // Sin importar mayúsculas, tildes ni espacios: «ladrillera arcillas…» autollena como la del directorio
-    if (id === "cliente") return elegirCliente(buscarCliente(demo.clientesActivos, v as string), v as string);
+    if (id === "cliente") return elegirCliente(confirmarCliente(v as string), v as string);
     if (id === "proyecto") return elegirProyecto(demo.proyectosVisibles.find((p) => etiquetaProyecto(p) === v));
     // Los equipos ya quedaron marcados en el documento desde el selector
     if (id === "equipos") {
@@ -318,6 +348,18 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     const campo = firmando!;
     setFirmando(null);
     editar(info.aplicarFirma(campo, url, doc.datos));
+    // Firma del cliente tomada desde el formato (no el asistente): quién recibe sale del contacto y se corrige con un toque
+    const d = doc.datos as unknown as Record<string, string | undefined>;
+    // (en el paso «Firma del cliente» del asistente, quién firma lo pregunta el asistente)
+    if (doc.tipo === "reporte" && campo === info.flujo.campoFirmaCliente && resaltar !== campo && !d.nombreRecibe?.trim()) {
+      const nombreRecibe = d.personaContactada?.trim() ?? "";
+      editar({ nombreRecibe, cargoRecibe: d.cargoRecibe?.trim() || d.cargo?.trim() || "" });
+      setAvisoCliente(
+        nombreRecibe
+          ? `Firma del cliente guardada a nombre de ${nombreRecibe}. Si firmó otra persona, toca su nombre bajo la firma para cambiarlo.`
+          : "Firma del cliente guardada. Escribe bajo la firma el nombre y el cargo de quien recibe.",
+      );
+    }
   }
 
   /** Guarda (y con `enviar`, envía a revisión o aprueba según el flujo del formato) y abre el detalle. */
@@ -331,6 +373,14 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     let clienteId = doc.clienteId;
     // Directorio: un cliente desactivado no se vuelve a crear; se ofrece usarlo
     let plan = registraClientes ? planCliente(demo.clientes, doc, "nuevo") : null;
+    // Se parece a uno del directorio sin ser el mismo nombre: se pregunta (salvo que ya dijo que no)
+    if (plan?.accion === "parecido") {
+      const elegido = confirmarCliente(clienteDoc(doc));
+      if (elegido) {
+        clienteId = elegido.id;
+        plan = planCliente(demo.clientes, { ...doc, clienteId }, "nuevo");
+      }
+    }
     if (plan?.accion === "inactivo") {
       const usar = confirm(`«${plan.cliente.nombre}» está desactivado en el directorio de clientes.\n\n¿Usarlo para este documento? (Si no, queda escrito a mano y no se crea otro cliente.)`);
       if (usar) {
@@ -467,6 +517,14 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
               <CheckCircle2 className="h-4 w-4" /> Todo completo: ya puedes {info.flujo.aprobarAlEnviar ? "aprobarlo y enviarlo al cliente" : "enviarlo a revisión"}.
             </p>
           )}
+          {avisoCliente && (
+            <p role="status" className="flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 print:hidden">
+              <span className="min-w-0 flex-1">{avisoCliente}</span>
+              <button type="button" aria-label="Cerrar aviso" onClick={() => setAvisoCliente(null)} className="shrink-0 rounded px-1 hover:bg-black/5">
+                ×
+              </button>
+            </p>
+          )}
           {/* Cliente y proyecto también desde el formulario: autollenan el formato igual que el asistente */}
           <section aria-label="Cliente y proyecto" className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-2 print:hidden">
             <label className="block text-sm">
@@ -476,7 +534,8 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
                 value={doc.clienteId}
                 onChange={(e) => {
                   const c = demo.clientes.find((x) => x.id === e.target.value);
-                  elegirCliente(c, c ? "" : clienteDoc(doc));
+                  setAvisoCliente((c ? null : elegirCliente(undefined, clienteDoc(doc))) ?? null);
+                  if (c) elegirCliente(c, "");
                 }}
               >
                 <option value="">{doc.clienteId ? "Sin cliente del directorio" : clienteDoc(doc) ? `Escrito a mano: ${clienteDoc(doc)}` : "Selecciona…"}</option>

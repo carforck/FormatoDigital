@@ -19,7 +19,11 @@
  * reutilizan al borrar); los permisos replican la base de datos (separación de
  * funciones de 0008, lo comercial solo admin de 0011, trabajo de campo de 0013:
  * retirar un envío, firma del cliente en sitio y clientes nuevos desde los
- * formatos). Ver docs/ARQUITECTURA.md.
+ * formatos; retirar o rechazar anula la firma del cliente tomada en sitio).
+ * Aprobar, rechazar, retirar y la firma en sitio devuelven el motivo si no
+ * aplicaron (otro llegó primero). Ver docs/ARQUITECTURA.md.
+ *
+ * Exporta también `FIRMA_ANULADA` y `firmaValida`.
  *
  * Exporta: `DemoProvider`, `useDemo`, `ahora`, `hoy`, `KEY_TRAS_LOGIN`, `Sincronizacion`.
  */
@@ -67,6 +71,11 @@ import {
 
 // Subir la versión al cambiar la semilla: los navegadores cargan los datos nuevos
 const KEY = "sotec-demo-v9";
+/** Evento del historial cuando la firma del cliente en sitio se anula al salir de revisión (igual en 0013). */
+const CERRADO_EN_SITIO = "Cerrado con la firma del cliente en sitio";
+export const FIRMA_ANULADA = "Se anuló la firma del cliente (el contenido cambió)";
+/** Firma del cliente en sitio válida: PNG en data URL de hasta 300 000 caracteres (igual que el portal, el enlace y 0013). */
+export const firmaValida = (imagen: string) => imagen.startsWith("data:image/png;base64,") && imagen.length <= 300000;
 
 /** Estado completo de la app: lo que se guarda en localStorage (demo) o en `espacios` (empresa). */
 interface Estado {
@@ -484,19 +493,22 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
         setSincronizacion("sin-conexion");
         return;
       }
+      // Cambios de este equipo sin enviar: los marcados sin conexión y también uno recién hecho
+      // que aún espera el guardado agrupado (700 ms), p. ej. un retiro o una firma
+      const sinGuardar = pendiente.current || compartido(sRef.current) !== ultimo.current;
       if (v > version.current) {
         const e = await leerEspacio(orgId.current);
         if (e && sesion.current) {
-          // Había cambios de este equipo sin enviar: gana lo más reciente del servidor (como un conflicto)
-          if (pendiente.current) {
+          // Gana lo más reciente del servidor (como un conflicto): lo local queda en el respaldo y se avisa
+          if (sinGuardar) {
             guardarConflicto(compartido(sRef.current));
-            setErrorGuardado("Mientras estabas sin conexión otra persona guardó cambios y se cargaron los datos más recientes. Revisa tus últimos cambios y vuelve a hacerlos si no aparecen.");
+            setErrorGuardado("Otra persona guardó cambios antes de que se enviaran los tuyos y se cargaron los datos más recientes. Revisa tus últimos cambios (retiros, firmas, aprobaciones) y vuelve a hacerlos si no aparecen.");
           }
           adoptar(e, sesion.current);
         }
       } else {
         // Sin cambios ajenos: si algo quedó sin guardar (sin conexión), se fuerza otro intento
-        if (!pendiente.current) setSincronizacion("guardado");
+        if (!sinGuardar) setSincronizacion("guardado");
         setS((prev) => ({ ...prev }));
       }
     };
@@ -592,17 +604,35 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
    * Aplica un cambio de estado a un documento sobre el estado más reciente: `fn` revalida
    * y devuelve el documento nuevo más lo que cambie (avisos, auditoría), o null si no aplica.
    */
+  /**
+   * Aplica una transición de un documento y dice si aplicó. Se valida contra el estado más
+   * reciente (`sRef`, que incluye lo aplicado en este mismo evento: un doble clic ve el primer
+   * cambio) y otra vez dentro de `setS` por si llegó algo entre tanto (otra pestaña). Un
+   * documento que se acaba de crear con `guardar` en el mismo evento va directo a la cola.
+   */
   const transicion = useCallback(
-    (id: string, fn: (d: Documento, prev: Estado) => (Partial<Estado> & { doc: Documento }) | null) => {
-      setS((prev) => {
+    (id: string, fn: (d: Documento, prev: Estado) => (Partial<Estado> & { doc: Documento }) | null): boolean => {
+      const aplicar = (prev: Estado): Estado | null => {
         const d = prev.documentos.find((x) => x.id === id);
-        if (!d) return prev;
+        if (!d) return null;
         const r = fn(d, prev);
         // La acción no aplica al estado actual (doble clic, otra pestaña, rol): no se hace nada
-        if (!r) return prev;
+        if (!r) return null;
         const { doc, ...resto } = r;
         return { ...prev, ...resto, documentos: prev.documentos.map((x) => (x.id === id ? doc : x)) };
-      });
+      };
+      const base = sRef.current;
+      // Documento recién creado en este mismo evento (guardar y enviar): aún no está en `sRef`,
+      // se aplica sobre el estado en cola como antes
+      if (!base.documentos.some((x) => x.id === id)) {
+        setS((prev) => aplicar(prev) ?? prev);
+        return true;
+      }
+      const siguiente = aplicar(base);
+      if (!siguiente) return false;
+      sRef.current = siguiente;
+      setS((prev) => (prev === base ? siguiente : (aplicar(prev) ?? prev)));
+      return true;
     },
     [],
   );
@@ -664,6 +694,29 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
     /** Revisores (por rol) con acceso al módulo del documento: a ellos van los avisos de revisión. */
     const revisoresDe = (tipo: TipoDoc) => (["supervisor", "admin"] as const).filter((r) => puedeUsarTipo(r, tipo));
     /** Por qué un documento ya no se puede aprobar o rechazar (otro llegó primero). */
+    /**
+     * Al salir de revisión (retirar o rechazar) el contenido puede cambiar: la firma del cliente
+     * tomada en sitio (su «recibido a satisfacción») ya no aplica y se anula (igual que 0013).
+     */
+    const sinFirmaCliente = (prev: Estado, d: Documento): { datos: Documento["datos"]; eventos: Documento["historial"]; auditoria: Auditoria[] } => {
+      const campo = infoDoc(d.tipo).flujo.campoFirmaCliente;
+      const datos = d.datos as unknown as Record<string, unknown>;
+      if (!campo || !String(datos[campo] ?? "").startsWith("data:image/")) return { datos: d.datos, eventos: [], auditoria: prev.auditoria };
+      return {
+        datos: { ...d.datos, [campo]: "", ...(d.tipo === "reporte" ? { nombreRecibe: "", cargoRecibe: "" } : {}) } as Documento["datos"],
+        eventos: [evento(prev, FIRMA_ANULADA)],
+        auditoria: registrar(prev, FIRMA_ANULADA, d.codigo),
+      };
+    };
+    /** Por qué ya no se puede retirar (el revisor llegó primero). */
+    const yaNoRetirable = (d: Documento): string =>
+      d.estado === "aprobado" || d.estado === "cerrado"
+        ? `${d.codigo} ya fue aprobado y no se puede retirar. Si hay que corregirlo, el revisor debe devolverlo con el motivo.`
+        : d.estado === "rechazado"
+          ? `${d.codigo} ya fue devuelto con un motivo: corrígelo con «Editar».`
+          : `${d.codigo} ya no está en revisión.`;
+    /** El documento como quedó (lo más reciente) para explicar por qué una acción no aplicó. */
+    const reciente = (id: string) => sRef.current.documentos.find((x) => x.id === id);
     const yaNoEnRevision = (d: Documento): string => {
       const ultimo = d.historial[d.historial.length - 1];
       if (d.estado === "borrador" && ultimo?.accion === "Retiró el envío para corregir") return `${nombre(ultimo.usuarioId)} retiró ${d.codigo} para corregirlo: ya no está en revisión. Volverá a tu bandeja cuando lo reenvíe.`;
@@ -838,10 +891,10 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
       },
 
       aprobar(id, firmaAutoriza) {
-        const actual = s.documentos.find((x) => x.id === id);
+        const actual = reciente(id);
         if (!actual) return "Documento no disponible.";
         if (actual.estado !== "en_revision") return yaNoEnRevision(actual);
-        transicion(id, (d, prev) => {
+        const aplicado = transicion(id, (d, prev) => {
           // Solo un revisor, solo en revisión y nunca sobre un documento propio (si el autor lo retiró, gana el retiro)
           if (d.estado !== "en_revision" || !revisaTipo(prev, d.tipo) || d.autorId === prev.usuarioId) return null;
           const u = prev.usuarios.find((x) => x.id === prev.usuarioId);
@@ -859,24 +912,27 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
               : `${prev.config.empresa} compartió ${info.formato.el} ${info.formato.corto.toLowerCase()} ${d.codigo} para tu firma`;
             notifs = [...aClientes(prev, d.clienteId, texto, d.id), ...notifs];
           }
-          const historial = [...d.historial, evento(prev, "Aprobó"), ...(enSitio ? [evento(prev, "Cerrado con la firma del cliente en sitio")] : [])];
+          const historial = [...d.historial, evento(prev, "Aprobó"), ...(enSitio ? [evento(prev, CERRADO_EN_SITIO)] : [])];
           return {
             doc: { ...d, datos, estado: enSitio ? "cerrado" : "aprobado", historial } as Documento,
             notificaciones: notifs,
-            auditoria: enSitio ? registrar({ ...prev, auditoria: registrar(prev, "Aprobó", d.codigo) }, "Cerró con la firma del cliente en sitio", d.codigo) : registrar(prev, "Aprobó", d.codigo),
+            auditoria: enSitio ? registrar({ ...prev, auditoria: registrar(prev, "Aprobó", d.codigo) }, CERRADO_EN_SITIO, d.codigo) : registrar(prev, "Aprobó", d.codigo),
           };
         });
+        if (!aplicado) {
+          const d = reciente(id);
+          return d && d.estado !== "en_revision" ? yaNoEnRevision(d) : `No se pudo aprobar ${actual.codigo}: este perfil no lo revisa.`;
+        }
         return null;
       },
 
       retirar(id) {
-        const actual = s.documentos.find((x) => x.id === id);
+        const actual = reciente(id);
         if (!actual || !usuario) return "Documento no disponible.";
         if (actual.autorId !== usuario.id) return "Solo el autor puede retirar el envío.";
-        if (actual.estado === "aprobado" || actual.estado === "cerrado") return `${actual.codigo} ya fue aprobado y no se puede retirar. Si hay que corregirlo, el revisor debe devolverlo con el motivo.`;
-        if (actual.estado !== "en_revision") return `${actual.codigo} ya no está en revisión.`;
+        if (actual.estado !== "en_revision") return yaNoRetirable(actual);
         if (!puedeRetirarDoc(usuario, actual)) return "Este formato no se retira de revisión.";
-        transicion(id, (d, prev) => {
+        const aplicado = transicion(id, (d, prev) => {
           const u = prev.usuarios.find((x) => x.id === prev.usuarioId);
           // Revalida con lo más reciente: si el revisor aprobó o rechazó primero, gana el revisor
           if (!u || !puedeRetirarDoc(u, d)) return null;
@@ -884,53 +940,79 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
           const texto = `${nombre(prev.usuarioId)} retiró ${d.codigo} de revisión para corregirlo`;
           // El aviso «envió … a revisión» sin leer ya no aplica: se quita
           const vigentes = prev.notificaciones.filter((n) => !(n.docId === d.id && !n.leida && (revisores as readonly string[]).includes(n.para) && n.texto.endsWith("a revisión")));
+          // La firma del cliente tomada en sitio no vale para lo que se va a corregir
+          const anula = sinFirmaCliente(prev, d);
           return {
-            doc: { ...d, estado: "borrador", historial: [...d.historial, evento(prev, "Retiró el envío para corregir")] },
+            doc: { ...d, datos: anula.datos, estado: "borrador", historial: [...d.historial, evento(prev, "Retiró el envío para corregir"), ...anula.eventos] } as Documento,
             notificaciones: [...revisores.map((r) => ({ id: uid("n"), para: r, texto, docId: d.id, fecha: ahora(), leida: false })), ...vigentes],
-            auditoria: registrar(prev, "Retiró el envío para corregir", d.codigo),
+            auditoria: registrar({ ...prev, auditoria: anula.auditoria }, "Retiró el envío para corregir", d.codigo),
           };
         });
+        if (!aplicado) {
+          const d = reciente(id);
+          return d ? yaNoRetirable(d) : "Documento no disponible.";
+        }
         return null;
       },
 
       firmaClienteEnSitio(id, imagen, quien, cargo) {
-        const actual = s.documentos.find((x) => x.id === id);
+        const actual = reciente(id);
         if (!actual || !usuario) return "Documento no disponible.";
-        if (!puedeFirmaClienteEnSitio(usuario, actual)) return actual.estado === "cerrado" ? `${actual.codigo} ya está cerrado.` : "La firma del cliente ya no se puede tomar aquí.";
-        if (!imagen.startsWith("data:image/") || quien.trim().length < 3) return "Falta la firma o el nombre de quien firma.";
-        transicion(id, (d, prev) => {
+        const noSePuede = (d: Documento) =>
+          d.estado === "cerrado" ? `${d.codigo} ya está cerrado.` : d.estado === "borrador" || d.estado === "rechazado" ? `${d.codigo} ya no está en revisión: corrígelo y la firma se toma al diligenciarlo.` : "La firma del cliente ya no se puede tomar aquí.";
+        if (!puedeFirmaClienteEnSitio(usuario, actual)) return noSePuede(actual);
+        if (quien.trim().length < 3) return "Falta el nombre de quien firma.";
+        if (!firmaValida(imagen)) return "La firma no se pudo guardar (imagen no válida o muy grande). Límpiala y vuelve a firmar.";
+        const aplicado = transicion(id, (d, prev) => {
           const u = prev.usuarios.find((x) => x.id === prev.usuarioId);
-          if (!u || !puedeFirmaClienteEnSitio(u, d)) return null;
+          if (!u || !puedeFirmaClienteEnSitio(u, d) || !firmaValida(imagen)) return null;
           const info = infoDoc(d.tipo);
           const campo = info.flujo.campoFirmaCliente!;
           const datos = { ...d.datos, ...info.aplicarFirma(campo, imagen, d.datos), ...(d.tipo === "reporte" ? { nombreRecibe: quien.trim(), cargoRecibe: cargo.trim() } : {}) };
           // Ya aprobado: la firma lo cierra (como en el portal o por enlace); en revisión, se cierra al aprobarlo
           const cierra = d.estado === "aprobado";
-          const historial = [...d.historial, evento(prev, "Firma del cliente en sitio", quien.trim()), ...(cierra ? [evento(prev, "Cerrado con la firma del cliente en sitio")] : [])];
+          // Mismos eventos y auditoría que 0013: «Firma del cliente en sitio» y, si cierra, «Cerrado con…»
+          const historial = [...d.historial, evento(prev, "Firma del cliente en sitio", quien.trim()), ...(cierra ? [evento(prev, CERRADO_EN_SITIO)] : [])];
           const texto = `${nombre(prev.usuarioId)} tomó en sitio la firma del cliente en ${d.codigo}${cierra ? ": quedó cerrado" : ""}`;
+          const auditoria = registrar(prev, "Firma del cliente en sitio", `${d.codigo} · ${quien.trim()}`);
+          // Cerrado: el aviso «… para tu firma» del portal ya no aplica (queda leído) y se avisa el cierre
+          const portal = cierra
+            ? aClientes(prev, d.clienteId, `${prev.config.empresa} cerró ${info.formato.el} ${info.formato.corto.toLowerCase()} ${d.codigo}, firmado en sitio`, d.id)
+            : [];
+          const avisos = cierra ? prev.notificaciones.map((n) => (n.docId === d.id && !n.leida && n.texto.endsWith("para tu firma") ? { ...n, leida: true } : n)) : prev.notificaciones;
           return {
             doc: { ...d, datos, estado: cierra ? "cerrado" : d.estado, historial } as Documento,
             // Los enlaces de firma pendientes de ese documento ya no sirven
             enlaces: prev.enlaces.map((e) => (e.docId === d.id && !e.usado ? { ...e, usado: ahora() } : e)),
-            notificaciones: [...revisoresDe(d.tipo).map((r) => ({ id: uid("n"), para: r, texto, docId: d.id, fecha: ahora(), leida: false })), ...prev.notificaciones],
-            auditoria: registrar(prev, "Firma del cliente en sitio", `${d.codigo} · ${quien.trim()}`),
+            notificaciones: [...portal, ...revisoresDe(d.tipo).map((r) => ({ id: uid("n"), para: r, texto, docId: d.id, fecha: ahora(), leida: false })), ...avisos],
+            auditoria: cierra ? registrar({ ...prev, auditoria }, CERRADO_EN_SITIO, d.codigo) : auditoria,
           };
         });
+        if (!aplicado) {
+          const d = reciente(id);
+          return d ? noSePuede(d) : "Documento no disponible.";
+        }
         return null;
       },
 
       rechazar(id, motivo) {
-        const actual = s.documentos.find((x) => x.id === id);
+        const actual = reciente(id);
         if (!actual) return "Documento no disponible.";
         if (actual.estado !== "en_revision") return yaNoEnRevision(actual);
-        transicion(id, (d, prev) => {
+        const aplicado = transicion(id, (d, prev) => {
           if (d.estado !== "en_revision" || !revisaTipo(prev, d.tipo) || d.autorId === prev.usuarioId || !motivo.trim()) return null;
+          // Se corregirá: la firma del cliente tomada en sitio se anula (vuelve a firmar lo corregido)
+          const anula = sinFirmaCliente(prev, d);
           return {
-            doc: { ...d, estado: "rechazado", motivoRechazo: motivo, historial: [...d.historial, evento(prev, "Rechazó", motivo)] },
+            doc: { ...d, datos: anula.datos, estado: "rechazado", motivoRechazo: motivo, historial: [...d.historial, evento(prev, "Rechazó", motivo), ...anula.eventos] } as Documento,
             notificaciones: notificar(prev, d.autorId, `${d.codigo} fue rechazado: ${motivo}`, d.id),
-            auditoria: registrar(prev, "Rechazó", `${d.codigo} · ${motivo}`),
+            auditoria: registrar({ ...prev, auditoria: anula.auditoria }, "Rechazó", `${d.codigo} · ${motivo}`),
           };
         });
+        if (!aplicado) {
+          const d = reciente(id);
+          return d && d.estado !== "en_revision" ? yaNoEnRevision(d) : `No se pudo rechazar ${actual.codigo}: falta el motivo o este perfil no lo revisa.`;
+        }
         return null;
       },
 

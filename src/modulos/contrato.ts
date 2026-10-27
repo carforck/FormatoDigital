@@ -45,8 +45,11 @@ export interface InfoFormato {
 export interface PropsPlantilla<D> {
   datos: D;
   codigoDoc?: string;
-  /** Si existe, los campos se editan en línea. */
-  editar?: (patch: Partial<D>) => void;
+  /**
+   * Si existe, los campos se editan en línea. Con una función, el cambio se calcula sobre los
+   * datos más recientes (fotos y facturas que terminan de comprimirse después de otro cambio).
+   */
+  editar?: (patch: Partial<D> | ((d: D) => Partial<D>)) => void;
   /** Abre el pad de firma para el campo indicado. */
   firmar?: (campo: string) => void;
   /** Campo que el asistente está preguntando; se resalta en la vista previa. */

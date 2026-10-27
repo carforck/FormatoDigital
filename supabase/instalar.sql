@@ -2363,16 +2363,24 @@ on conflict (organizacion_id) do nothing;
 --     Al aprobar un reporte que ya trae la firma del cliente, queda CERRADO de
 --     una vez (eventos «Aprobó» y «Cerrado con la firma del cliente en sitio»).
 --     Formatos con firma del cliente en sitio: `formato_firma_en_sitio` (hoy
---     'reporte'; la cotización no pasa por revisión).
+--     'reporte'; la cotización no pasa por revisión). La imagen es un PNG en
+--     data URL de hasta 300 000 caracteres (igual que el portal y el enlace).
 --  2. Retirar para corregir: el autor pasa su documento de en_revision a
 --     borrador mientras nadie lo ha aprobado («Retiró el envío para corregir»).
 --     Ya aprobado no se retira: solo el revisor lo devuelve con motivo.
 --     Quien llegue primero gana (la fila ya no está en el estado esperado).
+--     Al retirar o rechazar, la firma del cliente tomada en sitio se ANULA (el
+--     contenido va a cambiar): se vacían firmaCliente, nombreRecibe y
+--     cargoRecibe, se borra su fila de `firmas` (origen 'en_sitio') y queda el
+--     evento «Se anuló la firma del cliente (el contenido cambió)». Así el
+--     portal, el enlace o una nueva firma en sitio vuelven a funcionar.
 --  3. Clientes desde los formatos: el técnico puede CREAR clientes de su
 --     organización (no editarlos, desactivarlos ni borrarlos; eso sigue siendo
 --     de admin y supervisor). No se duplican: el nombre se compara sin
---     mayúsculas, tildes ni espacios de más (`clave_nombre`). `completar_cliente`
---     llena solo los campos VACÍOS de un cliente existente con lo del formato.
+--     mayúsculas, tildes (la ñ cuenta), puntuación, espacios de más ni la razón
+--     social del final (`clave_nombre`, idéntica a claveNombre de la app).
+--     `completar_cliente` llena solo los campos VACÍOS de un cliente activo
+--     con lo del formato.
 --
 -- La aplicación (fase 1, `espacios`) aplica las mismas reglas en
 -- src/nucleo/permisos.ts, src/nucleo/clientes.ts y DemoProvider.
@@ -2403,7 +2411,8 @@ as $$
   select (coalesce(nuevo, '{}'::jsonb) - array['firmaCliente', 'nombreRecibe', 'cargoRecibe'])
            = (coalesce(viejo, '{}'::jsonb) - array['firmaCliente', 'nombreRecibe', 'cargoRecibe'])
      and coalesce(viejo ->> 'firmaCliente', '') = ''
-     and coalesce(nuevo ->> 'firmaCliente', '') like 'data:image/%'
+     and coalesce(nuevo ->> 'firmaCliente', '') like 'data:image/png;base64,%'
+     and length(nuevo ->> 'firmaCliente') <= 300000
 $$;
 
 create or replace function public.documentos_flujo()
@@ -2421,6 +2430,8 @@ declare
   firma_en_sitio boolean := es_autor and public.formato_firma_en_sitio(new.formato_id)
                             and public.solo_firma_cliente(new.datos, old.datos);
   cierre_en_sitio boolean := false;
+  -- Retirar o rechazar un documento con la firma del cliente en sitio la anula
+  anula_firma boolean := false;
   actor text := coalesce((select nombre from public.perfiles where id = auth.uid()), nullif(current_setting('fd.actor_nombre', true), ''), '');
   accion text;
 begin
@@ -2454,7 +2465,10 @@ begin
   if new.estado = old.estado and old.estado = 'en_revision' and firma_en_sitio then
     insert into public.firmas (organizacion_id, documento_id, campo, firmante_nombre, firmante_usuario_id, imagen, origen)
     values (new.organizacion_id, new.id, 'firmaCliente', coalesce(nullif(trim(new.datos ->> 'nombreRecibe'), ''), 'Cliente'), null, new.datos ->> 'firmaCliente', 'en_sitio')
-    on conflict (documento_id, campo) do nothing;
+    -- Una firma en sitio anterior (anulada y vuelta a tomar) se reemplaza; la del portal o el enlace no
+    on conflict (documento_id, campo) do update
+      set firmante_nombre = excluded.firmante_nombre, imagen = excluded.imagen, firmado_at = now()
+      where public.firmas.origen = 'en_sitio';
     insert into public.documento_eventos (organizacion_id, documento_id, actor_id, actor_nombre, accion, detalle)
     values (new.organizacion_id, new.id, auth.uid(), actor, 'Firma del cliente en sitio', nullif(trim(new.datos ->> 'nombreRecibe'), ''));
     perform public.registrar_auditoria(new.organizacion_id, 'Firma del cliente en sitio', 'documento', new.id, jsonb_build_object('codigo', new.codigo));
@@ -2474,6 +2488,7 @@ begin
     elsif old.estado = 'en_revision' and new.estado = 'borrador' and es_autor then
       -- Retirar para corregir (0013): solo el autor y antes de la aprobación
       new.enviado_at := null; accion := 'Retiró el envío para corregir';
+      anula_firma := coalesce(old.datos ->> 'firmaCliente', '') <> '';
     elsif old.estado = 'en_revision' and new.estado in ('aprobado', 'rechazado') and revisor and es_autor then
       raise exception 'Nadie aprueba ni rechaza su propio documento' using errcode = '42501';
     elsif old.estado = 'en_revision' and new.estado = 'aprobado' and revisor then
@@ -2487,12 +2502,19 @@ begin
         raise exception 'El rechazo requiere un motivo' using errcode = '23514';
       end if;
       accion := 'Rechazó';
+      anula_firma := coalesce(old.datos ->> 'firmaCliente', '') <> '';
     elsif old.estado = 'aprobado' and new.estado = 'cerrado' and firma_en_sitio then
       -- El autor toma en sitio la firma del cliente que faltaba sobre un aprobado: lo cierra (0013)
       insert into public.firmas (organizacion_id, documento_id, campo, firmante_nombre, firmante_usuario_id, imagen, origen)
       values (new.organizacion_id, new.id, 'firmaCliente', coalesce(nullif(trim(new.datos ->> 'nombreRecibe'), ''), 'Cliente'), null, new.datos ->> 'firmaCliente', 'en_sitio')
-      on conflict (documento_id, campo) do nothing;
+      on conflict (documento_id, campo) do update
+        set firmante_nombre = excluded.firmante_nombre, imagen = excluded.imagen, firmado_at = now()
+        where public.firmas.origen = 'en_sitio';
       update public.enlaces_firma set usado_at = now() where documento_id = new.id and usado_at is null;
+      -- Mismos eventos que la app: «Firma del cliente en sitio» y luego «Cerrado con…»
+      insert into public.documento_eventos (organizacion_id, documento_id, actor_id, actor_nombre, accion, detalle)
+      values (new.organizacion_id, new.id, auth.uid(), actor, 'Firma del cliente en sitio', nullif(trim(new.datos ->> 'nombreRecibe'), ''));
+      perform public.registrar_auditoria(new.organizacion_id, 'Firma del cliente en sitio', 'documento', new.id, jsonb_build_object('codigo', new.codigo));
       new.cerrado_at := now(); accion := 'Cerrado con la firma del cliente en sitio';
     elsif old.estado = 'aprobado' and new.estado = 'cerrado' and revisor then
       new.cerrado_at := now(); accion := 'Cerró';
@@ -2524,6 +2546,14 @@ begin
       values (new.organizacion_id, new.id, auth.uid(), actor, 'Cerrado con la firma del cliente en sitio', null);
       perform public.registrar_auditoria(new.organizacion_id, 'Cerrado con la firma del cliente en sitio', 'documento', new.id, jsonb_build_object('codigo', new.codigo));
     end if;
+    -- Sale de revisión para corregirse: la firma del cliente en sitio ya no vale (portal, enlace o en sitio otra vez)
+    if anula_firma then
+      new.datos := new.datos || '{"firmaCliente":"","nombreRecibe":"","cargoRecibe":""}'::jsonb;
+      delete from public.firmas where documento_id = new.id and campo = 'firmaCliente' and origen = 'en_sitio';
+      insert into public.documento_eventos (organizacion_id, documento_id, actor_id, actor_nombre, accion, detalle)
+      values (new.organizacion_id, new.id, auth.uid(), actor, 'Se anuló la firma del cliente (el contenido cambió)', null);
+      perform public.registrar_auditoria(new.organizacion_id, 'Se anuló la firma del cliente (el contenido cambió)', 'documento', new.id, jsonb_build_object('codigo', new.codigo));
+    end if;
   end if;
 
   return new;
@@ -2534,20 +2564,30 @@ $$;
 -- 3. Clientes desde los formatos (el técnico crea; no edita ni borra)
 -- ---------------------------------------------------------------------------
 
--- Nombre comparable: minúsculas, sin tildes y con un solo espacio (igual que claveNombre en la app)
+-- Nombre comparable, idéntico a claveNombre (src/nucleo/clientes.ts; mismos casos de prueba en
+-- tests/unit/clientes.test.ts y supabase/tests): NFC, sin tildes (la ñ cuenta: «Peña» ≠ «Pena»),
+-- minúsculas, sin puntuación, un solo espacio (también tabulaciones y espacios duros) y sin la
+-- razón social del final («S.A.S.», «SAS», «S.A.», «Ltda.», «S. en C.», «E.U.»). Solo para comparar.
 create or replace function public.clave_nombre(t text)
 returns text
 language sql
 immutable
 set search_path = pg_catalog, public
 as $$
-  select lower(regexp_replace(btrim(translate(coalesce(t, ''),
-    'ÁÀÄÂÉÈËÊÍÌÏÎÓÒÖÔÚÙÜÛÑáàäâéèëêíìïîóòöôúùüûñ',
-    'AAAAEEEEIIIIOOOOUUUUNaaaaeeeeiiiioooouuuun')), '\s+', ' ', 'g'))
+  select btrim(regexp_replace(
+           btrim(regexp_replace(regexp_replace(lower(translate(normalize(coalesce(t, ''), NFC),
+             'ÁÀÄÂÃÉÈËÊÍÌÏÎÓÒÖÔÕÚÙÜÛÇÑáàäâãéèëêíìïîóòöôõúùüûçñ',
+             'aaaaaeeeeiiiiooooouuuucñaaaaaeeeeiiiiooooouuuucñ')),
+             '[.,''’´`"]', '', 'g'),
+             '[^a-z0-9ñ]+', ' ', 'g')),
+           ' (s ?a ?s|s ?a|ltda|limitada|s en c( ?s)?|e ?u)$', ''))
 $$;
 
 -- Sin duplicados por organización con otras mayúsculas, tildes o espacios (incluye los creados por el técnico).
--- Es un trigger y no un índice único para no fallar con duplicados que ya existan en una base en uso.
+-- Es un trigger y no un índice único para no fallar con duplicados que ya existan en una base en uso
+-- (p. ej. «X S.A.S.» y «X SAS» creados antes de 0013). Dos altas simultáneas del mismo nombre no se
+-- cuelan: el candado por organización y nombre comparable hace que la segunda espere a la primera
+-- y la vea al revisar.
 create or replace function public.clientes_sin_duplicar()
 returns trigger
 language plpgsql
@@ -2555,10 +2595,11 @@ security definer
 set search_path = pg_catalog, public
 as $$
 begin
-  new.nombre := regexp_replace(btrim(new.nombre), '\s+', ' ', 'g');
+  new.nombre := btrim(regexp_replace(normalize(new.nombre, NFC), '[\s\u00a0\u1680\u2000-\u200b\u2028\u2029\u202f\u205f\u3000\ufeff]+', ' ', 'g'));
   if new.nombre = '' then
     raise exception 'El cliente necesita un nombre' using errcode = '23514';
   end if;
+  perform pg_advisory_xact_lock(hashtext(new.organizacion_id::text || '|' || public.clave_nombre(new.nombre)));
   if (tg_op = 'INSERT' or public.clave_nombre(new.nombre) <> public.clave_nombre(old.nombre))
      and exists (select 1 from public.clientes c
                  where c.organizacion_id = new.organizacion_id and c.id <> new.id
@@ -2580,7 +2621,8 @@ drop policy if exists clientes_registrar_tecnico on public.clientes;
 create policy clientes_registrar_tecnico on public.clientes for insert to authenticated
   with check (public.tiene_rol(organizacion_id, array['tecnico']) and activo);
 
--- Llena solo los campos vacíos de un cliente con lo escrito en un formato (nunca sobrescribe)
+-- Llena solo los campos vacíos de un cliente ACTIVO con lo escrito en un formato (nunca sobrescribe);
+-- solo deja auditoría si algo cambió
 create or replace function public.completar_cliente(cliente uuid, datos jsonb)
 returns public.clientes
 language plpgsql
@@ -2589,6 +2631,7 @@ set search_path = pg_catalog, public
 as $$
 declare
   c public.clientes;
+  antes public.clientes;
   d jsonb := coalesce(datos, '{}'::jsonb);
   correo_nuevo text := btrim(coalesce(d ->> 'correo', ''));
   telefono_nuevo text := btrim(coalesce(d ->> 'telefono', ''));
@@ -2597,6 +2640,11 @@ begin
   if not found or not public.tiene_rol(c.organizacion_id, array['admin', 'supervisor', 'tecnico']) then
     raise exception 'Cliente no disponible' using errcode = '42501';
   end if;
+  -- Un cliente desactivado no se completa desde los formatos
+  if not c.activo then
+    return c;
+  end if;
+  antes := c;
   if correo_nuevo !~ '^[^\s@]+@[^\s@]+\.[^\s@]{2,}$' then correo_nuevo := ''; end if;
   if length(regexp_replace(telefono_nuevo, '\D', '', 'g')) < 7 then telefono_nuevo := ''; end if;
   update public.clientes set
@@ -2608,7 +2656,10 @@ begin
     telefono  = case when btrim(telefono) = '' then telefono_nuevo else telefono end
   where id = cliente
   returning * into c;
-  perform public.registrar_auditoria(c.organizacion_id, 'Completó datos del cliente', 'cliente', c.id, jsonb_build_object('nombre', c.nombre));
+  -- (updated_at lo cambia el trigger de toque aunque no se haya llenado nada)
+  if (to_jsonb(c) - 'updated_at') is distinct from (to_jsonb(antes) - 'updated_at') then
+    perform public.registrar_auditoria(c.organizacion_id, 'Completó datos del cliente', 'cliente', c.id, jsonb_build_object('nombre', c.nombre));
+  end if;
   return c;
 end;
 $$;

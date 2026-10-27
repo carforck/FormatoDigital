@@ -31,9 +31,10 @@ export async function comprimirImagen(archivo: File, lado = 1280, calidad = 0.72
 
 /**
  * Comprime varias imágenes (máx. `max`, en orden) y separa las que no se pudieron leer,
- * para agregar las buenas y avisar cuántas fallaron en vez de perderlas todas.
+ * para agregar las buenas y avisar cuántas fallaron en vez de perderlas todas. `sobrantes`:
+ * las que pasaron del máximo y no se agregaron (quien llama lo avisa).
  */
-export async function comprimirVarias(archivos: File[], max = 12, lado?: number, calidad?: number): Promise<{ imagenes: string[]; fallidas: number }> {
+export async function comprimirVarias(archivos: File[], max = 12, lado?: number, calidad?: number): Promise<{ imagenes: string[]; fallidas: number; sobrantes: number }> {
   const imagenes: string[] = [];
   let fallidas = 0;
   for (const f of archivos.slice(0, max)) {
@@ -43,5 +44,5 @@ export async function comprimirVarias(archivos: File[], max = 12, lado?: number,
       fallidas++;
     }
   }
-  return { imagenes, fallidas };
+  return { imagenes, fallidas, sobrantes: Math.max(0, archivos.length - max) };
 }

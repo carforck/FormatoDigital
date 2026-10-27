@@ -8,8 +8,8 @@
  * Recorre: técnico crea y envía un reporte, validación del permiso, acceso
  * restringido, coordinador aprueba, cliente firma; pedidos de Magno (fotos,
  * firma por enlace, envío, cuenta de cobro); trabajo de campo (firma del cliente
- * en sitio, retirar para corregir, cámara o galería, clientes nuevos al
- * directorio); que ninguna pantalla se desborde en 8 anchos y los controles del shell.
+ * en sitio, retirar para corregir —anula la firma del cliente—, cámara o galería,
+ * clientes nuevos al directorio y los que solo se parecen se preguntan); que ninguna pantalla se desborde en 8 anchos y los controles del shell.
  */
 const fs = require("fs");
 const os = require("os");
@@ -1420,6 +1420,65 @@ async function campo(b, errores) {
   await comoUsuario(p, "u-sup");
   await ir("/app/clientes", 500);
   ok((await texto()).includes("Ferretería El Tornillo") && (await texto()).includes("compras@eltornillo.example"), "el cliente creado por el técnico aparece en el directorio de la organización");
+
+  // 10. Retirar o rechazar anula la firma del cliente en sitio (el contenido va a cambiar)
+  await comoUsuario(p, "u-tec1");
+  await reporte({ cliente: "Ladrillera Arcillas del Caribe", firmaCliente: true });
+  const idAnula = idActual();
+  const urlAnula = p.url();
+  const avisos = [];
+  const alDialogo = (d) => avisos.push(d.message());
+  p.on("dialog", alDialogo);
+  await clic(p, "Retirar para corregir");
+  s = await estado();
+  let dA = s.documentos.find((d) => d.id === idAnula);
+  ok(avisos.some((m) => m.includes("se anula")) && dA.estado === "borrador" && dA.datos.firmaCliente === "" && dA.datos.nombreRecibe === "" && dA.historial.some((h) => h.accion === "Se anuló la firma del cliente (el contenido cambió)"), "retirar avisa y anula la firma del cliente en sitio (y quién recibe)");
+  await clic(p, "Enviar a revisión");
+  await clic(p, "Tomar firma del cliente en sitio");
+  await clic(p, "Firmar", "[role=dialog] button");
+  await firmar(p);
+  ok((await texto()).includes("cuando se apruebe"), "lo corregido y reenviado se vuelve a firmar en sitio");
+  await comoUsuario(p, "u-sup");
+  await p.goto(urlAnula, { waitUntil: "networkidle0" });
+  await sleep(600);
+  await clic(p, "Rechazar");
+  ok((await p.evaluate(() => document.querySelector("[role=dialog]").innerText)).includes("se anula"), "el rechazo avisa que se anula la firma del cliente");
+  await clic(p, "Falta detallar las recomendaciones", "[role=dialog] button");
+  await p.evaluate(() => [...document.querySelectorAll("[role=dialog] button")].find((x) => x.textContent.trim() === "Rechazar").click());
+  await sleep(400);
+  dA = (await estado()).documentos.find((d) => d.id === idAnula);
+  ok(dA.estado === "rechazado" && dA.datos.firmaCliente === "", "rechazar anula la firma del cliente en sitio");
+  p.off("dialog", alDialogo);
+
+  // 11. Un nombre que solo se parece se pregunta; si no es el mismo, queda escrito a mano y no se duplica
+  await comoUsuario(p, "u-tec1");
+  const nAntes = (await estado()).clientes.length;
+  await ir("/app/nuevo/reporte", 800);
+  await p.evaluate(() => (window.confirm = (m) => ((window.__preguntas = [...(window.__preguntas ?? []), m]), false)));
+  await responder(p, "Ferreteria el Tornillo S.A.S.");
+  const preguntas = await p.evaluate(() => window.__preguntas ?? []);
+  ok(preguntas.some((m) => m.includes("se parece a «Ferretería El Tornillo»")), "«Ferreteria el Tornillo S.A.S.» pregunta si es «Ferretería El Tornillo»");
+  ok((await texto()).includes("queda escrito a mano"), "si no es el mismo, el asistente avisa que queda escrito a mano");
+  await clic(p, "Sin proyecto");
+  await clic(p, "Guardar borrador");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
+  await sleep(600);
+  s = await estado();
+  ok(s.clientes.length === nAntes && !s.documentos.find((d) => d.id === idActual()).clienteId, "no se enlaza al cliente parecido ni se crea un duplicado (y no se vuelve a preguntar al guardar)");
+
+  // 12. Cambiar a mano el cliente elegido en el formato quita los datos que ese cliente había llenado
+  await ir("/app/nuevo/reporte", 800);
+  await clic(p, "Ladrillera Arcillas del Caribe");
+  await clic(p, "PRY-001-26");
+  await editarCampo(p, "cliente", "Distribuidora La Ceiba");
+  const hojaN = await p.evaluate(() => document.querySelector(".doc-print").innerText);
+  ok(!hojaN.includes("sistemas@arcillasdelcaribe.example") && !hojaN.includes("Ing. Daniel Ortega") && !hojaN.includes("Zona Industrial") && !hojaN.includes("PRY-001-26"), "renombrar el cliente quita correo, contacto, dirección y proyecto del anterior");
+  ok((await texto()).includes("Quité los datos de «Ladrillera Arcillas del Caribe»"), "avisa qué se quitó del cliente anterior");
+  await clic(p, "Guardar borrador");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
+  await sleep(600);
+  const ceiba = (await estado()).clientes.find((c) => c.nombre === "Distribuidora La Ceiba");
+  ok(ceiba && !ceiba.correo && !ceiba.contacto && !ceiba.direccion, "el cliente nuevo no hereda los datos del anterior");
   await p.close();
 }
 

@@ -4,7 +4,7 @@
  * Ruta /app/documentos/ver?id=<doc>: detalle de un documento con su plantilla y todas las
  * acciones del flujo (editar, enviar, retirar para corregir, aprobar/rechazar, firmar,
  * tomar la firma del cliente en sitio, cerrar, duplicar, pedir firma por enlace, enviar,
- * cobrar, PDF). Cada acción se habilita según @/nucleo/permisos y el `flujo` del módulo
+ * cobrar, PDF). Retirar o rechazar anula la firma del cliente tomada en sitio (se avisa antes). Cada acción se habilita según @/nucleo/permisos y el `flujo` del módulo
  * (@/modulos/registro); si otro llegó primero (p. ej. el autor retiró lo que se iba a
  * aprobar) se muestra el motivo. Params: ?desde= (regreso), ?ok=guardado|enviado.
  */
@@ -181,7 +181,8 @@ function Detalle() {
             <Button
               variant="outline"
               onClick={() => {
-                if (!confirm(`¿Retirar ${doc.codigo} de revisión para corregirlo?\n\nVuelve a borrador: lo editas y lo envías de nuevo. El revisor recibe un aviso.`)) return;
+                const anula = conFirmaEnSitio ? "\n\nLa firma del cliente tomada en sitio se anula: lo que corrijas tendrá que firmarlo de nuevo." : "";
+                if (!confirm(`¿Retirar ${doc.codigo} de revisión para corregirlo?\n\nVuelve a borrador: lo editas y lo envías de nuevo. El revisor recibe un aviso.${anula}`)) return;
                 const motivo = demo.retirar(doc.id);
                 resultado(motivo);
                 if (!motivo) setAviso({ tipo: "info", texto: `${doc.codigo} volvió a borrador. Corrígelo con «Editar» y envíalo de nuevo a revisión.` });
@@ -433,7 +434,7 @@ function Detalle() {
         />
       )}
 
-      {rechazo !== null && <DialogoRechazo codigo={doc.codigo} motivo={rechazo} setMotivo={setRechazo} onRechazar={() => resultado(demo.rechazar(doc.id, rechazo.trim()))} />}
+      {rechazo !== null && <DialogoRechazo codigo={doc.codigo} anulaFirma={conFirmaEnSitio} motivo={rechazo} setMotivo={setRechazo} onRechazar={() => resultado(demo.rechazar(doc.id, rechazo.trim()))} />}
 
       {enSitio && firma !== "sitio" && <DialogoFirmaEnSitio codigo={doc.codigo} datos={enSitio} setDatos={setEnSitio} onFirmar={() => setFirma("sitio")} />}
     </div>
@@ -441,14 +442,14 @@ function Detalle() {
 }
 
 /** Motivo del rechazo: Esc o un toque fuera cierran, el foco queda dentro (useModal). */
-function DialogoRechazo({ codigo, motivo, setMotivo, onRechazar }: { codigo: string; motivo: string; setMotivo: (m: string | null) => void; onRechazar: () => void }) {
+function DialogoRechazo({ codigo, anulaFirma, motivo, setMotivo, onRechazar }: { codigo: string; anulaFirma?: boolean; motivo: string; setMotivo: (m: string | null) => void; onRechazar: () => void }) {
   const cerrar = () => setMotivo(null);
   const ref: React.MutableRefObject<HTMLDivElement | null> = useModal<HTMLDivElement>(cerrar, { focoInicial: (): HTMLElement | null => ref.current?.querySelector("textarea") ?? null });
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" {...fondoQueCierra(cerrar)}>
       <div ref={ref} role="dialog" aria-modal="true" aria-label={`Rechazar ${codigo}`} className="w-full max-w-md rounded-xl bg-white p-4">
         <p className="font-semibold">Rechazar {codigo}</p>
-        <p className="text-sm text-slate-500">El autor recibe el motivo y puede corregirlo.</p>
+        <p className="text-sm text-slate-500">El autor recibe el motivo y puede corregirlo.{anulaFirma ? " La firma del cliente tomada en sitio se anula: lo corregido se firma de nuevo." : ""}</p>
         <textarea rows={3} value={motivo} onChange={(e) => setMotivo(e.target.value)} className="mt-3 w-full rounded-md border border-slate-300 p-2 text-sm" placeholder="Ej: falta la lista de verificación de alturas" />
         <div className="mt-2 flex flex-wrap gap-1">
           {["Falta detallar las recomendaciones", "Firma del ejecutor incompleta", "EPP insuficiente para el riesgo"].map((s) => (

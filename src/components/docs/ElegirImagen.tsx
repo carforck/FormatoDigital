@@ -7,7 +7,7 @@
  * `capture`: en iPhone y Android ofrece la fototeca y los archivos). Limpia el
  * input después de cada elección (se puede elegir el mismo archivo otra vez) y
  * muestra el error si una imagen no se pudo leer (p. ej. HEIC en Android o en
- * el computador). Lo usan el asistente, el reporte (registro fotográfico) y la
+ * el computador) o si pasaron del máximo de fotos por vez (`avisoSobrantes`). Lo usan el asistente, el reporte (registro fotográfico) y la
  * legalización de gastos (foto de la factura).
  */
 import { useState } from "react";
@@ -111,6 +111,11 @@ export function ElegirImagen({ onElegir, multiple, que, variante = "bloque", tex
       )}
     </div>
   );
+}
+
+/** Aviso de las fotos que pasaron del máximo por vez (`comprimirVarias`); vacío si no sobró ninguna. */
+export function avisoSobrantes(n: number, max = 12): string {
+  return n > 0 ? `Se agregan hasta ${max} fotos por vez: ${n === 1 ? "1 no se agregó" : `${n} no se agregaron`}. Elígelas de nuevo para agregarlas.` : "";
 }
 
 /** Mensaje cuando el navegador no puede abrir la imagen (HEIC fuera de Safari, archivo dañado o que no es imagen). */

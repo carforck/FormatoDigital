@@ -15,7 +15,7 @@ import { comprimirVarias } from "@/nucleo/imagenes";
 import type { DatosReporte, FotoReporte } from "@/nucleo/tipos";
 
 import { EditableText } from "@/components/docs/EditableText";
-import { ElegirImagen, mensajeImagenIlegible } from "@/components/docs/ElegirImagen";
+import { ElegirImagen, avisoSobrantes, mensajeImagenIlegible } from "@/components/docs/ElegirImagen";
 import { Encabezado, Firma } from "@/components/docs/Encabezado";
 import { EquiposEnFormato } from "@/modulos/equipos/EquiposEnFormato";
 import type { EquipoAtendido } from "@/modulos/equipos/tipos";
@@ -24,7 +24,7 @@ interface Props {
   datos: DatosReporte;
   codigoDoc?: string;
   /** Si existe, los campos se editan en línea. */
-  editar?: (patch: Partial<DatosReporte>) => void;
+  editar?: (patch: Partial<DatosReporte> | ((d: DatosReporte) => Partial<DatosReporte>)) => void;
   /** Abre el pad de firma para el campo indicado. */
   firmar?: (campo: "firmaTecnico" | "firmaCliente") => void;
   /** Campo que el asistente está preguntando; se resalta en la vista previa. */
@@ -127,7 +127,12 @@ export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, e
         <div className={cn(resaltar === "firmaCliente" && "rounded ring-2 ring-sotec-green")}>
           <Firma src={datos.firmaCliente} etiqueta="cliente" texto="✍ Toca para que firme el cliente" onFirmar={firmar ? () => firmar("firmaCliente") : undefined} />
           <div className="border-t border-black pt-0.5">Firma cliente · recibido a satisfacción</div>
-          {(datos.nombreRecibe || datos.cargoRecibe) && (
+          {/* Al diligenciar: quién recibe se corrige con un toque (la firma tomada aquí lo prellena con el contacto) */}
+          {editar && datos.firmaCliente ? (
+            <div className="text-[10.5px] leading-tight">
+              {campo("nombreRecibe", { placeholder: "Nombre de quien recibe" })} · {campo("cargoRecibe", { placeholder: "Cargo" })}
+            </div>
+          ) : (datos.nombreRecibe || datos.cargoRecibe) && (
             <div className="text-[10.5px] leading-tight">
               {datos.nombreRecibe}
               {datos.cargoRecibe ? ` · ${datos.cargoRecibe}` : ""}
@@ -203,10 +208,11 @@ function HojaFotos({
   /** Agrega hasta 12 fotos comprimidas; devuelve el aviso si alguna no se pudo leer (HEIC fuera de Safari). */
   const subir = async (lista: File[]): Promise<string | void> => {
     if (!lista.length || !editar) return;
-    const { imagenes, fallidas } = await comprimirVarias(lista);
+    const { imagenes, fallidas, sobrantes } = await comprimirVarias(lista);
     const t = Date.now();
-    if (imagenes.length) editar({ fotos: [...fotos, ...imagenes.map((src, k): FotoReporte => ({ id: `f-${t}-${k}`, src, descripcion: "", etiqueta: "" }))] });
-    if (fallidas) return mensajeImagenIlegible(fallidas);
+    // Sobre las fotos más recientes: mientras se comprimía pudo cambiar una descripción u otra foto
+    if (imagenes.length) editar((d) => ({ fotos: [...(d.fotos ?? []), ...imagenes.map((src, k): FotoReporte => ({ id: `f-${t}-${k}`, src, descripcion: "", etiqueta: "" }))] }));
+    return [fallidas ? mensajeImagenIlegible(fallidas) : "", avisoSobrantes(sobrantes)].filter(Boolean).join(" ") || undefined;
   };
   return (
     <article className={cn("doc-print mx-auto w-full max-w-[816px] bg-white p-6 text-[12px] leading-snug shadow-sm ring-1 ring-slate-200 sm:p-10", resaltar && "ring-2 ring-sotec-green")}>

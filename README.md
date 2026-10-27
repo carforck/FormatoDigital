@@ -274,8 +274,9 @@ en revisión, el autor puede **«Retirar para corregir»** (vuelve a borrador); 
 revisor lo devuelve con motivo. Un reporte que lleva la **firma del cliente tomada en sitio** queda
 cerrado al aprobarse. La cotización no pasa por revisión (la aprueba y envía la administración). Los
 consecutivos son por tipo y año y nunca se reutilizan. El cliente escrito a mano en un formato que no
-está en el directorio se guarda allí al guardar el documento (sin duplicados por mayúsculas o
-tildes), también desde el técnico.
+está en el directorio se guarda allí al guardar el documento (sin duplicados por mayúsculas, tildes,
+puntuación o razón social; si solo se parece a uno existente, se pregunta), también desde el técnico.
+Retirar o rechazar un reporte anula la firma del cliente tomada en sitio.
 
 Para **agregar un formato nuevo**, ver «Agregar un formato nuevo» en
 [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
@@ -328,7 +329,7 @@ cada tabla tiene `organizacion_id` y RLS.
 | `0010_equipos.sql` | Tablas `equipos` y `documento_equipos` con sus reglas y RLS |
 | `0011_comercial_solo_admin.sql` | Cotizaciones y cuentas de cobro solo para `admin` |
 | `0012_espacio_empresa.sql` | **`espacios`**: estado del modo empresa por organización (fase 1), RLS para el equipo interno y versión que solo avanza de a uno |
-| `0013_campo_tecnico.sql` | Trabajo de campo: firma del cliente en sitio por el autor (aprobar con ella cierra el reporte), retirar para corregir (en revisión → borrador), el técnico crea clientes sin duplicados (`clave_nombre`) y `completar_cliente` llena solo campos vacíos |
+| `0013_campo_tecnico.sql` | Trabajo de campo: firma del cliente en sitio por el autor (PNG ≤ 300 000; aprobar con ella cierra el reporte; retirar o rechazar la anula), retirar para corregir (en revisión → borrador), el técnico crea clientes sin duplicados (`clave_nombre`) y `completar_cliente` llena solo campos vacíos de clientes activos |
 
 Qué usa hoy la app (fase 1):
 

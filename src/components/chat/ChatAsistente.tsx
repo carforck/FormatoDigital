@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Bot, Check, CheckCircle2, PenLine, Plus, Send, Sparkles, Trash2, User } from "lucide-react";
 
-import { ElegirImagen, mensajeImagenIlegible } from "@/components/docs/ElegirImagen";
+import { ElegirImagen, avisoSobrantes, mensajeImagenIlegible } from "@/components/docs/ElegirImagen";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -129,14 +129,14 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
   const [firmante, setFirmante] = useState({ nombre: "", cargo: "" });
   const [avisoFirma, setAvisoFirma] = useState<string | null>(null);
 
-  /** Agrega hasta 12 fotos comprimidas; las que no se pudieron leer se avisan (ElegirImagen muestra el texto). */
+  /** Agrega hasta 12 fotos comprimidas; las que no se pudieron leer o pasaron de 12 se avisan (ElegirImagen muestra el texto). */
   async function agregarFotos(lista: File[]): Promise<string | void> {
     setProcesando(true);
     try {
-      const { imagenes, fallidas } = await comprimirVarias(lista);
+      const { imagenes, fallidas, sobrantes } = await comprimirVarias(lista);
       const t = Date.now();
       setFotos((p) => [...p, ...imagenes.map((src, k) => ({ id: `f-${t}-${p.length + k}`, src, descripcion: "", etiqueta: "" as const }))]);
-      if (fallidas) return mensajeImagenIlegible(fallidas);
+      return [fallidas ? mensajeImagenIlegible(fallidas) : "", avisoSobrantes(sobrantes)].filter(Boolean).join(" ") || undefined;
     } finally {
       setProcesando(false);
     }
@@ -513,8 +513,15 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
               <div className="space-y-2">
                 {paso.firmante && (
                   <div className="grid grid-cols-2 gap-1.5">
-                    <Input className="h-9 text-sm" placeholder="Nombre de quien firma" aria-label="Nombre de quien firma" value={firmante.nombre} onChange={(e) => setFirmante({ ...firmante, nombre: e.target.value })} />
-                    <Input className="h-9 text-sm" placeholder="Cargo" aria-label="Cargo de quien firma" value={firmante.cargo} onChange={(e) => setFirmante({ ...firmante, cargo: e.target.value })} />
+                    {/* Etiquetas visibles: prellenados, el placeholder ya no dice cuál es el nombre y cuál el cargo */}
+                    <label className="block text-[11px] font-medium text-slate-600">
+                      Quien firma
+                      <Input className="mt-0.5 h-9 text-sm" placeholder="Nombre de quien firma" aria-label="Nombre de quien firma" value={firmante.nombre} onChange={(e) => setFirmante({ ...firmante, nombre: e.target.value })} />
+                    </label>
+                    <label className="block text-[11px] font-medium text-slate-600">
+                      Cargo
+                      <Input className="mt-0.5 h-9 text-sm" placeholder="Cargo" aria-label="Cargo de quien firma" value={firmante.cargo} onChange={(e) => setFirmante({ ...firmante, cargo: e.target.value })} />
+                    </label>
                   </div>
                 )}
                 {avisoFirma && <p className="text-xs text-amber-700">{avisoFirma}</p>}

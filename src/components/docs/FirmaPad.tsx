@@ -3,7 +3,8 @@
 /**
  * Modal de firma manuscrita sobre `<canvas>`; entrega la firma como PNG en
  * data URL. Usado en el generador, `/app/documentos/ver` y `/firmar`
- * (firma del cliente por enlace).
+ * (firma del cliente por enlace). Con el dedo en iPhone y Android: `touch-none` evita que el
+ * trazo desplace la página; si el sistema cancela el toque (gesto, llamada) el trazo termina.
  */
 import { useEffect, useId, useRef, useState } from "react";
 import { Eraser, PenLine, X } from "lucide-react";
@@ -74,7 +75,12 @@ export function FirmaPad({ titulo, onGuardar, onCerrar }: Props) {
             const p = punto(e);
             ctx.beginPath();
             ctx.moveTo(p.x, p.y);
-            e.currentTarget.setPointerCapture(e.pointerId);
+            // La captura no es esencial: algunos navegadores la rechazan si el puntero ya se soltó
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId);
+            } catch {
+              /* sin captura: el trazo sigue mientras el dedo esté sobre el lienzo */
+            }
           }}
           onPointerMove={(e) => {
             if (!dibujando.current) return;
@@ -85,6 +91,7 @@ export function FirmaPad({ titulo, onGuardar, onCerrar }: Props) {
             setVacio(false);
           }}
           onPointerUp={() => (dibujando.current = false)}
+          onPointerCancel={() => (dibujando.current = false)}
         />
         <p className="mt-1 text-xs text-slate-500">Firma con el dedo, el lápiz o el mouse. Queda con fecha y hora en el historial.</p>
         <div className="mt-3 flex justify-between gap-2">

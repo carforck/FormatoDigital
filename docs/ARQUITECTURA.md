@@ -256,19 +256,38 @@ proyectos y equipos siguen igual (el técnico legaliza sus gastos).
     lo reenvía; historial «Retiró el envío para corregir», aviso a los
     revisores y se quita el aviso pendiente «envió … a revisión». Ya aprobado
     no se retira: solo el rechazo con motivo del revisor lo devuelve. Gana
-    quien llega primero: el proveedor revalida sobre el estado más reciente;
-    al revisor que lo tenía abierto se le explica que el autor lo retiró (y al
-    autor, que ya fue aprobado). En el modo empresa, si los dos guardan a la
-    vez, la versión optimista recarga lo más reciente con aviso.
+    quien llega primero: el proveedor revalida sobre el estado más reciente
+    (también lo hecho en el mismo evento, p. ej. un doble clic) y aprobar,
+    rechazar, retirar y la firma en sitio devuelven el motivo cuando no
+    aplicaron; al revisor que lo tenía abierto se le explica que el autor lo
+    retiró (y al autor, que ya fue aprobado). En el modo empresa, si los dos
+    guardan a la vez, la versión optimista recarga lo más reciente con aviso;
+    el sondeo de 15 s también trata como pendiente un cambio local que aún
+    espera el guardado agrupado (va al respaldo y se avisa, no se pierde en
+    silencio).
+  - *Retirar o rechazar anula la firma del cliente en sitio:* el contenido va a
+    cambiar, así que se vacían `firmaCliente`, `nombreRecibe` y `cargoRecibe`
+    con el evento «Se anuló la firma del cliente (el contenido cambió)» (en la
+    base también se borra su fila `en_sitio` de `firmas`, para que el portal,
+    el enlace o una nueva firma en sitio funcionen). La confirmación de
+    retirar y el diálogo de rechazo lo avisan. La firma en sitio se valida como
+    en el portal y el enlace: PNG en data URL de hasta 300 000 caracteres.
   - *Clientes nuevos desde los formatos* (`src/nucleo/clientes.ts`): al
     GUARDAR (no en cada tecla) un documento cuyo cliente escrito no está en el
     directorio, se crea para toda la organización con lo diligenciado
     (`datosCliente` del módulo: reporte, permiso y cotización; la legalización
     de gastos no, porque «cliente u obra» puede ser interno) y se enlaza el
     documento: «Guardé «X» en el directorio de clientes». El nombre se compara
-    sin mayúsculas, tildes ni espacios de más; si ya existe, se enlaza y se
-    llenan solo sus campos vacíos (nunca se sobrescribe); uno desactivado no se
-    recrea: se pregunta si se usa. Lo puede hacer el técnico con la acción
+    con `claveNombre` (= `clave_nombre` de 0013, con los mismos casos de prueba
+    en `tests/unit/clientes.test.ts` y `supabase/tests`): sin mayúsculas,
+    tildes (la ñ sí cuenta: «Peña» ≠ «Pena»), puntuación, espacios de más ni la
+    razón social final (S.A.S., Ltda., S. en C., E.U.). Si es el mismo nombre
+    (solo cambian mayúsculas o espacios) se enlaza y se llenan solo sus campos
+    vacíos (nunca se sobrescribe); si solo se parece, se **pregunta** «¿Es el
+    mismo cliente?» (enlazar al equivocado lo mostraría en el portal de otra
+    empresa) y, si no, queda escrito a mano sin crear un duplicado; uno
+    desactivado no se recrea: se pregunta si se usa. Cambiar a mano el cliente
+    elegido quita lo que ese cliente (y su proyecto) había llenado. Lo puede hacer el técnico con la acción
     `registrar_clientes`; editar, desactivar y eliminar siguen siendo del
     permiso `clientes` (Coordinador SST y administración).
 - **Separación de funciones** (`src/nucleo/permisos.ts` y el proveedor de
@@ -445,9 +464,12 @@ nuevo de una vez (SQL Editor → Run). Se regenera, no se edita a mano.
   `documento_eventos` y `auditoria`.
 - **Clientes (0013):** el técnico solo inserta clientes activos de su
   organización (`clientes_registrar_tecnico`); no los edita ni los borra. El
-  trigger `clientes_sin_duplicar` rechaza un nombre igual sin mayúsculas,
-  tildes ni espacios de más (`clave_nombre`) y `completar_cliente` llena solo
-  los campos vacíos con lo escrito en un formato.
+  trigger `clientes_sin_duplicar` rechaza un nombre con la misma
+  `clave_nombre` (sin mayúsculas, tildes salvo la ñ, puntuación, espacios ni
+  razón social; un candado por nombre evita que dos altas simultáneas se
+  cuelen) y `completar_cliente` llena solo los campos vacíos de un cliente
+  activo con lo escrito en un formato (auditoría solo si cambió algo). No es
+  un índice único para no fallar con duplicados que ya existan.
 - **Firma remota:** `crear_enlace_firma` (requiere sesión) genera un token de
   un solo uso con vencimiento (se guarda solo su hash). El cliente abre el
   enlace sin cuenta (`documento_por_enlace`) y firma (`firmar_con_enlace`).
@@ -524,10 +546,10 @@ Comandos de prueba, opciones de la e2e (`SOLO`, `BASE`, `CHROME`) y stack: ver e
 | 8 | El cliente consulta sus reportes | **Hecho:** portal del cliente (reportes, cotizaciones y cuentas emitidas de su empresa) |
 | 9 | Trabajo por proyecto y por cliente | **Hecho:** módulo Proyectos con sus documentos, cotizaciones y cuentas de cobro |
 | 10 | Equipos con su historial de reportes (cliente → sistema → equipo) | **Hecho:** módulo Equipos; el técnico marca o crea los equipos atendidos en el reporte |
-| 11 | «Desde el perfil técnico no se pudo recoger la firma cliente» | **Hecho:** paso «Firma del cliente (recibido a satisfacción)» en el asistente con quién firma y «El cliente firma después»; casilla «Toca para que firme el cliente» en el formulario; «Tomar firma del cliente en sitio» desde el detalle (en revisión o aprobado). Aprobar con esa firma lo deja cerrado |
-| 12 | «El reporte después de enviado no se deja editar» | **Hecho:** «Retirar para corregir» del autor mientras está en revisión (reporte, permiso y gasto) → borrador → editar → reenviar. Aprobado ya no se retira: el revisor lo devuelve con motivo |
+| 11 | «Desde el perfil técnico no se pudo recoger la firma cliente» | **Hecho:** paso «Firma del cliente (recibido a satisfacción)» en el asistente con quién firma y «El cliente firma después»; casilla «Toca para que firme el cliente» en el formulario (quién recibe se prellena y se corrige con un toque); «Tomar firma del cliente en sitio» desde el detalle (en revisión o aprobado). Aprobar con esa firma lo deja cerrado |
+| 12 | «El reporte después de enviado no se deja editar» | **Hecho:** «Retirar para corregir» del autor mientras está en revisión (reporte, permiso y gasto) → borrador → editar → reenviar. Retirar o rechazar anula la firma del cliente en sitio (se vuelve a firmar lo corregido). Aprobado ya no se retira: el revisor lo devuelve con motivo |
 | 13 | «Al querer agregar imágenes no permite, sólo abre la cámara» | **Hecho:** dos botones donde se agregan imágenes, «Tomar foto» (cámara) y «Galería / archivos» (sin `capture`); aviso claro si una imagen (HEIC) no se puede leer |
-| 14 | «Al digitar un cliente nuevo, que quede almacenado» | **Hecho:** al guardar el documento, el cliente nuevo queda en el directorio de la organización (también desde el técnico), sin duplicados por mayúsculas o tildes; si existe, se completan sus campos vacíos; el próximo reporte lo autollena |
+| 14 | «Al digitar un cliente nuevo, que quede almacenado» | **Hecho:** al guardar el documento, el cliente nuevo queda en el directorio de la organización (también desde el técnico), sin duplicados por mayúsculas, tildes, puntuación o razón social (la ñ cuenta); un nombre que solo se parece se pregunta; si existe, se completan sus campos vacíos; el próximo reporte lo autollena |
 
 ### Pendiente
 

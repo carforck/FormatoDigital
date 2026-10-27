@@ -2,7 +2,8 @@
  * Permisos por rol en la app: matriz de acciones y reglas de quién ve, edita o
  * revisa cada documento, cuenta y proyecto. Replican las políticas RLS y los
  * triggers de la base (0008 separación de funciones, 0009 proyectos, 0011 lo
- * comercial solo admin); `DemoProvider` los vuelve a aplicar en cada acción.
+ * comercial solo admin, 0013 trabajo de campo); `DemoProvider` los vuelve a
+ * aplicar en cada acción.
  */
 import type { CuentaCobro } from "@/modulos/cobros/tipos";
 import { infoDoc } from "@/modulos/registro";
@@ -17,6 +18,7 @@ export type Accion =
   | "cerrar_permiso"
   | "firmar_cliente"
   | "clientes"
+  | "registrar_clientes"
   | "cobros"
   | "proyectos"
   | "equipos"
@@ -32,9 +34,9 @@ export type Accion =
  * El cliente consulta sus cotizaciones (por `visibleCliente`) y sus cuentas emitidas.
  */
 const MATRIZ: Record<Rol, Accion[]> = {
-  tecnico: ["crear", "equipos"],
-  supervisor: ["crear", "ver_todos", "revisar", "cerrar_permiso", "clientes", "proyectos", "equipos"],
-  admin: ["crear", "cotizar", "ver_todos", "revisar", "cerrar_permiso", "clientes", "cobros", "ver_cobros", "proyectos", "equipos", "usuarios", "config", "auditoria", "mapa"],
+  tecnico: ["crear", "registrar_clientes", "equipos"],
+  supervisor: ["crear", "ver_todos", "revisar", "cerrar_permiso", "clientes", "registrar_clientes", "proyectos", "equipos"],
+  admin: ["crear", "cotizar", "ver_todos", "revisar", "cerrar_permiso", "clientes", "registrar_clientes", "cobros", "ver_cobros", "proyectos", "equipos", "usuarios", "config", "auditoria", "mapa"],
   cliente: ["firmar_cliente", "ver_cobros"],
 };
 
@@ -46,7 +48,8 @@ export const DESCRIPCION_ACCION: Record<Accion, string> = {
   revisar: "Aprobar o rechazar documentos",
   cerrar_permiso: "Cerrar permisos de trabajo",
   firmar_cliente: "Firmar reportes como cliente",
-  clientes: "Gestionar clientes",
+  clientes: "Gestionar clientes (editar, desactivar y eliminar)",
+  registrar_clientes: "Agregar al directorio el cliente nuevo escrito en un formato",
   cobros: "Crear y emitir cuentas de cobro (comercial)",
   proyectos: "Crear y gestionar proyectos",
   equipos: "Registrar, editar y retirar equipos de los clientes",
@@ -100,6 +103,28 @@ export function puedeVerDoc(u: Usuario, d: Documento): boolean {
 export function puedeEditarDoc(u: Usuario, d: Documento): boolean {
   if (u.rol === "cliente" || !puedeUsarTipo(u.rol, d.tipo)) return false;
   return d.autorId === u.id && (d.estado === "borrador" || d.estado === "rechazado");
+}
+
+/**
+ * El autor retira su envío mientras sigue en revisión (pedido de Magno): vuelve a borrador
+ * para corregirlo y reenviarlo. Ya aprobado no se retira: solo el revisor lo devuelve con
+ * motivo (rechazo). No aplica a lo que se aprueba al enviar (cotización).
+ */
+export function puedeRetirarDoc(u: Usuario, d: Documento): boolean {
+  return d.autorId === u.id && d.estado === "en_revision" && u.rol !== "cliente" && puedeUsarTipo(u.rol, d.tipo) && !infoDoc(d.tipo).flujo.aprobarAlEnviar;
+}
+
+/**
+ * El autor toma en sitio la firma del cliente (su «recibido») que faltó antes de enviar:
+ * en revisión (queda para cuando se apruebe) o ya aprobado (lo cierra). Solo formatos que
+ * cierra la firma del cliente y pasan por revisión (reporte).
+ */
+export function puedeFirmaClienteEnSitio(u: Usuario, d: Documento): boolean {
+  const { flujo } = infoDoc(d.tipo);
+  const campo = flujo.campoFirmaCliente;
+  if (flujo.cierre !== "cliente" || !campo || flujo.aprobarAlEnviar) return false;
+  const firmado = String((d.datos as unknown as Record<string, unknown>)[campo] ?? "").startsWith("data:image/");
+  return d.autorId === u.id && u.rol !== "cliente" && puedeUsarTipo(u.rol, d.tipo) && (d.estado === "en_revision" || d.estado === "aprobado") && !firmado;
 }
 
 /** Revisa (aprueba o rechaza) un revisor, sobre un documento en revisión que no sea suyo. */

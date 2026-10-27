@@ -32,6 +32,12 @@ export interface DatosReporte {
   nombreTecnico: string;
   firmaTecnico: string; // data URL
   firmaCliente: string; // data URL
+  /**
+   * Quién firma el «recibido a satisfacción» del cliente (en sitio, en el portal o por enlace)
+   * y su cargo; se imprimen bajo la firma. Por defecto, la persona contactada.
+   */
+  nombreRecibe?: string;
+  cargoRecibe?: string;
   /** Registro fotográfico: sale en una hoja anexa con el mismo encabezado. */
   fotos?: FotoReporte[];
 }

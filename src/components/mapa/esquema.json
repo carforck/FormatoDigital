@@ -12,7 +12,8 @@
     "0009_proyectos.sql",
     "0010_equipos.sql",
     "0011_comercial_solo_admin.sql",
-    "0012_espacio_empresa.sql"
+    "0012_espacio_empresa.sql",
+    "0013_campo_tecnico.sql"
   ],
   "tablas": [
     {

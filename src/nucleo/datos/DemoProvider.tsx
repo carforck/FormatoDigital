@@ -17,7 +17,9 @@
  * y no hace nada si ya no aplica (doble clic, otra pestaña, rol); los
  * consecutivos salen de contadores por tipo y año que solo avanzan (no se
  * reutilizan al borrar); los permisos replican la base de datos (separación de
- * funciones de 0008, lo comercial solo admin de 0011). Ver docs/ARQUITECTURA.md.
+ * funciones de 0008, lo comercial solo admin de 0011, trabajo de campo de 0013:
+ * retirar un envío, firma del cliente en sitio y clientes nuevos desde los
+ * formatos). Ver docs/ARQUITECTURA.md.
  *
  * Exporta: `DemoProvider`, `useDemo`, `ahora`, `hoy`, `KEY_TRAS_LOGIN`, `Sincronizacion`.
  */
@@ -30,7 +32,8 @@ import * as reglasEquipos from "@/modulos/equipos/reglas";
 import type { ApiEquipos, Equipo } from "@/modulos/equipos/tipos";
 import { CATALOGO_SERVICIOS, IVA_GENERAL, type ServicioCatalogo } from "@/modulos/cotizaciones/catalogo";
 import { infoDoc, prefijoDe } from "@/modulos/registro";
-import { puede, puedeCrearTipo, puedeUsarTipo, puedeVerCuenta, puedeVerDoc, puedeVerProyecto } from "@/nucleo/permisos";
+import { planCliente } from "@/nucleo/clientes";
+import { puede, puedeCrearTipo, puedeFirmaClienteEnSitio, puedeRetirarDoc, puedeUsarTipo, puedeVerCuenta, puedeVerDoc, puedeVerProyecto } from "@/nucleo/permisos";
 import {
   CLIENTES_SEED,
   CONFIG_SEED,
@@ -217,16 +220,31 @@ interface Api extends Estado, ApiEquipos {
   /** Cierra la sesión (en modo empresa también la de Supabase); los datos quedan. */
   salir: () => void;
   // Documentos y su flujo: borrador → en revisión → aprobado → cerrado (o rechazado)
-  /** Crea (con el consecutivo definitivo) o actualiza el contenido de un documento propio en borrador o rechazado. */
+  /**
+   * Crea (con el consecutivo definitivo) o actualiza el contenido de un documento propio en borrador o rechazado.
+   * Con `registrar_clientes`, el cliente escrito que no está en el directorio se crea y se enlaza; si ya está,
+   * se enlaza y se llenan solo sus campos vacíos (`planCliente`, @/nucleo/clientes).
+   */
   guardar: (doc: Documento) => Documento;
   /** Vista previa del siguiente id y código; el definitivo se asigna en `guardar`. */
   nuevoId: (tipo: TipoDoc) => { id: string; codigo: string; consecutivo: number };
   /** El autor lo envía a revisión (o lo aprueba de una vez si el formato tiene `aprobarAlEnviar`). */
   enviar: (id: string) => void;
-  /** Un revisor con acceso al módulo aprueba lo ajeno en revisión; `firmaAutoriza` va a la casilla del formato. */
-  aprobar: (id: string, firmaAutoriza?: string) => void;
-  /** Un revisor devuelve lo ajeno en revisión con motivo obligatorio. */
-  rechazar: (id: string, motivo: string) => void;
+  /**
+   * Un revisor con acceso al módulo aprueba lo ajeno en revisión; `firmaAutoriza` va a la casilla del formato.
+   * Si ya trae la firma del cliente tomada en sitio (reporte), queda cerrado de una vez.
+   * Devuelve el motivo si ya no aplica (p. ej. el autor lo retiró) o null.
+   */
+  aprobar: (id: string, firmaAutoriza?: string) => string | null;
+  /** El autor retira su envío mientras está en revisión: vuelve a borrador para corregirlo. Devuelve el motivo si no se pudo, o null. */
+  retirar: (id: string) => string | null;
+  /**
+   * El autor toma en sitio la firma del cliente que faltó (en revisión o aprobado; si ya está
+   * aprobado, lo cierra). `nombre` y `cargo`: quién recibe. Devuelve el motivo si no se pudo, o null.
+   */
+  firmaClienteEnSitio: (id: string, imagen: string, nombre: string, cargo: string) => string | null;
+  /** Un revisor devuelve lo ajeno en revisión con motivo obligatorio. Devuelve el motivo si ya no aplica, o null. */
+  rechazar: (id: string, motivo: string) => string | null;
   /** Cierra un aprobado: un revisor, o el cliente con su firma si el formato lo cierra el cliente. */
   cerrar: (id: string, cambios: Partial<Documento["datos"]>) => void;
   /** Copia como borrador propio (el módulo limpia fechas y firmas); devuelve el id nuevo. */
@@ -643,6 +661,39 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
       }
       return r;
     };
+    /** Revisores (por rol) con acceso al módulo del documento: a ellos van los avisos de revisión. */
+    const revisoresDe = (tipo: TipoDoc) => (["supervisor", "admin"] as const).filter((r) => puedeUsarTipo(r, tipo));
+    /** Por qué un documento ya no se puede aprobar o rechazar (otro llegó primero). */
+    const yaNoEnRevision = (d: Documento): string => {
+      const ultimo = d.historial[d.historial.length - 1];
+      if (d.estado === "borrador" && ultimo?.accion === "Retiró el envío para corregir") return `${nombre(ultimo.usuarioId)} retiró ${d.codigo} para corregirlo: ya no está en revisión. Volverá a tu bandeja cuando lo reenvíe.`;
+      if (d.estado === "aprobado" || d.estado === "cerrado") return `${d.codigo} ya fue aprobado${ultimo ? ` (${nombre(ultimo.usuarioId)})` : ""}.`;
+      if (d.estado === "rechazado") return `${d.codigo} ya fue devuelto al autor.`;
+      return `${d.codigo} ya no está en revisión.`;
+    };
+    /**
+     * Directorio de clientes al guardar (pedido de Magno): el cliente escrito que no está se crea
+     * para toda la organización (también desde el técnico, con `registrar_clientes`) y se enlaza;
+     * si ya está, se enlaza y se llenan solo sus campos vacíos. Uno desactivado no se recrea.
+     */
+    const conDirectorio = (prev: Estado, doc: Documento): { doc: Documento; clientes: Cliente[]; auditoria: Auditoria[] } => {
+      const sinCambio = { doc, clientes: prev.clientes, auditoria: prev.auditoria };
+      const r = rolDe(prev);
+      if (!r || !(puede(r, "registrar_clientes") || puede(r, "clientes"))) return sinCambio;
+      const plan = planCliente(prev.clientes, doc, uid("c"));
+      if (plan.accion === "crear") {
+        return { doc: { ...doc, clienteId: plan.cliente.id }, clientes: [...prev.clientes, plan.cliente], auditoria: registrar(prev, "Creó cliente desde un formato", `${plan.cliente.nombre} · ${doc.codigo}`) };
+      }
+      if (plan.accion === "enlazar") {
+        if (!plan.campos.length) return { ...sinCambio, doc: { ...doc, clienteId: plan.cliente.id } };
+        return {
+          doc: { ...doc, clienteId: plan.cliente.id },
+          clientes: prev.clientes.map((c) => (c.id === plan.cliente.id ? plan.cliente : c)),
+          auditoria: registrar(prev, "Completó datos del cliente", `${plan.cliente.nombre}: ${plan.campos.join(", ")}`),
+        };
+      }
+      return sinCambio;
+    };
     /** Código visible: PREFIJO-001-26. */
     const codigo = (pref: string, n: number, anio: string) => `${pref}-${String(n).padStart(3, "0")}-${anio.slice(2)}`;
 
@@ -727,8 +778,9 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
             // Solo el autor edita, y solo en borrador o rechazado; se conserva lo que no es contenido
             const editable = existente.autorId === prev.usuarioId && usaTipo(prev, existente.tipo) && (existente.estado === "borrador" || existente.estado === "rechazado");
             if (!editable) return prev;
-            const merged = { ...existente, datos: doc.datos, clienteId: doc.clienteId, proyectoId: doc.proyectoId || undefined, equiposIds: equiposDelCliente(prev, doc), actualizado: ahora() } as Documento;
-            return { ...prev, documentos: prev.documentos.map((d) => (d.id === doc.id ? merged : d)) };
+            const dir = conDirectorio(prev, { ...existente, datos: doc.datos, clienteId: doc.clienteId, proyectoId: doc.proyectoId || undefined, actualizado: ahora() } as Documento);
+            const merged = { ...dir.doc, equiposIds: equiposDelCliente(prev, dir.doc) } as Documento;
+            return { ...prev, clientes: dir.clientes, auditoria: dir.auditoria, documentos: prev.documentos.map((d) => (d.id === doc.id ? merged : d)) };
           }
           // Documento nuevo: solo de un módulo que el perfil puede diligenciar (lo comercial, la administración)
           const r = rolDe(prev);
@@ -737,20 +789,22 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
           const anio = anioDe(hoy());
           const clave = `${doc.tipo}-${anio}`;
           const n = (prev.consecutivos[clave] ?? 0) + 1;
-          const nuevo = {
+          const base = {
             ...actualizado,
-            equiposIds: equiposDelCliente(prev, doc),
             consecutivo: n,
             codigo: codigo(prefijo(prev, doc.tipo), n, anio),
             autorId: prev.usuarioId ?? doc.autorId,
             estado: "borrador",
             historial: [evento(prev, "Creó el documento")],
           } as Documento;
+          const dir = conDirectorio(prev, base);
+          const nuevo = { ...dir.doc, equiposIds: equiposDelCliente(prev, dir.doc) } as Documento;
           return {
             ...prev,
+            clientes: dir.clientes,
             consecutivos: { ...prev.consecutivos, [clave]: n },
             documentos: [nuevo, ...prev.documentos],
-            auditoria: registrar(prev, "Creó", nuevo.codigo),
+            auditoria: registrar({ ...prev, auditoria: dir.auditoria }, "Creó", nuevo.codigo),
           };
         });
         return actualizado;
@@ -774,7 +828,7 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
           }
           const texto = `${nombre(prev.usuarioId)} envió ${d.codigo} a revisión`;
           // Solo a los revisores con acceso al módulo
-          const revisores = (["supervisor", "admin"] as const).filter((r) => puedeUsarTipo(r, d.tipo));
+          const revisores = revisoresDe(d.tipo);
           return {
             doc: { ...d, estado: "en_revision", motivoRechazo: undefined, historial: [...d.historial, evento(prev, "Envió a revisión")] },
             notificaciones: [...revisores.map((r) => ({ id: uid("n"), para: r, texto, docId: d.id, fecha: ahora(), leida: false })), ...prev.notificaciones],
@@ -784,27 +838,91 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
       },
 
       aprobar(id, firmaAutoriza) {
+        const actual = s.documentos.find((x) => x.id === id);
+        if (!actual) return "Documento no disponible.";
+        if (actual.estado !== "en_revision") return yaNoEnRevision(actual);
         transicion(id, (d, prev) => {
-          // Solo un revisor, solo en revisión y nunca sobre un documento propio
+          // Solo un revisor, solo en revisión y nunca sobre un documento propio (si el autor lo retiró, gana el retiro)
           if (d.estado !== "en_revision" || !revisaTipo(prev, d.tipo) || d.autorId === prev.usuarioId) return null;
           const u = prev.usuarios.find((x) => x.id === prev.usuarioId);
           const info = infoDoc(d.tipo);
           // Cada formato escribe en su casilla quién autoriza (permiso) o da el Vo.Bo. (gastos)
           const datos = u && info.flujo.alAprobar ? { ...d.datos, ...info.flujo.alAprobar(d.datos as never, u, firmaAutoriza) } : d.datos;
-          let notifs = notificar(prev, d.autorId, `${d.codigo} fue aprobado por ${nombre(prev.usuarioId)}`, d.id);
+          // Firma del cliente tomada en sitio (su «recibido»): al aprobarlo queda cerrado (igual que 0013)
+          const campo = info.flujo.cierre === "cliente" ? info.flujo.campoFirmaCliente : undefined;
+          const enSitio = Boolean(campo && String((datos as unknown as Record<string, unknown>)[campo] ?? "").startsWith("data:image/"));
+          let notifs = notificar(prev, d.autorId, enSitio ? `${d.codigo} fue aprobado por ${nombre(prev.usuarioId)} y quedó cerrado con la firma del cliente` : `${d.codigo} fue aprobado por ${nombre(prev.usuarioId)}`, d.id);
           // Lo que cierra el cliente con su firma (reporte, cotización) le llega a su portal
           if (info.visibleCliente && info.flujo.cierre === "cliente") {
-            notifs = [...aClientes(prev, d.clienteId, `${prev.config.empresa} compartió ${info.formato.el} ${info.formato.corto.toLowerCase()} ${d.codigo} para tu firma`, d.id), ...notifs];
+            const texto = enSitio
+              ? `${prev.config.empresa} compartió ${info.formato.el} ${info.formato.corto.toLowerCase()} ${d.codigo}, firmado en sitio`
+              : `${prev.config.empresa} compartió ${info.formato.el} ${info.formato.corto.toLowerCase()} ${d.codigo} para tu firma`;
+            notifs = [...aClientes(prev, d.clienteId, texto, d.id), ...notifs];
           }
+          const historial = [...d.historial, evento(prev, "Aprobó"), ...(enSitio ? [evento(prev, "Cerrado con la firma del cliente en sitio")] : [])];
           return {
-            doc: { ...d, datos, estado: "aprobado", historial: [...d.historial, evento(prev, "Aprobó")] } as Documento,
+            doc: { ...d, datos, estado: enSitio ? "cerrado" : "aprobado", historial } as Documento,
             notificaciones: notifs,
-            auditoria: registrar(prev, "Aprobó", d.codigo),
+            auditoria: enSitio ? registrar({ ...prev, auditoria: registrar(prev, "Aprobó", d.codigo) }, "Cerró con la firma del cliente en sitio", d.codigo) : registrar(prev, "Aprobó", d.codigo),
           };
         });
+        return null;
+      },
+
+      retirar(id) {
+        const actual = s.documentos.find((x) => x.id === id);
+        if (!actual || !usuario) return "Documento no disponible.";
+        if (actual.autorId !== usuario.id) return "Solo el autor puede retirar el envío.";
+        if (actual.estado === "aprobado" || actual.estado === "cerrado") return `${actual.codigo} ya fue aprobado y no se puede retirar. Si hay que corregirlo, el revisor debe devolverlo con el motivo.`;
+        if (actual.estado !== "en_revision") return `${actual.codigo} ya no está en revisión.`;
+        if (!puedeRetirarDoc(usuario, actual)) return "Este formato no se retira de revisión.";
+        transicion(id, (d, prev) => {
+          const u = prev.usuarios.find((x) => x.id === prev.usuarioId);
+          // Revalida con lo más reciente: si el revisor aprobó o rechazó primero, gana el revisor
+          if (!u || !puedeRetirarDoc(u, d)) return null;
+          const revisores = revisoresDe(d.tipo);
+          const texto = `${nombre(prev.usuarioId)} retiró ${d.codigo} de revisión para corregirlo`;
+          // El aviso «envió … a revisión» sin leer ya no aplica: se quita
+          const vigentes = prev.notificaciones.filter((n) => !(n.docId === d.id && !n.leida && (revisores as readonly string[]).includes(n.para) && n.texto.endsWith("a revisión")));
+          return {
+            doc: { ...d, estado: "borrador", historial: [...d.historial, evento(prev, "Retiró el envío para corregir")] },
+            notificaciones: [...revisores.map((r) => ({ id: uid("n"), para: r, texto, docId: d.id, fecha: ahora(), leida: false })), ...vigentes],
+            auditoria: registrar(prev, "Retiró el envío para corregir", d.codigo),
+          };
+        });
+        return null;
+      },
+
+      firmaClienteEnSitio(id, imagen, quien, cargo) {
+        const actual = s.documentos.find((x) => x.id === id);
+        if (!actual || !usuario) return "Documento no disponible.";
+        if (!puedeFirmaClienteEnSitio(usuario, actual)) return actual.estado === "cerrado" ? `${actual.codigo} ya está cerrado.` : "La firma del cliente ya no se puede tomar aquí.";
+        if (!imagen.startsWith("data:image/") || quien.trim().length < 3) return "Falta la firma o el nombre de quien firma.";
+        transicion(id, (d, prev) => {
+          const u = prev.usuarios.find((x) => x.id === prev.usuarioId);
+          if (!u || !puedeFirmaClienteEnSitio(u, d)) return null;
+          const info = infoDoc(d.tipo);
+          const campo = info.flujo.campoFirmaCliente!;
+          const datos = { ...d.datos, ...info.aplicarFirma(campo, imagen, d.datos), ...(d.tipo === "reporte" ? { nombreRecibe: quien.trim(), cargoRecibe: cargo.trim() } : {}) };
+          // Ya aprobado: la firma lo cierra (como en el portal o por enlace); en revisión, se cierra al aprobarlo
+          const cierra = d.estado === "aprobado";
+          const historial = [...d.historial, evento(prev, "Firma del cliente en sitio", quien.trim()), ...(cierra ? [evento(prev, "Cerrado con la firma del cliente en sitio")] : [])];
+          const texto = `${nombre(prev.usuarioId)} tomó en sitio la firma del cliente en ${d.codigo}${cierra ? ": quedó cerrado" : ""}`;
+          return {
+            doc: { ...d, datos, estado: cierra ? "cerrado" : d.estado, historial } as Documento,
+            // Los enlaces de firma pendientes de ese documento ya no sirven
+            enlaces: prev.enlaces.map((e) => (e.docId === d.id && !e.usado ? { ...e, usado: ahora() } : e)),
+            notificaciones: [...revisoresDe(d.tipo).map((r) => ({ id: uid("n"), para: r, texto, docId: d.id, fecha: ahora(), leida: false })), ...prev.notificaciones],
+            auditoria: registrar(prev, "Firma del cliente en sitio", `${d.codigo} · ${quien.trim()}`),
+          };
+        });
+        return null;
       },
 
       rechazar(id, motivo) {
+        const actual = s.documentos.find((x) => x.id === id);
+        if (!actual) return "Documento no disponible.";
+        if (actual.estado !== "en_revision") return yaNoEnRevision(actual);
         transicion(id, (d, prev) => {
           if (d.estado !== "en_revision" || !revisaTipo(prev, d.tipo) || d.autorId === prev.usuarioId || !motivo.trim()) return null;
           return {
@@ -813,6 +931,7 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
             auditoria: registrar(prev, "Rechazó", `${d.codigo} · ${motivo}`),
           };
         });
+        return null;
       },
 
       cerrar(id, cambios) {
@@ -1014,7 +1133,7 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
             const ev = { fecha: ahora(), usuarioId: "", accion: "Firmó por enlace", detalle: nombre.trim() };
             return {
               ...d,
-              datos: { ...d.datos, firmaCliente: imagen },
+              datos: { ...d.datos, firmaCliente: imagen, nombreRecibe: d.datos.nombreRecibe || nombre.trim() },
               estado: cierra ? "cerrado" : d.estado,
               historial: [...d.historial, ev, ...(cierra ? [{ ...ev, accion: "Cerró con la firma del cliente" }] : [])],
             };

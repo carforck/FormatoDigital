@@ -6,11 +6,13 @@
  * Plantilla del FO-GSST-25 · Legalización de gastos: réplica en A4 con los
  * colores del formato de SOTEC (encabezado propio, no el `Encabezado` común),
  * tabla de ítems editable y las fotos de las facturas en hojas anexas «Soportes».
+ * La foto de cada factura se toma con la cámara o se elige de la galería (`ElegirImagen`).
  */
 
-import { Camera, Plus, Receipt, Trash2 } from "lucide-react";
+import { Plus, Receipt, Trash2 } from "lucide-react";
 
 import { EditableText } from "@/components/docs/EditableText";
+import { ElegirImagen } from "@/components/docs/ElegirImagen";
 import { Firma, LogoFormato } from "@/components/docs/Encabezado";
 import { cn } from "@/lib/utils";
 import { formatoDe } from "@/modulos/registro";
@@ -195,16 +197,7 @@ export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: P
                 <td className="border border-slate-300 px-1 text-center">
                   <div className="flex items-center justify-center gap-1">
                     <EditableText value={i.recibo} disabled={!editar} placeholder={editar ? "N°" : " "} ariaLabel={`Recibo gasto ${k + 1}`} onCommit={(v) => item(i.id, { recibo: v })} />
-                    {editar && (
-                      <label className="print:hidden cursor-pointer rounded p-0.5 text-[#2E7D32] hover:bg-[#F1F8E9]" title={i.soporte ? "Cambiar foto de la factura" : "Adjuntar foto de la factura"}>
-                        <Camera className="h-3.5 w-3.5" />
-                        <input type="file" accept="image/*" capture="environment" className="sr-only" aria-label={`Foto factura gasto ${k + 1}`} onChange={(e) => {
-                            const archivo = e.target.files?.[0];
-                            e.target.value = "";
-                            void fotoFactura(i.id, archivo);
-                          }} />
-                      </label>
-                    )}
+                    {editar && <ElegirImagen variante="icono" que={`factura del gasto ${k + 1}`} onElegir={([archivo]) => fotoFactura(i.id, archivo)} />}
                   </div>
                 </td>
                 <td className="border border-slate-300 px-1 text-right tabular-nums">

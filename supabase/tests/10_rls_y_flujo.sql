@@ -632,4 +632,150 @@ do $$ begin
 exception when insufficient_privilege then null; end $$;
 reset role;
 
+-- ------------------------------------------------- 13. trabajo de campo (0013)
+-- Firma del cliente en sitio, retirar para corregir y clientes nuevos desde los formatos
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+insert into ctx select 'fc1', (public.crear_documento('10000000-0000-0000-0000-000000000001', 'reporte', '{"asunto":"Campo 1","firmaCliente":""}', null, 'c0000000-0000-0000-0000-000000000001')).id;
+insert into ctx select 'fc2', (public.crear_documento('10000000-0000-0000-0000-000000000001', 'reporte', '{"asunto":"Campo 2"}', null, 'c0000000-0000-0000-0000-000000000001')).id;
+insert into ctx select 'fc3', (public.crear_documento('10000000-0000-0000-0000-000000000001', 'reporte', '{"asunto":"Campo 3"}', null, 'c0000000-0000-0000-0000-000000000001')).id;
+update public.documentos set estado = 'en_revision' where id in (select v::uuid from ctx where k in ('fc1', 'fc2', 'fc3'));
+-- En revisión, el autor toma la firma del cliente en sitio (sin cambiar nada más)
+update public.documentos set datos = datos || '{"firmaCliente":"data:image/png;base64,AAAA","nombreRecibe":"Ing. Daniel","cargoRecibe":"Sistemas"}'
+  where id = (select v::uuid from ctx where k = 'fc1');
+do $$ begin
+  assert (select estado from public.documentos where id = (select v::uuid from ctx where k = 'fc1')) = 'en_revision', 'la firma en sitio no cambia el estado';
+  assert exists (select 1 from public.documento_eventos where documento_id = (select v::uuid from ctx where k = 'fc1') and accion = 'Firma del cliente en sitio' and detalle = 'Ing. Daniel'), 'evento «Firma del cliente en sitio»';
+  assert (select origen from public.firmas where documento_id = (select v::uuid from ctx where k = 'fc1') and campo = 'firmaCliente') = 'en_sitio', 'la firma queda en firmas con origen en_sitio';
+end $$;
+-- Con la firma no se aprovecha para cambiar el contenido, ni se reemplaza la firma ya puesta
+do $$ begin
+  update public.documentos set datos = datos || '{"asunto":"cambiado","firmaCliente":"data:image/png;base64,BBBB"}' where id = (select v::uuid from ctx where k = 'fc2');
+  raise exception 'FALLO: cambió el contenido junto con la firma en revisión';
+exception when insufficient_privilege then null; end $$;
+do $$ begin
+  update public.documentos set datos = datos || '{"firmaCliente":"data:image/png;base64,CCCC"}' where id = (select v::uuid from ctx where k = 'fc1');
+  raise exception 'FALLO: reemplazó la firma del cliente en revisión';
+exception when insufficient_privilege then null; end $$;
+do $$ begin
+  update public.documentos set datos = datos || '{"firmaCliente":"no-es-imagen"}' where id = (select v::uuid from ctx where k = 'fc2');
+  raise exception 'FALLO: aceptó una firma que no es imagen';
+exception when insufficient_privilege then null; end $$;
+-- Retirar para corregir: en revisión → borrador (solo el autor), se corrige y se reenvía
+update public.documentos set estado = 'borrador' where id = (select v::uuid from ctx where k = 'fc2');
+update public.documentos set datos = datos || '{"asunto":"Campo 2 corregido"}' where id = (select v::uuid from ctx where k = 'fc2');
+update public.documentos set estado = 'en_revision' where id = (select v::uuid from ctx where k = 'fc2');
+do $$ begin
+  assert exists (select 1 from public.documento_eventos where documento_id = (select v::uuid from ctx where k = 'fc2') and accion = 'Retiró el envío para corregir'), 'evento «Retiró el envío para corregir»';
+  assert (select datos ->> 'asunto' from public.documentos where id = (select v::uuid from ctx where k = 'fc2')) = 'Campo 2 corregido', 'corregido tras retirarlo';
+  assert (select estado from public.documentos where id = (select v::uuid from ctx where k = 'fc2')) = 'en_revision', 'reenviado a revisión';
+end $$;
+-- Retirar no permite cambiar el contenido en el mismo paso
+do $$ begin
+  update public.documentos set estado = 'borrador', datos = datos || '{"asunto":"a la vez"}' where id = (select v::uuid from ctx where k = 'fc3');
+  raise exception 'FALLO: retiró y cambió el contenido en un solo paso';
+exception when insufficient_privilege then null; end $$;
+reset role;
+-- Otro técnico no ve ni retira lo ajeno
+select pg_temp.como('00000000-0000-0000-0000-0000000000a4');
+update public.documentos set estado = 'borrador' where id = (select v::uuid from ctx where k = 'fc3');
+reset role;
+do $$ begin assert (select estado from public.documentos where id = (select v::uuid from ctx where k = 'fc3')) = 'en_revision', 'otro técnico no retira lo ajeno'; end $$;
+-- La coordinadora no pone firmas ni retira lo ajeno; aprueba: con firma en sitio queda cerrado
+select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
+do $$ begin
+  update public.documentos set datos = datos || '{"firmaCliente":"data:image/png;base64,AAAA"}' where id = (select v::uuid from ctx where k = 'fc3');
+  raise exception 'FALLO: la coordinadora puso la firma del cliente en un documento ajeno en revisión';
+exception when insufficient_privilege then null; end $$;
+do $$ begin
+  update public.documentos set estado = 'borrador' where id = (select v::uuid from ctx where k = 'fc3');
+  raise exception 'FALLO: la coordinadora retiró un documento ajeno';
+exception when insufficient_privilege then null; end $$;
+update public.documentos set estado = 'aprobado' where id = (select v::uuid from ctx where k = 'fc1');
+update public.documentos set estado = 'aprobado' where id = (select v::uuid from ctx where k = 'fc2');
+do $$ begin
+  assert (select estado from public.documentos where id = (select v::uuid from ctx where k = 'fc1')) = 'cerrado', 'aprobar con firma del cliente en sitio lo cierra';
+  assert (select cerrado_at is not null and aprobado_por = '00000000-0000-0000-0000-0000000000a2' from public.documentos where id = (select v::uuid from ctx where k = 'fc1')), 'registra aprobación y cierre';
+  assert (select count(*) from public.documento_eventos where documento_id = (select v::uuid from ctx where k = 'fc1') and accion in ('Aprobó', 'Cerrado con la firma del cliente en sitio')) = 2, 'eventos Aprobó + Cerrado con la firma del cliente en sitio';
+  assert (select estado from public.documentos where id = (select v::uuid from ctx where k = 'fc2')) = 'aprobado', 'sin firma del cliente queda aprobado';
+end $$;
+reset role;
+-- Ya aprobado, el autor no lo retira; sí toma la firma en sitio y eso lo cierra (y anula los enlaces)
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+do $$ begin
+  update public.documentos set estado = 'borrador' where id = (select v::uuid from ctx where k = 'fc2');
+  raise exception 'FALLO: retiró un documento ya aprobado';
+exception when insufficient_privilege then null; end $$;
+insert into ctx select 'tkc', public.crear_enlace_firma((select v::uuid from ctx where k = 'fc2'), '');
+do $$ begin
+  update public.documentos set estado = 'cerrado', datos = datos || '{"asunto":"otro","firmaCliente":"data:image/png;base64,AAAA"}' where id = (select v::uuid from ctx where k = 'fc2');
+  raise exception 'FALLO: cerró cambiando el contenido además de la firma';
+exception when insufficient_privilege then null; end $$;
+update public.documentos set estado = 'cerrado', datos = datos || '{"firmaCliente":"data:image/png;base64,AAAA","nombreRecibe":"Arq. Laura"}' where id = (select v::uuid from ctx where k = 'fc2');
+do $$ begin
+  assert (select estado from public.documentos where id = (select v::uuid from ctx where k = 'fc2')) = 'cerrado', 'la firma en sitio sobre un aprobado lo cierra';
+  assert exists (select 1 from public.documento_eventos where documento_id = (select v::uuid from ctx where k = 'fc2') and accion = 'Cerrado con la firma del cliente en sitio'), 'evento de cierre en sitio';
+end $$;
+do $$ begin
+  perform public.crear_enlace_firma((select v::uuid from ctx where k = 'fc1'), '');
+  raise exception 'FALLO: pidió firma por enlace de un reporte ya firmado en sitio';
+exception when check_violation then null; end $$;
+reset role;
+select pg_temp.como(null);
+do $$ begin
+  perform public.firmar_con_enlace((select v from ctx where k = 'tkc'), 'Otra persona', 'data:image/png;base64,iVBORw0KGgo=');
+  raise exception 'FALLO: un enlace anterior firmó un reporte ya cerrado en sitio';
+exception when insufficient_privilege then null; end $$;
+reset role;
+
+-- Clientes: el técnico los crea (sin duplicados) pero no los edita ni los borra
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+insert into public.clientes (id, organizacion_id, nombre, contacto)
+values ('c0000000-0000-0000-0000-0000000000f1', '10000000-0000-0000-0000-000000000001', '  Ferretería  El Tornillo ', 'Marta Gómez');
+do $$ begin
+  insert into public.clientes (organizacion_id, nombre) values ('10000000-0000-0000-0000-000000000001', 'ferreteria el TORNILLO');
+  raise exception 'FALLO: duplicó un cliente con otras mayúsculas y sin tildes';
+exception when unique_violation then null; end $$;
+do $$ begin
+  insert into public.clientes (organizacion_id, nombre, activo) values ('10000000-0000-0000-0000-000000000001', 'Cliente inactivo', false);
+  raise exception 'FALLO: el técnico creó un cliente inactivo';
+exception when insufficient_privilege then null; end $$;
+do $$ begin
+  insert into public.clientes (organizacion_id, nombre) values ('20000000-0000-0000-0000-000000000002', 'Intruso');
+  raise exception 'FALLO: el técnico creó un cliente en otra empresa';
+exception when insufficient_privilege then null; end $$;
+update public.clientes set contacto = 'Otro', activo = false where id = 'c0000000-0000-0000-0000-0000000000f1';
+delete from public.clientes where id = 'c0000000-0000-0000-0000-0000000000f1';
+do $$ begin
+  assert (select public.completar_cliente('c0000000-0000-0000-0000-0000000000f1', '{"correo":"compras@eltornillo.test","contacto":"Pedro","telefono":"12"}')).correo = 'compras@eltornillo.test', 'completa el correo vacío';
+end $$;
+reset role;
+do $$ begin
+  assert (select nombre from public.clientes where id = 'c0000000-0000-0000-0000-0000000000f1') = 'Ferretería El Tornillo', 'el nombre se guarda sin espacios de más';
+  assert (select contacto from public.clientes where id = 'c0000000-0000-0000-0000-0000000000f1') = 'Marta Gómez', 'el técnico no edita ni completar_cliente sobrescribe el contacto';
+  assert (select activo from public.clientes where id = 'c0000000-0000-0000-0000-0000000000f1'), 'el técnico no desactiva clientes';
+  assert (select telefono from public.clientes where id = 'c0000000-0000-0000-0000-0000000000f1') = '', 'un teléfono inválido no se completa';
+end $$;
+-- El cliente del portal no crea clientes; otra empresa no completa los ajenos
+select pg_temp.como('00000000-0000-0000-0000-0000000000a5');
+do $$ begin
+  insert into public.clientes (organizacion_id, nombre) values ('10000000-0000-0000-0000-000000000001', 'Desde el portal');
+  raise exception 'FALLO: un usuario cliente creó clientes';
+exception when insufficient_privilege then null; end $$;
+reset role;
+select pg_temp.como('00000000-0000-0000-0000-0000000000b1');
+do $$ begin
+  perform public.completar_cliente('c0000000-0000-0000-0000-0000000000f1', '{"nit":"1"}');
+  raise exception 'FALLO: otra empresa completó un cliente ajeno';
+exception when insufficient_privilege then null; end $$;
+reset role;
+-- La coordinadora sí edita (y renombrar a un duplicado se rechaza)
+select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
+do $$ begin
+  update public.clientes set nombre = 'LADRILLERA arcillas del caribe' where id = 'c0000000-0000-0000-0000-0000000000f1';
+  raise exception 'FALLO: renombró un cliente a uno que ya existe';
+exception when unique_violation then null; end $$;
+update public.clientes set contacto = 'Pedro Ruiz' where id = 'c0000000-0000-0000-0000-0000000000f1';
+do $$ begin assert (select contacto from public.clientes where id = 'c0000000-0000-0000-0000-0000000000f1') = 'Pedro Ruiz', 'la coordinadora edita clientes'; end $$;
+reset role;
+
 select 'OK: todas las pruebas pasaron' as resultado;

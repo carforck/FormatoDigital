@@ -4,7 +4,9 @@
  * Pantalla de diligenciamiento de un formato (`/app/nuevo/<tipo>`, vía
  * PaginaGenerador): chat guiado (ChatAsistente) a la izquierda y la plantilla
  * editable a la derecha (pestañas en móvil). Guarda borradores en localStorage,
- * avisa antes de salir con cambios y guarda/envía con `useDemo`.
+ * avisa antes de salir con cambios y guarda/envía con `useDemo`. El cliente escrito a
+ * mano que no está en el directorio se guarda allí al GUARDAR el documento (también
+ * desde el técnico, ver @/nucleo/clientes); uno desactivado no se recrea: se ofrece usarlo.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -28,6 +30,7 @@ import type { Cliente, Documento, Proyecto, TipoDoc } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 import { avance, faltantes } from "@/nucleo/validar";
 import { puede } from "@/nucleo/permisos";
+import { avisoPlan, buscarCliente, claveNombre, dejarAvisoCliente, planCliente } from "@/nucleo/clientes";
 
 interface Props {
   tipo: TipoDoc;
@@ -157,23 +160,46 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   /** Mezcla un cambio parcial en el contenido del formato. */
   const editar = (cambio: object) => setDoc((d) => ({ ...d, datos: { ...d.datos, ...cambio } }) as Documento);
 
+  /**
+   * Edición en línea del formato. Si se escribe el cliente a mano: uno del directorio (activo)
+   * autollena sus datos; uno distinto del elegido deja el documento sin cliente del directorio
+   * (se registrará al guardar).
+   */
+  const editarFormato = (cambio: object) => {
+    const c = cambio as Record<string, unknown>;
+    if (info.campoCliente in c && typeof c[info.campoCliente] === "string") {
+      const texto = c[info.campoCliente] as string;
+      const elegido = demo.clientes.find((x) => x.id === doc.clienteId);
+      const otro = buscarCliente(demo.clientesActivos, texto);
+      if (otro && otro.id !== doc.clienteId) {
+        elegirCliente(otro);
+        return;
+      }
+      if (elegido && texto.trim() && claveNombre(texto) !== claveNombre(elegido.nombre) && !otro) {
+        elegirCliente(undefined, texto);
+        return;
+      }
+    }
+    editar(cambio);
+  };
+
   // Proyectos que se pueden elegir: los visibles, no cerrados, del cliente elegido (o todos si aún no hay cliente)
   const proyectosElegibles = demo.proyectosVisibles.filter((p) => (p.estado !== "cerrado" || p.id === doc.proyectoId) && (!doc.clienteId || p.clienteId === doc.clienteId));
   const proyecto = demo.proyectos.find((p) => p.id === doc.proyectoId);
+
+  // El cliente escrito a mano se registra en el directorio al guardar (si el formato lo registra y el perfil puede)
+  const registraClientes = Boolean(info.datosCliente) && (puede(usuario.rol, "registrar_clientes") || puede(usuario.rol, "clientes"));
 
   /** Elige un cliente del directorio (o lo deja escrito a mano); un proyecto de otro cliente se quita. */
   function elegirCliente(c: Cliente | undefined, texto = ""): string | undefined {
     if (!c) {
       setDoc((d) => ({ ...d, clienteId: "", proyectoId: undefined, equiposIds: undefined, datos: { ...d.datos, [info.campoCliente]: texto } }) as Documento);
-      // Cliente nuevo escrito en el chat: quien gestiona clientes lo deja en el directorio para la próxima vez
+      // Cliente nuevo escrito en el chat: se guarda en el directorio cuando se guarde el documento (no en cada tecla)
       const nombre = texto.trim();
-      if (nombre && puede(usuario.rol, "clientes") && !demo.clientes.some((x) => x.nombre.toLowerCase() === nombre.toLowerCase())) {
-        const nuevo: Cliente = { id: `c-${Date.now()}`, nombre, nit: "", direccion: "", contacto: "", cargo: "", correo: "", telefono: "", sitio: "" };
-        demo.guardarCliente(nuevo);
-        setDoc((d) => ({ ...d, clienteId: nuevo.id }) as Documento);
-        return `Agregué «${nombre}» a tu directorio de clientes. Completa sus datos (NIT, dirección, contacto) en Clientes para autollenarlos la próxima vez.`;
-      }
-      return;
+      if (!nombre || !registraClientes) return;
+      const existente = buscarCliente(demo.clientes, nombre);
+      if (existente?.activo === false) return `«${existente.nombre}» está desactivado en el directorio de clientes. Al guardar te pregunto si quieres usarlo (no se crea otro).`;
+      return `«${nombre}» es un cliente nuevo: al guardar ${info.formato.el} ${info.formato.corto.toLowerCase()} lo dejo en el directorio con los datos que escribas, para que la próxima vez se autocomplete.`;
     }
     const r = mod.alElegirCliente(c);
     setDoc((d) => {
@@ -199,8 +225,21 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
 
   /** Aplica la respuesta de un paso del chat; devuelve el mensaje de confirmación del asistente. */
   function aplicar(id: string, v: ValorPaso): string | void {
-    if (id.startsWith("firma")) return;
-    if (id === "cliente") return elegirCliente(demo.clientesActivos.find((x) => x.nombre === v), v as string);
+    if (id.startsWith("firma")) {
+      // Firma de un tercero (cliente): el asistente entrega quién firma; la imagen ya está en el formato
+      if (Array.isArray(v)) {
+        const r = mod.aplicar(id, v, doc.datos);
+        editar(r.cambio);
+        return r.mensaje;
+      }
+      const campoCliente = info.flujo.campoFirmaCliente;
+      if (id === campoCliente && !(doc.datos as unknown as Record<string, string>)[id]) {
+        return `Sin firma del cliente por ahora. Cuando ${info.formato.el} ${info.formato.corto.toLowerCase()} se apruebe, el cliente podrá firmarlo en su portal o con el enlace de firma; también puedes tomarla en sitio desde el documento.`;
+      }
+      return;
+    }
+    // Sin importar mayúsculas, tildes ni espacios: «ladrillera arcillas…» autollena como la del directorio
+    if (id === "cliente") return elegirCliente(buscarCliente(demo.clientesActivos, v as string), v as string);
     if (id === "proyecto") return elegirProyecto(demo.proyectosVisibles.find((p) => etiquetaProyecto(p) === v));
     // Los equipos ya quedaron marcados en el documento desde el selector
     if (id === "equipos") {
@@ -289,10 +328,21 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
       setVista("doc");
       return;
     }
-    const clienteId = doc.clienteId || demo.clientes.find((c) => c.nombre === clienteDoc(doc))?.id || "";
+    let clienteId = doc.clienteId;
+    // Directorio: un cliente desactivado no se vuelve a crear; se ofrece usarlo
+    let plan = registraClientes ? planCliente(demo.clientes, doc, "nuevo") : null;
+    if (plan?.accion === "inactivo") {
+      const usar = confirm(`«${plan.cliente.nombre}» está desactivado en el directorio de clientes.\n\n¿Usarlo para este documento? (Si no, queda escrito a mano y no se crea otro cliente.)`);
+      if (usar) {
+        clienteId = plan.cliente.id;
+        plan = planCliente(demo.clientes, { ...doc, clienteId }, "nuevo");
+      }
+    }
     setGuardando(true);
     const g = demo.guardar({ ...doc, clienteId });
     if (enviar) demo.enviar(g.id);
+    const avisoDirectorio = plan && avisoPlan(plan);
+    if (avisoDirectorio) dejarAvisoCliente(g.id, avisoDirectorio);
     try {
       localStorage.removeItem(claveCache);
     } catch {
@@ -472,13 +522,19 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
           )}
           <p className="text-xs text-slate-500 print:hidden">Clic sobre cualquier campo del formato para editarlo. Los campos resaltados en verde son los que el asistente está preguntando.</p>
           <div className="overflow-x-auto rounded-lg bg-slate-100 p-2 sm:p-4">
-            <Plantilla datos={doc.datos} codigoDoc={doc.codigo} empresa={empresaDe(demo.config)} equipos={equiposAtendidos(equiposIds, demo.equipos)} editar={editar} firmar={(c) => setFirmando(c)} resaltar={resaltar} />
+            <Plantilla datos={doc.datos} codigoDoc={doc.codigo} empresa={empresaDe(demo.config)} equipos={equiposAtendidos(equiposIds, demo.equipos)} editar={editarFormato} firmar={(c) => setFirmando(c)} resaltar={resaltar} />
           </div>
           <div className="lg:hidden print:hidden">{acciones}</div>
         </div>
       </div>
 
-      {firmando && <FirmaPad titulo="Firma" onCerrar={() => setFirmando(null)} onGuardar={guardarFirma} />}
+      {firmando && (
+        <FirmaPad
+          titulo={firmando === info.flujo.campoFirmaCliente ? "Firma del cliente · recibido a satisfacción" : "Firma"}
+          onCerrar={() => setFirmando(null)}
+          onGuardar={guardarFirma}
+        />
+      )}
     </div>
   );
 }

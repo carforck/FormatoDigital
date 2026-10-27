@@ -101,8 +101,8 @@ const META: Record<string, Meta> = {
       { estado: "anulada", etiqueta: "Anulada", rama: true },
     ],
   },
-  reportes: { rama: "pertenece a", notaFlujo: "Rechazado vuelve al autor; la firma del cliente lo cierra" },
-  permisos: { rama: "autoriza el trabajo de", notaFlujo: "Rechazado vuelve al autor; se cierra al terminar la labor" },
+  reportes: { rama: "pertenece a", notaFlujo: "El autor lo retira mientras está en revisión; rechazado vuelve al autor; la firma del cliente (en sitio, portal o enlace) lo cierra" },
+  permisos: { rama: "autoriza el trabajo de", notaFlujo: "El autor lo retira mientras está en revisión; rechazado vuelve al autor; se cierra al terminar la labor" },
   gastos: { rama: "legaliza los gastos de", notaFlujo: "Aprobado = Vo.Bo.; cerrado = reembolsado. Interno: el cliente no lo ve" },
   cotizaciones: { padre: ["clientes"], rama: "se cotiza a", notaFlujo: "Solo la administración: la aprueba y envía en un paso; la firma del cliente la acepta" },
   cobros: {

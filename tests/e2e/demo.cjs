@@ -7,8 +7,9 @@
  * Necesita Chrome/Chromium: CHROME=/ruta/al/chrome (por defecto busca el de Playwright).
  * Recorre: técnico crea y envía un reporte, validación del permiso, acceso
  * restringido, coordinador aprueba, cliente firma; pedidos de Magno (fotos,
- * firma por enlace, envío, cuenta de cobro); que ninguna pantalla se desborde
- * en 8 anchos y los controles del shell.
+ * firma por enlace, envío, cuenta de cobro); trabajo de campo (firma del cliente
+ * en sitio, retirar para corregir, cámara o galería, clientes nuevos al
+ * directorio); que ninguna pantalla se desborde en 8 anchos y los controles del shell.
  */
 const fs = require("fs");
 const os = require("os");
@@ -16,7 +17,7 @@ const path = require("path");
 const puppeteer = require("puppeteer-core");
 
 const BASE = (process.env.BASE || "http://localhost:3100").replace(/\/$/, "");
-const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion"
+const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion" | "campo"
 const CLAVE = "sotec-demo-v9";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -113,6 +114,7 @@ async function flujo(b, errores) {
   await clic(p, "Firmar ahora");
   await firmar(p);
   await clic(p, "Continuar");
+  await clic(p, "El cliente firma después");
   await clic(p, "Enviar a revisión");
   await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"));
   await sleep(500);
@@ -393,7 +395,7 @@ async function magno(b, errores) {
   await p.type('input[placeholder="Descripción o motivo"]', "Almuerzo de la comisión");
   await p.type('input[placeholder="N° recibo / factura"]', "FE-123");
   await p.type('input[aria-label="Valor del gasto"]', "28000");
-  const foto = await p.$('input[aria-label="Foto de la factura"]');
+  const foto = await p.$('input[aria-label="Elegir de la galería o archivos: factura o recibo del gasto"]');
   await foto.uploadFile(path.join(__dirname, "fixtures/foto.jpg"));
   await p.waitForFunction(() => document.body.innerText.includes("Factura adjunta"), { timeout: 15000 });
   await clic(p, "Agregar gasto");
@@ -406,7 +408,7 @@ async function magno(b, errores) {
   const pend = await p.evaluate(() => [...document.querySelectorAll("li")].map((l) => l.textContent));
   ok(pend.includes("Gasto 1: número de recibo o foto de la factura"), "un gasto sin recibo ni foto de factura no se deja enviar");
   // Adjuntar la factura del gasto 1 desde el formato y enviar
-  const fotoFila = await p.$('input[aria-label="Foto factura gasto 1"]');
+  const fotoFila = await p.$('input[aria-label="Elegir de la galería o archivos: factura del gasto 1"]');
   await fotoFila.uploadFile(path.join(__dirname, "fixtures/foto.jpg"));
   await sleep(1500);
   ok((await p.evaluate(() => [...document.querySelectorAll(".doc-zona > .doc-print")].length)) === 2, "con facturas, la legalización trae la hoja «Soportes»");
@@ -491,6 +493,7 @@ async function proyectos(b, errores) {
   await clic(p, "Firmar ahora");
   await firmar(p);
   await clic(p, "Continuar");
+  await clic(p, "El cliente firma después");
   await clic(p, "Enviar a revisión");
   await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
   await sleep(600);
@@ -773,6 +776,7 @@ async function equipos(b, errores) {
   await clic(p, "Firmar ahora");
   await firmar(p);
   await clic(p, "Continuar");
+  await clic(p, "El cliente firma después");
   await clic(p, "Enviar a revisión");
   await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
   await sleep(600);
@@ -1125,6 +1129,300 @@ async function navegacion(b, errores) {
   await p.close();
 }
 
+/** Responde el paso actual del asistente: la sugerencia con ese texto o, si no hay, lo escribe. */
+async function responder(p, texto) {
+  await sleep(60);
+  const hecho = await p.evaluate((t) => {
+    const b = [...document.querySelectorAll("main form button[type=button]")].find((x) => x.textContent.trim() === t);
+    if (b) b.click();
+    return !!b;
+  }, texto);
+  if (!hecho) {
+    await p.type("main form input:not([type=file])", texto);
+    await p.keyboard.press("Enter");
+  }
+  await sleep(350);
+}
+
+/** Edita un campo de la plantilla en línea (clic en el texto, reemplaza y Enter). */
+async function editarCampo(p, etiqueta, valor) {
+  await p.evaluate((l) => document.querySelector(`.doc-print [role=button][aria-label="${l}"]`).click(), etiqueta);
+  await sleep(150);
+  await p.evaluate((l) => {
+    const i = document.querySelector(`.doc-print input[aria-label="${l}"]`);
+    i.focus();
+    i.select();
+  }, etiqueta);
+  await p.keyboard.type(valor);
+  await p.keyboard.press("Enter");
+  await sleep(300);
+}
+
+/**
+ * Pedidos de Magno en campo (técnico desde el celular): firma del cliente en sitio,
+ * retirar un envío para corregirlo, cámara o galería y clientes nuevos al directorio.
+ */
+async function campo(b, errores) {
+  console.log("\n— Campo: firma del cliente en sitio, retirar para corregir, galería y clientes nuevos");
+  const p = await nuevaPagina(b, errores);
+  await p.setViewport({ width: 1440, height: 900 });
+  await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "networkidle0" });
+  await clic(p, "Técnico de campo");
+  await p.waitForFunction(() => location.pathname.includes("/app/nuevo/reporte"));
+  await sleep(800);
+  const texto = () => p.evaluate(() => document.body.innerText.replace(/\s+/g, " "));
+  const h1 = () => p.evaluate(() => document.querySelector("h1").innerText);
+  const estado = () => p.evaluate((k) => JSON.parse(localStorage.getItem(k)), CLAVE);
+  const ir = async (ruta, ms = 600) => {
+    await p.goto(BASE + ruta, { waitUntil: "networkidle0" });
+    await sleep(ms);
+  };
+  const codigoActual = () => p.evaluate(() => document.querySelector("h1 .font-mono")?.textContent ?? "");
+  const idActual = () => new URL(p.url()).searchParams.get("id");
+
+  /** Diligencia un reporte en el asistente hasta la firma del cliente y lo envía (o lo guarda). */
+  async function reporte({ cliente, contacto = "Ing. Daniel Ortega", firmaCliente = false, enviar = true, alFotos }) {
+    await ir("/app/nuevo/reporte", 800);
+    await responder(p, cliente);
+    await clic(p, "Sin proyecto");
+    await clic(p, "Correctivo");
+    await clic(p, String(new Date().getFullYear()));
+    await clic(p, "08:00");
+    await clic(p, "10:00");
+    await responder(p, contacto);
+    await clic(p, "Reparación fibra óptica");
+    await clic(p, "Continuar sin equipos");
+    await clic(p, "Redactar borrador");
+    await clic(p, "Enviar", "form button");
+    await clic(p, "Programar mantenimiento");
+    if (alFotos) await alFotos();
+    else await clic(p, "Continuar sin fotos");
+    await clic(p, "Andrés Camacho Ruiz");
+    await clic(p, "Firmar ahora");
+    await firmar(p);
+    await clic(p, "Continuar");
+    let nombreFirma = null;
+    if (firmaCliente) {
+      await clic(p, "El cliente firma ahora");
+      ok((await p.evaluate(() => document.querySelector("[role=dialog]")?.innerText ?? "")).includes("recibido a satisfacción"), "el pad dice «Firma del cliente · recibido a satisfacción»");
+      await firmar(p);
+      nombreFirma = await p.evaluate(() => document.querySelector('input[aria-label="Nombre de quien firma"]')?.value ?? "");
+      await clic(p, "Continuar");
+    } else {
+      await clic(p, "El cliente firma después");
+    }
+    await clic(p, enviar ? "Enviar a revisión" : "Guardar borrador");
+    await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
+    await sleep(600);
+    return nombreFirma;
+  }
+
+  // 1. Cámara o galería: dos botones; la galería sin «capture» (en el celular ofrece la fototeca)
+  const ilegible = path.join(os.tmpdir(), "fd-foto-ilegible.heic");
+  fs.writeFileSync(ilegible, "esto no es una imagen");
+  let botones = null;
+  const nombreFirma = await reporte({
+    cliente: "Ladrillera Arcillas del Caribe",
+    firmaCliente: true,
+    alFotos: async () => {
+      botones = await p.evaluate(() => {
+        const ins = [...document.querySelectorAll("input[type=file]")].filter((i) => i.closest("label")?.textContent.includes("Galería") || i.closest("label")?.textContent.includes("Tomar foto"));
+        const cam = ins.find((i) => i.closest("label").textContent.includes("Tomar foto"));
+        const gal = ins.find((i) => i.closest("label").textContent.includes("Galería"));
+        return { cam: cam?.getAttribute("capture"), galCapture: gal?.hasAttribute("capture"), galMultiple: gal?.multiple, galAccept: gal?.accept, galLabel: gal?.getAttribute("aria-label") };
+      });
+      const galeria = await p.$('input[aria-label="Elegir de la galería o archivos: fotos del registro fotográfico"]');
+      await galeria.uploadFile(ilegible);
+      await p.waitForFunction(() => document.body.innerText.includes("No se pudo leer la imagen"), { timeout: 15000 }).catch(() => {});
+      ok((await texto()).includes("No se pudo leer la imagen") && (await texto()).includes("HEIC"), "una imagen que no se puede leer (HEIC) muestra un aviso claro en vez de fallar en silencio");
+      await galeria.uploadFile(path.join(__dirname, "fixtures/foto.jpg"));
+      await p.waitForFunction(() => [...document.querySelectorAll("button")].some((x) => x.textContent.includes("Continuar con 1")), { timeout: 15000 });
+      await clic(p, "Continuar con 1");
+    },
+  });
+  ok(botones && botones.cam === "environment" && botones.galCapture === false && botones.galMultiple === true && botones.galAccept === "image/*", `«Tomar foto» abre la cámara y «Galería / archivos» no tiene capture (${JSON.stringify(botones)})`);
+  ok(nombreFirma === "Ing. Daniel Ortega", `quien firma se prellena con la persona contactada (${nombreFirma})`);
+  const urlFirmado = p.url();
+  const codFirmado = await codigoActual();
+  let hoja = await p.evaluate(() => document.querySelector(".doc-print").innerText);
+  ok((await h1()).includes("En revisión") && hoja.includes("recibido a satisfacción") && hoja.includes("Ing. Daniel Ortega · Ing. sistemas"), `${codFirmado} sale en revisión con la firma del cliente y quien recibe bajo la firma`);
+
+  // 2. La coordinadora lo ve en la bandeja (con la firma en sitio) y al aprobarlo queda cerrado
+  await comoUsuario(p, "u-sup");
+  await ir("/app/revision");
+  ok((await texto()).includes(codFirmado) && (await texto()).includes("Con firma del cliente en sitio"), "la bandeja marca el reporte que trae la firma del cliente en sitio");
+  await p.goto(urlFirmado, { waitUntil: "networkidle0" });
+  await sleep(600);
+  ok((await texto()).includes("al aprobarlo queda cerrado"), "el detalle avisa al revisor que se cierra al aprobar");
+  await clic(p, "Aprobar");
+  let t = await texto();
+  ok((await h1()).includes("Cerrado") && t.includes("Aprobó") && t.includes("Cerrado con la firma del cliente en sitio"), "aprobar un reporte con firma del cliente lo deja cerrado (historial: Aprobó + Cerrado con la firma…)");
+  let s = await estado();
+  const dFirmado = s.documentos.find((d) => d.codigo === codFirmado);
+  ok(s.notificaciones.some((n) => n.para === "u-cli" && n.docId === dFirmado.id && n.texto.includes("firmado en sitio")), "el portal del cliente recibe el reporte firmado en sitio");
+  ok(!(await texto()).includes("Pedir firma al cliente"), "un reporte cerrado no ofrece pedir firma por enlace");
+
+  // 3. Sin la firma del cliente: aprobado queda «Aprobado» (portal o enlace como siempre)
+  await comoUsuario(p, "u-tec1");
+  await reporte({ cliente: "Ladrillera Arcillas del Caribe" });
+  const urlSin = p.url();
+  const codSin = await codigoActual();
+  await comoUsuario(p, "u-sup");
+  await p.goto(urlSin, { waitUntil: "networkidle0" });
+  await sleep(600);
+  await clic(p, "Aprobar");
+  ok((await h1()).includes("Aprobado") && (await texto()).includes("Pedir firma al cliente"), `${codSin} sin firma del cliente queda aprobado y se puede pedir la firma por enlace`);
+  // Ya aprobado, el técnico no lo retira (solo el rechazo con motivo del revisor lo devuelve)
+  await comoUsuario(p, "u-tec1");
+  await p.goto(urlSin, { waitUntil: "networkidle0" });
+  await sleep(600);
+  t = await texto();
+  ok(!t.includes("Retirar para corregir") && !t.includes("Editar") && t.includes("Tomar firma del cliente en sitio"), "aprobado: el técnico no lo retira ni lo edita, pero sí puede tomar la firma en sitio");
+  await clic(p, "Tomar firma del cliente en sitio");
+  await clic(p, "Firmar", "[role=dialog] button");
+  await firmar(p);
+  t = await texto();
+  ok((await h1()).includes("Cerrado") && t.includes("Firma del cliente en sitio"), "la firma en sitio sobre un aprobado lo cierra");
+
+  // 4. Enviado sin la firma: el técnico la toma desde el detalle mientras está en revisión
+  await reporte({ cliente: "Ladrillera Arcillas del Caribe" });
+  const urlTarde = p.url();
+  await clic(p, "Tomar firma del cliente en sitio");
+  await p.evaluate(() => {
+    const i = document.querySelector("[role=dialog] input");
+    i.focus();
+  });
+  await p.keyboard.down("Control");
+  await p.keyboard.press("a");
+  await p.keyboard.up("Control");
+  await p.keyboard.type("Ing. Carolina Vélez");
+  await clic(p, "Firmar", "[role=dialog] button");
+  await firmar(p);
+  t = await texto();
+  ok((await h1()).includes("En revisión") && t.includes("Firma del cliente en sitio") && t.includes("Ing. Carolina Vélez") && !t.includes("Tomar firma del cliente en sitio"), "en revisión, el técnico toma la firma en sitio desde el detalle (historial «Firma del cliente en sitio»)");
+  await comoUsuario(p, "u-sup");
+  await p.goto(urlTarde, { waitUntil: "networkidle0" });
+  await sleep(600);
+  await clic(p, "Aprobar");
+  ok((await h1()).includes("Cerrado"), "al aprobarlo queda cerrado con esa firma");
+
+  // 5. Retirar para corregir: vuelve a borrador, se edita y se reenvía; el revisor recibe el aviso
+  await comoUsuario(p, "u-tec1");
+  await reporte({ cliente: "Ladrillera Arcillas del Caribe" });
+  const urlRet = p.url();
+  const idRet = idActual();
+  const codRet = await codigoActual();
+  // Doble clic: un solo retiro
+  await p.evaluate(() => {
+    const b = [...document.querySelectorAll("button")].find((x) => x.textContent.includes("Retirar para corregir"));
+    b.click();
+    b.click();
+  });
+  await sleep(600);
+  s = await estado();
+  let dRet = s.documentos.find((d) => d.id === idRet);
+  ok((await h1()).includes("Borrador") && dRet.historial.filter((h) => h.accion === "Retiró el envío para corregir").length === 1, `«Retirar para corregir» devuelve ${codRet} a borrador una sola vez (doble clic)`);
+  ok(s.notificaciones.some((n) => n.para === "supervisor" && n.docId === idRet && n.texto.includes("retiró")) && !s.notificaciones.some((n) => n.para === "supervisor" && n.docId === idRet && !n.leida && n.texto.endsWith("a revisión")), "el revisor recibe «retiró … para corregirlo» y desaparece el aviso pendiente de revisión");
+  await clic(p, "Editar");
+  await p.waitForFunction(() => location.pathname.includes("/app/nuevo/reporte"), { timeout: 15000 });
+  await sleep(800);
+  await editarCampo(p, "asunto", "Reparación fibra óptica tramo hornos");
+  await clic(p, "Enviar a revisión");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
+  await sleep(600);
+  s = await estado();
+  dRet = s.documentos.find((d) => d.id === idRet);
+  ok((await h1()).includes("En revisión") && dRet.datos.asunto === "Reparación fibra óptica tramo hornos", "corregido y reenviado: vuelve a revisión con el cambio");
+
+  // 6. La bandeja del revisor se actualiza sola cuando el autor retira desde otro equipo
+  await comoUsuario(p, "u-sup");
+  await ir("/app/revision");
+  ok((await texto()).includes(codRet), "la bandeja muestra el reporte reenviado");
+  const p2 = await nuevaPagina(b, errores);
+  await p2.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  // Otra pestaña/equipo deja el reporte retirado (el técnico lo retiró desde su celular)
+  await p2.evaluate(
+    (k, id) => {
+      const st = JSON.parse(localStorage.getItem(k));
+      st.documentos = st.documentos.map((d) => (d.id === id ? { ...d, estado: "borrador", historial: [...d.historial, { fecha: "2026-10-27T10:00:00", usuarioId: "u-tec1", accion: "Retiró el envío para corregir" }] } : d));
+      st.usuarioId = "u-sup";
+      localStorage.setItem(k, JSON.stringify(st));
+    },
+    CLAVE,
+    idRet,
+  );
+  await sleep(800);
+  ok(!(await texto()).includes(codRet), "sin recargar, el reporte retirado sale de la bandeja del revisor");
+  // El revisor que lo tenía abierto ve el motivo (gana el retiro) y ya no puede aprobarlo
+  await p.goto(urlRet, { waitUntil: "networkidle0" });
+  await sleep(600);
+  t = await texto();
+  ok(t.includes("retiró el envío para corregirlo") && !t.includes("Aprobar"), "el revisor ve que el autor lo retiró y no tiene «Aprobar»");
+  await p2.close();
+
+  // 7. Cliente nuevo escrito por el técnico: queda en el directorio y autollena el próximo reporte
+  await comoUsuario(p, "u-tec1");
+  const antes = (await estado()).clientes.length;
+  await reporte({ cliente: "Ferretería El Tornillo", contacto: "Marta Gómez", enviar: false });
+  t = await texto();
+  ok(t.includes("Guardé «Ferretería El Tornillo» en el directorio de clientes"), "al guardar, avisa «Guardé «Ferretería El Tornillo» en el directorio de clientes»");
+  s = await estado();
+  const nuevo = s.clientes.find((c) => c.nombre === "Ferretería El Tornillo");
+  const dNuevo = s.documentos.find((d) => d.id === idActual());
+  ok(s.clientes.length === antes + 1 && nuevo && nuevo.contacto === "Marta Gómez" && dNuevo.clienteId === nuevo.id, "el técnico crea el cliente con lo escrito (contacto) y el reporte queda enlazado");
+  // Otra vez con otras mayúsculas, tildes y espacios: no se duplica, autollena y completa lo vacío
+  await ir("/app/nuevo/reporte", 800);
+  await responder(p, "  ferreteria  el TORNILLO ");
+  hoja = await p.evaluate(() => document.querySelector(".doc-print").innerText);
+  ok(hoja.includes("Ferretería El Tornillo") && hoja.includes("Marta Gómez"), "escribirlo con otras mayúsculas o sin tildes autollena el cliente del directorio");
+  await clic(p, "Sin proyecto");
+  await editarCampo(p, "correo", "compras@eltornillo.example");
+  await clic(p, "Guardar borrador");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
+  await sleep(600);
+  s = await estado();
+  const tornillos = s.clientes.filter((c) => c.nombre.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes("ferreteria el tornillo"));
+  ok(tornillos.length === 1 && tornillos[0].correo === "compras@eltornillo.example" && tornillos[0].contacto === "Marta Gómez", "sin duplicar: se completó el correo que faltaba y se conservó el contacto");
+  ok((await texto()).includes("Completé en el directorio los datos que le faltaban"), "avisa qué datos completó en el directorio");
+  // Lo que ya tiene el cliente no se sobrescribe desde un formato
+  await ir("/app/nuevo/reporte", 800);
+  await responder(p, "Ferretería El Tornillo");
+  await clic(p, "Sin proyecto");
+  await editarCampo(p, "correo", "otro@correo.example");
+  await clic(p, "Guardar borrador");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
+  await sleep(600);
+  s = await estado();
+  ok(s.clientes.find((c) => c.nombre === "Ferretería El Tornillo").correo === "compras@eltornillo.example", "un correo distinto en el formato no sobrescribe el del directorio");
+
+  // 8. Un cliente desactivado no se recrea: se ofrece usarlo (las pruebas aceptan el diálogo)
+  await p.evaluate((k) => {
+    const st = JSON.parse(localStorage.getItem(k));
+    st.clientes = st.clientes.map((c) => (c.id === "c-puerto" ? { ...c, activo: false } : c));
+    localStorage.setItem(k, JSON.stringify(st));
+  }, CLAVE);
+  const nClientes = (await estado()).clientes.length;
+  await ir("/app/nuevo/reporte", 900);
+  await responder(p, "centro logistico bahia");
+  ok((await texto()).includes("está desactivado en el directorio"), "escribir un cliente desactivado avisa que existe (no se crea otro)");
+  await clic(p, "Sin proyecto");
+  await clic(p, "Guardar borrador");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
+  await sleep(600);
+  s = await estado();
+  ok(s.clientes.length === nClientes && s.documentos.find((d) => d.id === idActual()).clienteId === "c-puerto", "al aceptar, el documento usa el cliente desactivado sin duplicarlo");
+
+  // 9. El técnico no edita ni elimina clientes; la administración sí los ve en el directorio
+  await ir("/app/clientes", 500);
+  ok((await texto()).includes("Acceso restringido"), "el técnico no entra al directorio a editar o eliminar clientes");
+  await comoUsuario(p, "u-sup");
+  await ir("/app/clientes", 500);
+  ok((await texto()).includes("Ferretería El Tornillo") && (await texto()).includes("compras@eltornillo.example"), "el cliente creado por el técnico aparece en el directorio de la organización");
+  await p.close();
+}
+
 async function impresion(b, errores) {
   console.log("\n— Impresión y PDF (/imprimir)");
   const p = await nuevaPagina(b, errores);
@@ -1412,6 +1710,7 @@ async function comercial(b, errores) {
     if (!SOLO || SOLO === "navegacion") await navegacion(b, errores);
     if (!SOLO || SOLO === "comercial") await comercial(b, errores);
     if (!SOLO || SOLO === "impresion") await impresion(b, errores);
+    if (!SOLO || SOLO === "campo") await campo(b, errores);
   } catch (e) {
     ok(false, `error: ${e.message}`);
   } finally {

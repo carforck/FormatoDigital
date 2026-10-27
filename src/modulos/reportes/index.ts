@@ -1,8 +1,10 @@
 /**
  * Módulo de documento FO-GSST-22 · Reporte técnico (prefijo RT): pasos del
  * asistente, autollenado por cliente y proyecto, equipos atendidos y flujo.
- * Visible para el cliente; se cierra con la firma del cliente (en sitio o por
- * enlace) y sus ítems alimentan las cuentas de cobro.
+ * Visible para el cliente; se cierra con la firma del cliente (su «recibido a
+ * satisfacción»: en sitio al terminar, en su portal o por enlace) y sus ítems
+ * alimentan las cuentas de cobro. Si la firma se tomó en sitio, al aprobarlo
+ * queda cerrado de una vez. El cliente nuevo escrito aquí queda en el directorio.
  */
 
 import type { ModuloDocumento } from "@/modulos/contrato";
@@ -48,10 +50,12 @@ export const moduloReportes: ModuloDocumento<DatosReporte> = {
   Plantilla: PlantillaReporte,
   clienteDe: (d) => d.cliente,
   campoCliente: "cliente",
+  // Cliente nuevo escrito en el reporte: se guarda en el directorio con lo diligenciado
+  datosCliente: (d) => ({ nombre: d.cliente, direccion: d.direccion, contacto: d.personaContactada, cargo: d.cargo, correo: d.correo, telefono: d.telefono }),
   visibleCliente: true,
   color: "var(--serie-a)",
   flujo: { aprobar: "Aprobar", firmaAlAprobar: false, cierre: "cliente", campoFirmaCliente: "firmaCliente", cerrar: "Firmar como cliente", eventoCierre: "Firmó como cliente" },
-  duplicar: (d, hoy) => ({ ...d, fecha: hoy, firmaTecnico: "", firmaCliente: "" }),
+  duplicar: (d, hoy) => ({ ...d, fecha: hoy, firmaTecnico: "", firmaCliente: "", nombreRecibe: "", cargoRecibe: "" }),
   alElegirProyecto: (p) => ({
     cambio: { proyecto: `${p.codigo} · ${p.nombre}` },
     mensaje: `El reporte queda en el proyecto ${p.codigo} · ${p.nombre}${p.sitio ? ` (${p.sitio})` : ""}.`,
@@ -124,9 +128,28 @@ export const moduloReportes: ModuloDocumento<DatosReporte> = {
     },
     { id: "nombreTecnico", tipo: "texto", resaltar: "nombreTecnico", pregunta: "Nombre del técnico que firma", sugerencias: [usuarioNombre] },
     { id: "firmaTecnico", tipo: "firma", resaltar: "firmaTecnico", pregunta: "Firma del técnico. Puedes firmar con el dedo desde el celular." },
+    {
+      // El «recibido» del cliente en sitio, al terminar el trabajo (pedido de Magno)
+      id: "firmaCliente",
+      tipo: "firma",
+      resaltar: "firmaCliente",
+      pregunta: "Firma del cliente (recibido a satisfacción). Pásale el celular a quien recibe el trabajo.",
+      ayuda: "Si firma ahora, al aprobarse el reporte queda cerrado. Si no puede, sigue sin firma: después firma en su portal o con el enlace que se le envía al aprobarse.",
+      firmante: { nombre: datos.nombreRecibe || datos.personaContactada, cargo: datos.cargoRecibe || datos.cargo },
+      omitir: "El cliente firma después",
+      firmar: "El cliente firma ahora",
+    },
   ],
 
   aplicar: (id, valor, datos) => {
+    // Firma del cliente tomada en sitio: el asistente entrega quién firma y su cargo (la imagen ya está en el formato)
+    if (id === "firmaCliente" && Array.isArray(valor)) {
+      const [nombreRecibe = "", cargoRecibe = ""] = valor as string[];
+      return {
+        cambio: { nombreRecibe, cargoRecibe },
+        mensaje: `Firma de ${nombreRecibe} recibida. Cuando se apruebe, el reporte queda cerrado sin pedirle otra firma al cliente.`,
+      };
+    }
     if (id === "fotos") {
       const nuevas = valor as NonNullable<DatosReporte["fotos"]>;
       return {

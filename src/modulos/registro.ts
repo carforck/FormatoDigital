@@ -76,6 +76,8 @@ export interface InfoDoc {
   Plantilla: ComponentType<PropsPlantilla<unknown>>;
   clienteDe: (datos: unknown) => string;
   campoCliente: string;
+  /** Datos del cliente escritos en el formato (registro automático en el directorio); sin esto, no se registra. */
+  datosCliente?: (datos: unknown) => Partial<Omit<Cliente, "id" | "activo">>;
   alElegirProyecto?: (p: Proyecto, c: Cliente | undefined) => { cambio: Record<string, unknown>; mensaje?: string };
   visibleCliente: boolean;
   /** Permiso que exige el módulo al personal interno (ver `puedeUsarTipo`). */
@@ -115,6 +117,7 @@ export function infoDoc(tipo: TipoDoc): InfoDoc {
     Plantilla: (m.Plantilla ?? SinPlantilla) as ComponentType<PropsPlantilla<unknown>>,
     clienteDe: (d) => (m.clienteDe ? m.clienteDe(d as Record<string, unknown>) : String((d as Record<string, unknown>)?.cliente ?? "")),
     campoCliente: m.campoCliente ?? "cliente",
+    datosCliente: m.datosCliente as InfoDoc["datosCliente"],
     alElegirProyecto: m.alElegirProyecto as InfoDoc["alElegirProyecto"],
     visibleCliente: m.visibleCliente ?? false,
     requiere: m.requiere,

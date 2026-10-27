@@ -2,17 +2,20 @@
 
 /**
  * Plantilla del FO-GSST-22 · Reporte técnico: réplica en carta del formato con
- * edición en línea, firmas del técnico y del cliente, equipos atendidos y el
- * registro fotográfico como hoja(s) anexa(s) con el mismo encabezado.
+ * edición en línea, firmas del técnico y del cliente (su «recibido a satisfacción»,
+ * con quién firma y su cargo), equipos atendidos y el registro fotográfico como
+ * hoja(s) anexa(s) con el mismo encabezado; las fotos se toman con la cámara o se
+ * eligen de la galería (`ElegirImagen`).
  */
 
-import { Camera, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { comprimirImagen } from "@/nucleo/imagenes";
+import { comprimirVarias } from "@/nucleo/imagenes";
 import type { DatosReporte, FotoReporte } from "@/nucleo/tipos";
 
 import { EditableText } from "@/components/docs/EditableText";
+import { ElegirImagen, mensajeImagenIlegible } from "@/components/docs/ElegirImagen";
 import { Encabezado, Firma } from "@/components/docs/Encabezado";
 import { EquiposEnFormato } from "@/modulos/equipos/EquiposEnFormato";
 import type { EquipoAtendido } from "@/modulos/equipos/tipos";
@@ -122,8 +125,14 @@ export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, e
           <div className="border-t border-black pt-0.5">Firma técnico</div>
         </div>
         <div className={cn(resaltar === "firmaCliente" && "rounded ring-2 ring-sotec-green")}>
-          <Firma src={datos.firmaCliente} etiqueta="cliente" onFirmar={firmar ? () => firmar("firmaCliente") : undefined} />
-          <div className="border-t border-black pt-0.5">Firma cliente</div>
+          <Firma src={datos.firmaCliente} etiqueta="cliente" texto="✍ Toca para que firme el cliente" onFirmar={firmar ? () => firmar("firmaCliente") : undefined} />
+          <div className="border-t border-black pt-0.5">Firma cliente · recibido a satisfacción</div>
+          {(datos.nombreRecibe || datos.cargoRecibe) && (
+            <div className="text-[10.5px] leading-tight">
+              {datos.nombreRecibe}
+              {datos.cargoRecibe ? ` · ${datos.cargoRecibe}` : ""}
+            </div>
+          )}
         </div>
       </div>
 
@@ -191,11 +200,13 @@ function HojaFotos({
   ultima: boolean;
 }) {
   const cambiar = (id: string, patch: Partial<FotoReporte>) => editar?.({ fotos: fotos.map((f) => (f.id === id ? { ...f, ...patch } : f)) });
-  const subir = async (lista: File[]) => {
+  /** Agrega hasta 12 fotos comprimidas; devuelve el aviso si alguna no se pudo leer (HEIC fuera de Safari). */
+  const subir = async (lista: File[]): Promise<string | void> => {
     if (!lista.length || !editar) return;
-    const nuevas: FotoReporte[] = [];
-    for (const f of lista.slice(0, 12)) nuevas.push({ id: `f-${Date.now()}-${nuevas.length}`, src: await comprimirImagen(f), descripcion: "", etiqueta: "" });
-    editar({ fotos: [...fotos, ...nuevas] });
+    const { imagenes, fallidas } = await comprimirVarias(lista);
+    const t = Date.now();
+    if (imagenes.length) editar({ fotos: [...fotos, ...imagenes.map((src, k): FotoReporte => ({ id: `f-${t}-${k}`, src, descripcion: "", etiqueta: "" }))] });
+    if (fallidas) return mensajeImagenIlegible(fallidas);
   };
   return (
     <article className={cn("doc-print mx-auto w-full max-w-[816px] bg-white p-6 text-[12px] leading-snug shadow-sm ring-1 ring-slate-200 sm:p-10", resaltar && "ring-2 ring-sotec-green")}>
@@ -242,16 +253,7 @@ function HojaFotos({
           })}
         </div>
       )}
-      {editar && ultima && (
-        <label className="print:hidden mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-sotec-green/60 bg-sotec-soft px-3 py-3 text-sm font-medium text-sotec-greenDeep hover:bg-sotec-green/20">
-          <Camera className="h-4 w-4" /> Agregar fotos
-          <input type="file" accept="image/*" capture="environment" multiple className="sr-only" onChange={(e) => {
-              const lista = e.target.files ? Array.from(e.target.files) : [];
-              e.target.value = "";
-              void subir(lista);
-            }} />
-        </label>
-      )}
+      {editar && ultima && <ElegirImagen multiple className="mt-3" que="fotos del registro fotográfico" textoCamara="Tomar foto" textoGaleria="Galería / archivos" onElegir={subir} />}
       <p className="mt-6 text-center text-[9.5px] font-bold print:mt-3">
         Documento emitido por el Servicio de Calidad de la Compañía. El documento es propiedad de SOTEC.
       </p>

@@ -204,7 +204,7 @@ tablas relacionales con RLS (ya existen en las migraciones) y retira `espacios`.
 │   └── lib/utils.ts                  `cn()`: une clases de Tailwind
 │
 ├── supabase/
-│   ├── migrations/                   Migraciones SQL (0001 … 0012), en orden
+│   ├── migrations/                   Migraciones SQL (0001 … 0013), en orden
 │   ├── seed.sql                      Organización SOTEC, sus formatos y un cliente ficticio
 │   ├── instalar.sql                  Migraciones + semilla en un solo archivo (generado)
 │   └── tests/                        Pruebas de RLS y flujo para el PostgreSQL desechable
@@ -259,7 +259,7 @@ módulo pregunta «¿es reporte o permiso?».
 
 | Módulo | Carpeta | Prefijo | Qué hace |
 |---|---|---|---|
-| Reportes técnicos (FO-GSST-22) | `src/modulos/reportes/` | RT | Servicio en sitio, equipos atendidos, registro fotográfico como hoja anexa, firma del cliente |
+| Reportes técnicos (FO-GSST-22) | `src/modulos/reportes/` | RT | Servicio en sitio, equipos atendidos, registro fotográfico como hoja anexa (cámara o galería), firma del cliente en sitio («recibido a satisfacción»), portal o enlace |
 | Permisos de trabajo (F-GSST-13) | `src/modulos/permisos/` | PT | Peligros, EPP, verificación, ejecutores y cierre del permiso |
 | Legalización de gastos (FO-GSST-25) | `src/modulos/gastos/` | LG | Ítems con la foto de la factura (hoja «Soportes»); interno, el cliente no lo ve |
 | Cotizaciones | `src/modulos/cotizaciones/` | COT | Ítems del catálogo e IVA por tarifa; la administración aprueba y envía en un paso; el cliente acepta con su firma |
@@ -269,9 +269,13 @@ módulo pregunta «¿es reporte o permiso?».
 | Órdenes de servicio | `src/modulos/ordenes/` | — | Tabla lista en la base; falta la interfaz |
 
 Flujo de los documentos: **borrador → en revisión → aprobado → cerrado** (rechazado vuelve al autor
-con motivo). Nadie aprueba lo propio; solo el autor edita, envía o borra su borrador. La cotización
-no pasa por revisión (la aprueba y envía la administración). Los consecutivos son por tipo y año y
-nunca se reutilizan.
+con motivo). Nadie aprueba lo propio; solo el autor edita, envía o borra su borrador. Mientras está
+en revisión, el autor puede **«Retirar para corregir»** (vuelve a borrador); ya aprobado, solo el
+revisor lo devuelve con motivo. Un reporte que lleva la **firma del cliente tomada en sitio** queda
+cerrado al aprobarse. La cotización no pasa por revisión (la aprueba y envía la administración). Los
+consecutivos son por tipo y año y nunca se reutilizan. El cliente escrito a mano en un formato que no
+está en el directorio se guarda allí al guardar el documento (sin duplicados por mayúsculas o
+tildes), también desde el técnico.
 
 Para **agregar un formato nuevo**, ver «Agregar un formato nuevo» en
 [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
@@ -281,7 +285,7 @@ Para **agregar un formato nuevo**, ver «Agregar un formato nuevo» en
 ## Roles y permisos
 
 Matriz en `src/nucleo/permisos.ts`; la base de datos aplica las mismas reglas con RLS y triggers
-(migraciones 0008 y 0011).
+(migraciones 0008, 0011 y 0013).
 
 | Acción | Técnico | Coordinador SST (`supervisor`) | Administrador | Cliente |
 |---|---|---|---|---|
@@ -290,7 +294,10 @@ Matriz en `src/nucleo/permisos.ts`; la base de datos aplica las mismas reglas co
 | Revisar (aprobar / rechazar) | — | ✔ | ✔ | — |
 | Cerrar permisos de trabajo | — | ✔ | ✔ | — |
 | Cotizaciones y cuentas de cobro (comercial) | — | — | ✔ | Consulta las suyas; acepta cotizaciones con su firma |
-| Clientes | — | ✔ | ✔ | — |
+| Clientes: agregar uno nuevo desde un formato (`registrar_clientes`) | ✔ | ✔ | ✔ | — |
+| Clientes: editar, desactivar y eliminar (`clientes`) | — | ✔ | ✔ | — |
+| Retirar su envío mientras está en revisión | ✔ (lo propio) | ✔ (lo propio) | ✔ (lo propio) | — |
+| Tomar en sitio la firma del cliente (su reporte, en revisión o aprobado) | ✔ | ✔ | ✔ | — |
 | Proyectos | Ve los activos y los suyos | ✔ | ✔ | Los de su empresa |
 | Equipos | ✔ (no elimina) | ✔ | ✔ | Los de su empresa (solo lectura) |
 | Usuarios, configuración, auditoría, mapa | — | — | ✔ | — |
@@ -321,6 +328,7 @@ cada tabla tiene `organizacion_id` y RLS.
 | `0010_equipos.sql` | Tablas `equipos` y `documento_equipos` con sus reglas y RLS |
 | `0011_comercial_solo_admin.sql` | Cotizaciones y cuentas de cobro solo para `admin` |
 | `0012_espacio_empresa.sql` | **`espacios`**: estado del modo empresa por organización (fase 1), RLS para el equipo interno y versión que solo avanza de a uno |
+| `0013_campo_tecnico.sql` | Trabajo de campo: firma del cliente en sitio por el autor (aprobar con ella cierra el reporte), retirar para corregir (en revisión → borrador), el técnico crea clientes sin duplicados (`clave_nombre`) y `completar_cliente` llena solo campos vacíos |
 
 Qué usa hoy la app (fase 1):
 
@@ -511,14 +519,14 @@ para que abra sin conexión desde la instalación (si no, se guarda la primera v
 
 | Comando | Qué prueba |
 |---|---|
-| `npm run test:unit` | Valor en letras (`tests/unit/letras.test.ts`) y cálculos de la cotización (`tests/unit/cotizacion.test.ts`) |
+| `npm run test:unit` | Valor en letras (`tests/unit/letras.test.ts`), cálculos de la cotización (`tests/unit/cotizacion.test.ts`) y directorio de clientes desde los formatos (`tests/unit/clientes.test.ts`) |
 | `npm run test:e2e` | La demo completa en Chrome (`tests/e2e/demo.cjs`), contra `http://localhost:3100` |
 | `npm run test:db` | Migraciones, RLS y flujo en PostgreSQL desechable |
 
 Opciones de la e2e (variables de entorno):
 
 - `SOLO=<sección>`: una sola sección (`flujo`, `responsive`, `controles`, `magno`, `proyectos`,
-  `crud`, `equipos`, `navegacion`, `comercial`, `impresion`).
+  `crud`, `equipos`, `navegacion`, `comercial`, `impresion`, `campo`).
 - `BASE=<url>`: otro servidor (por ejemplo `https://controlone.sotecse.com`).
 - `CHROME=<ruta>`: ejecutable de Chrome si no está en la ruta por defecto.
 

@@ -24,6 +24,8 @@ export const moduloPermisos: ModuloDocumento<DatosPermiso> = {
   Plantilla: PlantillaPermiso,
   clienteDe: (d) => d.cliente,
   campoCliente: "cliente",
+  // Cliente nuevo escrito en el permiso: queda en el directorio con su sitio de trabajo
+  datosCliente: (d) => ({ nombre: d.cliente, sitio: d.sitioTrabajo }),
   visibleCliente: true,
   color: "var(--serie-b)",
   flujo: {

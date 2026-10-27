@@ -4,10 +4,12 @@
  * Ruta /app/revision: bandeja del revisor. Muestra los documentos en revisión (más
  * antiguos primero) y los aprobados que cierra SST. Para perfiles con permiso `revisar`
  * (supervisor/Coordinador SST y administración). Cada tarjeta abre el detalle con
- * ?desde=revision para volver aquí. Datos: demo.visibles de useDemo().
+ * ?desde=revision para volver aquí. Datos: demo.visibles de useDemo(), así la bandeja se
+ * actualiza sola cuando el autor envía o retira un documento (otra pestaña o equipo). Marca
+ * los reportes que traen la firma del cliente en sitio (al aprobarlos quedan cerrados).
  */
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Signature } from "lucide-react";
 
 import { EstadoBadge, fechaCorta } from "@/components/ui/badges";
 import { PageHeader } from "@/components/ui/corporativo";
@@ -24,6 +26,11 @@ export default function Revision() {
   // Aprobados que cierra SST (permisos, gastos); los que cierra el cliente con su firma esperan en su portal
   const porCerrar = demo.visibles.filter((d) => d.estado === "aprobado" && infoDoc(d.tipo).flujo.cierre !== "cliente");
   const autor = (id: string) => demo.usuarios.find((u) => u.id === id)?.nombre ?? "—";
+  /** El formato lo cierra la firma del cliente y ya la trae (tomada en sitio). */
+  const firmadoEnSitio = (d: (typeof cola)[number]) => {
+    const campo = infoDoc(d.tipo).flujo.campoFirmaCliente;
+    return Boolean(campo && String((d.datos as unknown as Record<string, unknown>)[campo] ?? "").startsWith("data:image/"));
+  };
 
   /** Tarjeta de un documento con el resultado de la validación automática (faltantes) y el llamado a la acción. */
   const tarjeta = (d: (typeof cola)[number], cta: string) => {
@@ -48,6 +55,11 @@ export default function Revision() {
         ) : (
           <p className="mt-2 flex items-center gap-1 text-xs text-amber-700">
             <AlertTriangle className="h-3.5 w-3.5" /> {p.length} observación(es) de la validación
+          </p>
+        )}
+        {d.estado === "en_revision" && firmadoEnSitio(d) && (
+          <p className="mt-1 flex items-center gap-1 text-xs text-emerald-700">
+            <Signature className="h-3.5 w-3.5" /> Con firma del cliente en sitio: se cierra al aprobar
           </p>
         )}
         <p className="mt-3 text-sm font-semibold text-sotec-greenDeep">{cta} →</p>

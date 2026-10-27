@@ -136,6 +136,13 @@ export interface ModuloDocumento<D> {
   clienteDe?: (datos: D) => string;
   /** Campo de texto donde va el cliente escrito a mano (sin directorio). Por defecto: "cliente". */
   campoCliente?: keyof D & string;
+  /**
+   * Lo inverso de `alElegirCliente`: los datos del cliente escritos en el formato. Con esto,
+   * al GUARDAR un documento con un cliente que no está en el directorio se crea para todo el
+   * equipo (también desde el técnico) y, si ya existe, se completan solo sus campos vacíos.
+   * Por defecto: no se registra (p. ej. gastos: «cliente u obra» puede ser un centro interno).
+   */
+  datosCliente?: (datos: D) => Partial<Omit<Cliente, "id" | "activo">>;
   /** Autollenado al elegir un proyecto (obra, sitio, centro de costos). Por defecto: nada. */
   alElegirProyecto?: (p: Proyecto, c: Cliente | undefined) => { cambio: Partial<D>; mensaje?: string };
   /**

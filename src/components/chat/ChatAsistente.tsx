@@ -5,15 +5,19 @@
  * aporta cada módulo de formato, muestra el control adecuado a cada tipo y
  * entrega las respuestas con `aplicar`. Lo usa el Generador; los tipos `Paso`
  * y `ValorPaso` forman parte del contrato de módulos (`src/modulos/contrato.ts`).
+ * Las fotos (registro fotográfico, facturas) se toman con la cámara o se eligen de la
+ * galería (`ElegirImagen`); un paso de firma puede preguntar quién firma (`firmante`).
  */
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Bot, Camera, Check, CheckCircle2, PenLine, Plus, Send, Sparkles, Trash2, User } from "lucide-react";
+import { AlertTriangle, Bot, Check, CheckCircle2, PenLine, Plus, Send, Sparkles, Trash2, User } from "lucide-react";
+
+import { ElegirImagen, mensajeImagenIlegible } from "@/components/docs/ElegirImagen";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { comprimirImagen } from "@/nucleo/imagenes";
+import { comprimirImagen, comprimirVarias } from "@/nucleo/imagenes";
 import type { Ejecutor, FotoReporte, ItemGasto } from "@/nucleo/tipos";
 import { TIPOS_GASTO } from "@/modulos/gastos/catalogo";
 import { UNIDADES } from "@/modulos/cotizaciones/catalogo";
@@ -48,6 +52,15 @@ export interface Paso {
   agregar?: false | "servicio";
   /** Texto de ayuda del formulario de «Agregar otro». */
   ayudaAgregar?: string;
+  /**
+   * Paso «firma» de alguien más (p. ej. el cliente): pide su nombre y cargo, prellenados con
+   * estos valores. Al continuar firmado, `aplicar` recibe `[nombre, cargo]`; omitido, recibe "".
+   */
+  firmante?: { nombre: string; cargo: string };
+  /** Paso «firma»: texto del botón para firmar («El cliente firma ahora»). Por defecto «Firmar ahora». */
+  firmar?: string;
+  /** Paso «firma»: texto del botón para seguir sin firma («El cliente firma después»). Por defecto «Después». */
+  omitir?: string;
 }
 
 /** Servicio o producto nuevo para el catálogo de la cotización. */
@@ -112,16 +125,18 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
   const [otroAbierto, setOtroAbierto] = useState(false);
   const [otro, setOtro] = useState("");
   const [servicio, setServicio] = useState({ unidad: "Unidades", precio: "" });
+  // Paso de firma de un tercero (cliente): quién firma y su cargo
+  const [firmante, setFirmante] = useState({ nombre: "", cargo: "" });
+  const [avisoFirma, setAvisoFirma] = useState<string | null>(null);
 
-  async function agregarFotos(lista: FileList | null) {
-    if (!lista?.length) return;
+  /** Agrega hasta 12 fotos comprimidas; las que no se pudieron leer se avisan (ElegirImagen muestra el texto). */
+  async function agregarFotos(lista: File[]): Promise<string | void> {
     setProcesando(true);
     try {
-      const nuevas: FotoReporte[] = [];
-      for (const f of Array.from(lista).slice(0, 12)) {
-        nuevas.push({ id: `f-${Date.now()}-${nuevas.length}`, src: await comprimirImagen(f), descripcion: "", etiqueta: "" });
-      }
-      setFotos((p) => [...p, ...nuevas]);
+      const { imagenes, fallidas } = await comprimirVarias(lista);
+      const t = Date.now();
+      setFotos((p) => [...p, ...imagenes.map((src, k) => ({ id: `f-${t}-${p.length + k}`, src, descripcion: "", etiqueta: "" as const }))]);
+      if (fallidas) return mensajeImagenIlegible(fallidas);
     } finally {
       setProcesando(false);
     }
@@ -141,6 +156,8 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
     setOtroAbierto(false);
     setOtro("");
     setServicio({ unidad: "Unidades", precio: "" });
+    setFirmante({ nombre: paso?.firmante?.nombre ?? "", cargo: paso?.firmante?.cargo ?? "" });
+    setAvisoFirma(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i]);
 
@@ -408,16 +425,7 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
                     ))}
                   </div>
                 )}
-                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-sotec-green/60 bg-sotec-soft px-3 py-3 text-sm font-medium text-sotec-greenDeep hover:bg-sotec-green/20">
-                  <Camera className="h-4 w-4" /> {procesando ? "Procesando…" : "Tomar o subir fotos"}
-                  <input type="file" accept="image/*" capture="environment" multiple className="sr-only"
-                    onChange={(e) => {
-                      // agregarFotos copia la lista antes de su primer await; se limpia el input para poder elegir el mismo archivo otra vez
-                      void agregarFotos(e.target.files);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
+                <ElegirImagen multiple que="fotos del registro fotográfico" textoGaleria="Galería / archivos" onElegir={agregarFotos} />
                 <div className="flex gap-2">
                   <Button size="sm" className="flex-1" disabled={procesando} onClick={() => avanzar(fotos, fotos.length ? `${fotos.length} foto(s) agregadas` : "Sin fotos")}>
                     {fotos.length ? `Continuar con ${fotos.length}` : "Continuar sin fotos"}
@@ -459,37 +467,26 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
                     <Input className="h-8 text-xs" type="number" min={1} aria-label="Cantidad" value={gasto.cantidad} onChange={(e) => setGasto({ ...gasto, cantidad: Math.max(1, Number(e.target.value)) })} />
                     <Input className="h-8 text-xs" type="number" min={0} step={100} placeholder="Valor unitario" aria-label="Valor del gasto" value={gasto.valorUnitario || ""} onChange={(e) => setGasto({ ...gasto, valorUnitario: Math.max(0, Number(e.target.value)) })} />
                   </div>
-                  <label className={cn("flex cursor-pointer items-center justify-center gap-2 rounded-md border-2 border-dashed px-2 py-2 text-xs font-medium", gasto.soporte ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-sotec-green/60 bg-sotec-soft text-sotec-greenDeep")}>
-                    {gasto.soporte ? (
-                      <>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={gasto.soporte} alt="Factura" className="h-8 w-8 rounded object-cover" /> Factura adjunta · cambiar
-                      </>
-                    ) : (
-                      <>
-                        <Camera className="h-4 w-4" /> {procesando ? "Procesando…" : "Foto de la factura o recibo"}
-                      </>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="sr-only"
-                      aria-label="Foto de la factura"
-                      onChange={async (e) => {
-                        const f = e.target.files?.[0];
-                        // Se limpia para que elegir de nuevo el mismo archivo vuelva a disparar «change»
-                        e.target.value = "";
-                        if (!f) return;
-                        setProcesando(true);
-                        try {
-                          setGasto({ ...gasto, soporte: await comprimirImagen(f, 1400, 0.75) });
-                        } finally {
-                          setProcesando(false);
-                        }
-                      }}
-                    />
-                  </label>
+                  {gasto.soporte && (
+                    <p className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-xs font-medium text-emerald-800">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={gasto.soporte} alt="Factura" className="h-8 w-8 rounded object-cover" /> Factura adjunta · puedes cambiarla
+                    </p>
+                  )}
+                  <ElegirImagen
+                    que="factura o recibo del gasto"
+                    textoCamara={gasto.soporte ? "Otra foto" : "Foto de la factura"}
+                    textoGaleria="Galería / archivos"
+                    onElegir={async ([f]) => {
+                      setProcesando(true);
+                      try {
+                        const soporte = await comprimirImagen(f, 1400, 0.75);
+                        setGasto((g) => ({ ...g, soporte }));
+                      } finally {
+                        setProcesando(false);
+                      }
+                    }}
+                  />
                   <Button
                     type="button"
                     variant="outline"
@@ -513,13 +510,36 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
             {paso.tipo === "componente" && paso.render?.(avanzar)}
 
             {paso.tipo === "firma" && (
-              <div className="flex gap-2">
-                <Button className="flex-1" variant={firmado(paso.id) ? "outline" : "default"} onClick={() => onFirmar(paso.id)}>
-                  <PenLine className="h-4 w-4" /> {firmado(paso.id) ? "Volver a firmar" : "Firmar ahora"}
-                </Button>
-                <Button variant="ghost" onClick={() => avanzar("", firmado(paso.id) ? "Firmado ✓" : "Firmaré después")}>
-                  {firmado(paso.id) ? "Continuar" : "Después"}
-                </Button>
+              <div className="space-y-2">
+                {paso.firmante && (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <Input className="h-9 text-sm" placeholder="Nombre de quien firma" aria-label="Nombre de quien firma" value={firmante.nombre} onChange={(e) => setFirmante({ ...firmante, nombre: e.target.value })} />
+                    <Input className="h-9 text-sm" placeholder="Cargo" aria-label="Cargo de quien firma" value={firmante.cargo} onChange={(e) => setFirmante({ ...firmante, cargo: e.target.value })} />
+                  </div>
+                )}
+                {avisoFirma && <p className="text-xs text-amber-700">{avisoFirma}</p>}
+                <div className="flex flex-wrap gap-2">
+                  <Button className="flex-1" variant={firmado(paso.id) ? "outline" : "default"} onClick={() => onFirmar(paso.id)}>
+                    <PenLine className="h-4 w-4" /> {firmado(paso.id) ? "Volver a firmar" : (paso.firmar ?? "Firmar ahora")}
+                  </Button>
+                  {firmado(paso.id) ? (
+                    <Button
+                      variant="default"
+                      onClick={() => {
+                        if (!paso.firmante) return avanzar("", "Firmado ✓");
+                        const nombre = firmante.nombre.trim().replace(/\s+/g, " ");
+                        if (nombre.length < 3) return setAvisoFirma("Escribe el nombre de quien firma.");
+                        avanzar([nombre, firmante.cargo.trim()], `Firmó ${nombre}${firmante.cargo.trim() ? ` (${firmante.cargo.trim()})` : ""} ✓`);
+                      }}
+                    >
+                      Continuar
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" onClick={() => avanzar("", paso.omitir ?? "Firmaré después")}>
+                      {paso.omitir ?? "Después"}
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
 

@@ -3,6 +3,8 @@
  * mayor y JPEG con `calidad`. Una foto de 4 MB queda en ~100-200 KB, suficiente
  * para el registro fotográfico impreso y los soportes de gastos. Devuelve un
  * data URL JPEG (fondo blanco para las PNG con transparencia). Solo en el navegador.
+ * Si el navegador no puede abrir el archivo (HEIC del iPhone fuera de Safari, archivo
+ * dañado) lanza un error: quien la llama muestra el aviso (`ElegirImagen`).
  */
 export async function comprimirImagen(archivo: File, lado = 1280, calidad = 0.72): Promise<string> {
   const url = URL.createObjectURL(archivo);
@@ -25,4 +27,21 @@ export async function comprimirImagen(archivo: File, lado = 1280, calidad = 0.72
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+/**
+ * Comprime varias imágenes (máx. `max`, en orden) y separa las que no se pudieron leer,
+ * para agregar las buenas y avisar cuántas fallaron en vez de perderlas todas.
+ */
+export async function comprimirVarias(archivos: File[], max = 12, lado?: number, calidad?: number): Promise<{ imagenes: string[]; fallidas: number }> {
+  const imagenes: string[] = [];
+  let fallidas = 0;
+  for (const f of archivos.slice(0, max)) {
+    try {
+      imagenes.push(await comprimirImagen(f, lado, calidad));
+    } catch {
+      fallidas++;
+    }
+  }
+  return { imagenes, fallidas };
 }

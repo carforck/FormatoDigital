@@ -2,14 +2,16 @@
 
 /**
  * Ruta /app/documentos/ver?id=<doc>: detalle de un documento con su plantilla y todas las
- * acciones del flujo (editar, enviar, aprobar/rechazar, firmar, cerrar, duplicar, pedir
- * firma por enlace, enviar, cobrar, PDF). Cada acción se habilita según @/nucleo/permisos y
- * el `flujo` del módulo (@/modulos/registro). Params: ?desde= (regreso), ?ok=guardado|enviado.
+ * acciones del flujo (editar, enviar, retirar para corregir, aprobar/rechazar, firmar,
+ * tomar la firma del cliente en sitio, cerrar, duplicar, pedir firma por enlace, enviar,
+ * cobrar, PDF). Cada acción se habilita según @/nucleo/permisos y el `flujo` del módulo
+ * (@/modulos/registro); si otro llegó primero (p. ej. el autor retiró lo que se iba a
+ * aprobar) se muestra el motivo. Params: ?desde= (regreso), ?ok=guardado|enviado.
  */
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useRef, useState } from "react";
-import { Cctv, Check, CheckCircle2, Copy, FolderKanban, Link2, Lock, PenLine, Printer, Receipt, Send, SendHorizonal, Trash2, X } from "lucide-react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { AlertTriangle, Cctv, Check, CheckCircle2, Copy, FolderKanban, Info, Link2, Lock, PenLine, Printer, Receipt, Send, SendHorizonal, Signature, Trash2, Undo2, UserPlus, X } from "lucide-react";
 
 import { EnviarDocumento } from "@/components/docs/EnviarDocumento";
 import { Volver, marcarEdicion, useAvisoDeRegreso, useOrigen } from "@/components/ui/volver";
@@ -18,7 +20,9 @@ import { fondoQueCierra, useModal } from "@/components/ui/useModal";
 import { FirmaPad } from "@/components/docs/FirmaPad";
 import { Button } from "@/components/ui/button";
 import { EstadoBadge } from "@/components/ui/badges";
-import { puede, puedeCrearTipo, puedeEditarDoc, puedeRevisarDoc, puedeVerDoc } from "@/nucleo/permisos";
+import { Input } from "@/components/ui/input";
+import { tomarAvisoCliente } from "@/nucleo/clientes";
+import { puede, puedeCrearTipo, puedeEditarDoc, puedeFirmaClienteEnSitio, puedeRetirarDoc, puedeRevisarDoc, puedeVerDoc } from "@/nucleo/permisos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { abrirImpresion, tituloArchivo } from "@/nucleo/impresion";
 import { rutaCuenta, rutaEquipo, rutaProyecto, urlPublica } from "@/nucleo/rutas";
@@ -45,7 +49,17 @@ function Detalle() {
   // Abierto desde un proyecto (?desde=proyecto:<id>), «Volver» regresa al proyecto
   const origen = useOrigen({ href: "/app/documentos", label: "Documentos" });
   const conOrigen = (q: string) => (origen.query ? `${q}&${origen.query}` : q);
-  const [firma, setFirma] = useState<null | "aprobar" | "cliente" | "cierre">(null);
+  const [firma, setFirma] = useState<null | "aprobar" | "cliente" | "cierre" | "sitio">(null);
+  // Firma del cliente en sitio desde el detalle: quién firma antes de abrir el pad
+  const [enSitio, setEnSitio] = useState<null | { nombre: string; cargo: string }>(null);
+  // Resultado de una acción que ya no aplicaba (otro llegó primero) o aviso del directorio de clientes
+  const [aviso, setAviso] = useState<{ tipo: "error" | "info"; texto: string } | null>(null);
+  useEffect(() => {
+    const t = id ? tomarAvisoCliente(id) : null;
+    if (t) setAviso({ tipo: "info", texto: t });
+  }, [id]);
+  /** Muestra el motivo si la acción ya no aplicaba. */
+  const resultado = (motivo: string | null) => setAviso(motivo ? { tipo: "error", texto: motivo } : null);
   const [rechazo, setRechazo] = useState<string | null>(null);
   const [cierre, setCierre] = useState<Partial<DatosPermiso>>({ cierreAreaLimpia: "", cierraNombre: u.nombre, firmaCierre: "" });
   const [envio, setEnvio] = useState<null | { enlace?: string }>(null);
@@ -75,6 +89,11 @@ function Detalle() {
   // El cierre depende del formato: formulario (permiso), firma del cliente (reporte, cotización) o un revisor (gastos)
   const cierraPermiso = flujo.cierre === "formulario" && doc.estado === "aprobado" && puede(u.rol, "cerrar_permiso");
   const firmaCliente = flujo.cierre === "cliente" && Boolean(flujo.campoFirmaCliente) && doc.estado === "aprobado" && ((u.rol === "cliente" && doc.clienteId === u.clienteId) || puede(u.rol, "revisar"));
+  // El autor retira su envío antes de que lo aprueben, o toma en sitio la firma del cliente que faltó
+  const retira = puedeRetirarDoc(u, doc);
+  const tomaFirmaEnSitio = puedeFirmaClienteEnSitio(u, doc) && !firmaCliente;
+  const conFirmaEnSitio = flujo.cierre === "cliente" && Boolean(flujo.campoFirmaCliente) && String((doc.datos as unknown as Record<string, unknown>)[flujo.campoFirmaCliente ?? ""] ?? "").startsWith("data:image/");
+  const ultimo = doc.historial[doc.historial.length - 1];
   const cierraRevisor = flujo.cierre === "revisor" && doc.estado === "aprobado" && puede(u.rol, "revisar");
   const proyecto = demo.proyectos.find((p) => p.id === doc.proyectoId);
   const datosLibres = doc.datos as unknown as Record<string, string | undefined>;
@@ -102,6 +121,23 @@ function Detalle() {
               ? "Aprobada y enviada: el cliente ya la ve en su portal para aceptarla con su firma."
               : "Enviado a revisión. El Coordinador SST recibió una notificación (cambia a ese perfil para aprobarlo)."
             : "Borrador guardado."}
+        </p>
+      )}
+
+      {aviso && (
+        <p
+          role={aviso.tipo === "error" ? "alert" : "status"}
+          className={
+            aviso.tipo === "error"
+              ? "print:hidden flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+              : "print:hidden flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900"
+          }
+        >
+          {aviso.tipo === "error" ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> : <UserPlus className="mt-0.5 h-4 w-4 shrink-0" />}
+          <span className="min-w-0 flex-1">{aviso.texto}</span>
+          <button type="button" aria-label="Cerrar aviso" onClick={() => setAviso(null)} className="shrink-0 rounded p-0.5 hover:bg-black/5">
+            <X className="h-4 w-4" />
+          </button>
         </p>
       )}
 
@@ -141,9 +177,33 @@ function Detalle() {
               <SendHorizonal className="h-4 w-4" /> {flujo.aprobarAlEnviar ?? "Enviar a revisión"}
             </Button>
           )}
+          {retira && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (!confirm(`¿Retirar ${doc.codigo} de revisión para corregirlo?\n\nVuelve a borrador: lo editas y lo envías de nuevo. El revisor recibe un aviso.`)) return;
+                const motivo = demo.retirar(doc.id);
+                resultado(motivo);
+                if (!motivo) setAviso({ tipo: "info", texto: `${doc.codigo} volvió a borrador. Corrígelo con «Editar» y envíalo de nuevo a revisión.` });
+              }}
+            >
+              <Undo2 className="h-4 w-4" /> Retirar para corregir
+            </Button>
+          )}
+          {tomaFirmaEnSitio && (
+            <Button
+              variant={doc.estado === "aprobado" ? "default" : "outline"}
+              onClick={() => {
+                const d = doc.datos as unknown as Record<string, string | undefined>;
+                setEnSitio({ nombre: d.nombreRecibe || d.personaContactada || "", cargo: d.cargoRecibe || d.cargo || "" });
+              }}
+            >
+              <Signature className="h-4 w-4" /> Tomar firma del cliente en sitio
+            </Button>
+          )}
           {revisa && (
             <>
-              <Button onClick={() => (flujo.firmaAlAprobar ? setFirma("aprobar") : demo.aprobar(doc.id))}>
+              <Button onClick={() => (flujo.firmaAlAprobar ? setFirma("aprobar") : resultado(demo.aprobar(doc.id)))}>
                 <Check className="h-4 w-4" /> {flujo.aprobar}
               </Button>
               <Button variant="outline" className="border-rose-200 text-rose-700 hover:bg-rose-50" onClick={() => setRechazo("")}>
@@ -238,9 +298,22 @@ function Detalle() {
           <strong>Pendiente para enviar ({pend.length}):</strong> {pend.join(" · ")}
         </div>
       )}
+      {revisa && conFirmaEnSitio && (
+        <p className="print:hidden flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+          <Signature className="h-4 w-4 shrink-0" /> Trae la firma del cliente tomada en sitio: al aprobarlo queda cerrado.
+        </p>
+      )}
+      {doc.estado === "borrador" && !editable && ultimo?.accion === "Retiró el envío para corregir" && (
+        <p className="print:hidden flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+          <Info className="h-4 w-4 shrink-0" /> {nombre(ultimo.usuarioId)} retiró el envío para corregirlo. Volverá a la bandeja de revisión cuando lo reenvíe.
+        </p>
+      )}
       {!editable && u.rol !== "cliente" && (doc.estado === "en_revision" || doc.estado === "aprobado" || doc.estado === "cerrado") && (
         <p className="print:hidden flex items-center gap-2 text-xs text-slate-500">
-          <Lock className="h-3.5 w-3.5" /> Documento bloqueado: después de enviarse no se puede modificar, así queda la trazabilidad del SGC.
+          <Lock className="h-3.5 w-3.5 shrink-0" />
+          {retira
+            ? "Enviado a revisión: no se edita aquí. Mientras no lo aprueben puedes «Retirar para corregir»."
+            : "Documento bloqueado: después de enviarse no se puede modificar, así queda la trazabilidad del SGC."}
         </p>
       )}
 
@@ -308,12 +381,35 @@ function Detalle() {
 
       {firma && (
         <FirmaPad
-          titulo={firma === "aprobar" ? (doc.tipo === "gasto" ? "Firma del Vo.Bo." : "Firma de quien autoriza") : firma === "cliente" ? "Firma del cliente" : "Firma de quien cierra"}
+          titulo={
+            firma === "aprobar"
+              ? doc.tipo === "gasto"
+                ? "Firma del Vo.Bo."
+                : "Firma de quien autoriza"
+              : firma === "cliente" || firma === "sitio"
+                ? "Firma del cliente · recibido a satisfacción"
+                : "Firma de quien cierra"
+          }
           onCerrar={() => setFirma(null)}
           onGuardar={(url) => {
-            if (firma === "aprobar") demo.aprobar(doc.id, url);
-            // El módulo decide qué más se llena con la firma (p. ej. la fecha de aceptación de la cotización)
-            if (firma === "cliente" && flujo.campoFirmaCliente) demo.cerrar(doc.id, info.aplicarFirma(flujo.campoFirmaCliente, url, doc.datos) as Partial<typeof doc.datos>);
+            if (firma === "aprobar") resultado(demo.aprobar(doc.id, url));
+            // El módulo decide qué más se llena con la firma (p. ej. la fecha de aceptación de la cotización);
+            // en el portal, quien recibe es el usuario del cliente
+            if (firma === "cliente" && flujo.campoFirmaCliente) {
+              const recibe = doc.tipo === "reporte" && u.rol === "cliente" && !doc.datos.nombreRecibe ? { nombreRecibe: u.nombre } : {};
+              demo.cerrar(doc.id, { ...info.aplicarFirma(flujo.campoFirmaCliente, url, doc.datos), ...recibe } as Partial<typeof doc.datos>);
+            }
+            if (firma === "sitio" && enSitio) {
+              const motivo = demo.firmaClienteEnSitio(doc.id, url, enSitio.nombre, enSitio.cargo);
+              resultado(motivo);
+              if (!motivo) {
+                setAviso({
+                  tipo: "info",
+                  texto: doc.estado === "aprobado" ? `Firma de ${enSitio.nombre.trim()} guardada: ${doc.codigo} quedó cerrado.` : `Firma de ${enSitio.nombre.trim()} guardada: cuando se apruebe, ${doc.codigo} queda cerrado.`,
+                });
+              }
+              setEnSitio(null);
+            }
             if (firma === "cierre") setCierre((c) => ({ ...c, firmaCierre: url }));
             setFirma(null);
           }}
@@ -337,7 +433,9 @@ function Detalle() {
         />
       )}
 
-      {rechazo !== null && <DialogoRechazo codigo={doc.codigo} motivo={rechazo} setMotivo={setRechazo} onRechazar={() => demo.rechazar(doc.id, rechazo.trim())} />}
+      {rechazo !== null && <DialogoRechazo codigo={doc.codigo} motivo={rechazo} setMotivo={setRechazo} onRechazar={() => resultado(demo.rechazar(doc.id, rechazo.trim()))} />}
+
+      {enSitio && firma !== "sitio" && <DialogoFirmaEnSitio codigo={doc.codigo} datos={enSitio} setDatos={setEnSitio} onFirmar={() => setFirma("sitio")} />}
     </div>
   );
 }
@@ -372,6 +470,49 @@ function DialogoRechazo({ codigo, motivo, setMotivo, onRechazar }: { codigo: str
             }}
           >
             Rechazar
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Quién recibe el trabajo (nombre y cargo) antes de pasarle el celular para que firme en sitio. */
+function DialogoFirmaEnSitio({
+  codigo,
+  datos,
+  setDatos,
+  onFirmar,
+}: {
+  codigo: string;
+  datos: { nombre: string; cargo: string };
+  setDatos: (d: { nombre: string; cargo: string } | null) => void;
+  onFirmar: () => void;
+}) {
+  const cerrar = () => setDatos(null);
+  const ref: React.MutableRefObject<HTMLDivElement | null> = useModal<HTMLDivElement>(cerrar, { focoInicial: (): HTMLElement | null => ref.current?.querySelector("input") ?? null });
+  const listo = datos.nombre.trim().length >= 3;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" {...fondoQueCierra(cerrar)}>
+      <div ref={ref} role="dialog" aria-modal="true" aria-label={`Firma del cliente en sitio: ${codigo}`} className="w-full max-w-md rounded-xl bg-white p-4">
+        <p className="font-semibold">Firma del cliente en sitio</p>
+        <p className="text-sm text-slate-500">Recibido a satisfacción del servicio de {codigo}. Confirma quién firma y pásale el celular.</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <label className="block text-xs font-medium text-slate-600">
+            Nombre de quien firma
+            <Input className="mt-1" value={datos.nombre} onChange={(e) => setDatos({ ...datos, nombre: e.target.value })} />
+          </label>
+          <label className="block text-xs font-medium text-slate-600">
+            Cargo
+            <Input className="mt-1" value={datos.cargo} onChange={(e) => setDatos({ ...datos, cargo: e.target.value })} />
+          </label>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="ghost" onClick={cerrar}>
+            Cancelar
+          </Button>
+          <Button disabled={!listo} onClick={onFirmar}>
+            <PenLine className="h-4 w-4" /> Firmar
           </Button>
         </div>
       </div>

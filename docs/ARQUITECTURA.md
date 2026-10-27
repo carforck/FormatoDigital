@@ -226,6 +226,51 @@ proyectos y equipos siguen igual (el técnico legaliza sus gastos).
 - **Compresión de fotos** (`src/nucleo/imagenes.ts`): lado mayor de 1280 px
   en JPEG; una foto de 4 MB queda en ~100–200 KB. La usan el registro
   fotográfico y los soportes de gastos.
+- **Cámara o galería** (`src/components/docs/ElegirImagen.tsx`, pedido 13): donde
+  se agregan imágenes (fotos del reporte en el asistente y en el anexo, factura
+  del gasto en el asistente y en la fila del formato) hay dos acciones: «Tomar
+  foto» (`capture="environment"`, abre la cámara) y «Galería / archivos» (sin
+  `capture`, `accept="image/*"`, varias a la vez donde aplica). Con `capture`
+  el celular abre solo la cámara y esconde la galería. El input se limpia tras
+  cada elección; si una imagen no se puede leer (HEIC del iPhone fuera de
+  Safari, archivo dañado) se avisa en pantalla y se agregan las demás
+  (`comprimirVarias`).
+- **Trabajo de campo** (pedidos 11, 12 y 14, migración 0013):
+  - *Firma del cliente en sitio* (su «recibido a satisfacción»): el asistente
+    del reporte la pide justo después de la firma del técnico, con el nombre y
+    cargo de quien firma (prellenados con la persona contactada y su cargo;
+    `nombreRecibe` / `cargoRecibe` se imprimen bajo la firma) y la opción «El
+    cliente firma después». En el formulario, la casilla dice «Toca para que
+    firme el cliente». Si se envió sin ella, el autor la toma desde el detalle
+    («Tomar firma del cliente en sitio») mientras está en revisión o aprobado;
+    queda en el historial «Firma del cliente en sitio».
+  - *Al aprobar* un reporte que ya trae la firma del cliente queda **cerrado**
+    (historial «Aprobó» + «Cerrado con la firma del cliente en sitio»; el
+    portal del cliente recibe «firmado en sitio»). Sin la firma sigue
+    «Aprobado» y se cierra como antes: portal del cliente o enlace de firma
+    (el enlace solo se crea sobre un aprobado sin firma; tomar la firma en
+    sitio anula los pendientes).
+  - *Retirar para corregir:* el autor de un documento en revisión (reporte,
+    permiso, gasto; `puedeRetirarDoc`, por el registro genérico: todo formato
+    sin `aprobarAlEnviar`) lo devuelve a borrador con confirmación, lo edita y
+    lo reenvía; historial «Retiró el envío para corregir», aviso a los
+    revisores y se quita el aviso pendiente «envió … a revisión». Ya aprobado
+    no se retira: solo el rechazo con motivo del revisor lo devuelve. Gana
+    quien llega primero: el proveedor revalida sobre el estado más reciente;
+    al revisor que lo tenía abierto se le explica que el autor lo retiró (y al
+    autor, que ya fue aprobado). En el modo empresa, si los dos guardan a la
+    vez, la versión optimista recarga lo más reciente con aviso.
+  - *Clientes nuevos desde los formatos* (`src/nucleo/clientes.ts`): al
+    GUARDAR (no en cada tecla) un documento cuyo cliente escrito no está en el
+    directorio, se crea para toda la organización con lo diligenciado
+    (`datosCliente` del módulo: reporte, permiso y cotización; la legalización
+    de gastos no, porque «cliente u obra» puede ser interno) y se enlaza el
+    documento: «Guardé «X» en el directorio de clientes». El nombre se compara
+    sin mayúsculas, tildes ni espacios de más; si ya existe, se enlaza y se
+    llenan solo sus campos vacíos (nunca se sobrescribe); uno desactivado no se
+    recrea: se pregunta si se usa. Lo puede hacer el técnico con la acción
+    `registrar_clientes`; editar, desactivar y eliminar siguen siendo del
+    permiso `clientes` (Coordinador SST y administración).
 - **Separación de funciones** (`src/nucleo/permisos.ts` y el proveedor de
   datos, igual que la migración 0008): solo el autor edita, envía o borra su
   borrador; nadie aprueba lo propio (`puedeRevisarDoc`); abrir `?id=` de un
@@ -376,7 +421,7 @@ con la misma versión optimista (si otro guardó entre tanto, gana el servidor c
 aviso). El caché nunca toca `/api/*` ni Supabase. Detalle, límites y
 actualizaciones: [`README.md`](../README.md#app-instalable-y-sin-conexión-pwa).
 
-La lista de migraciones (0001 … 0012) con su contenido está en el
+La lista de migraciones (0001 … 0013) con su contenido está en el
 [`README.md`](../README.md#backend-supabase).
 
 `supabase/instalar.sql` une migraciones y semilla para instalar un proyecto
@@ -392,9 +437,17 @@ nuevo de una vez (SQL Editor → Run). Se regenera, no se edita a mano.
   Lo comercial (cotizaciones y cuentas de cobro) es solo de `admin` (0011).
 - **Reglas en la base de datos, no solo en la app** (trigger
   `documentos_flujo`): transiciones válidas (borrador → en revisión →
-  aprobado → cerrado; rechazo con motivo obligatorio), quién puede hacer cada
-  una, contenido bloqueado después de enviar, y registro de cada paso en
+  aprobado → cerrado; rechazo con motivo obligatorio; el autor retira de en
+  revisión a borrador antes de la aprobación, 0013), quién puede hacer cada
+  una, contenido bloqueado después de enviar (salvo la firma del cliente en
+  sitio que pone el autor en revisión o al cerrar un aprobado, 0013; aprobar
+  un reporte que ya la trae lo deja cerrado), y registro de cada paso en
   `documento_eventos` y `auditoria`.
+- **Clientes (0013):** el técnico solo inserta clientes activos de su
+  organización (`clientes_registrar_tecnico`); no los edita ni los borra. El
+  trigger `clientes_sin_duplicar` rechaza un nombre igual sin mayúsculas,
+  tildes ni espacios de más (`clave_nombre`) y `completar_cliente` llena solo
+  los campos vacíos con lo escrito en un formato.
 - **Firma remota:** `crear_enlace_firma` (requiere sesión) genera un token de
   un solo uso con vencimiento (se guarda solo su hash). El cliente abre el
   enlace sin cuenta (`documento_por_enlace`) y firma (`firmar_con_enlace`).
@@ -433,7 +486,9 @@ bash scripts/armar-instalador.sh                                # 3. regenera su
   visibilidad por rol, flujo de estados, bloqueo, firma por enlace,
   auditoría, legalización de gastos (oculta al cliente), cuentas de cobro y
   proyectos (aislamiento entre empresas y clientes, proyecto coherente con el
-  cliente, bloqueo al enviar, cotización aceptada por el cliente en su portal).
+  cliente, bloqueo al enviar, cotización aceptada por el cliente en su portal)
+  y trabajo de campo (firma del cliente en sitio, cierre al aprobar, retirar
+  para corregir, clientes creados por el técnico sin duplicados).
 - `aplicar-migracion.py` envía el SQL a Supabase en una transacción (Management
   API) con `SUPABASE_ACCESS_TOKEN` y `SUPABASE_PROJECT_REF` de `.env.local`.
   Ese archivo **nunca** se sube al repositorio.
@@ -469,6 +524,10 @@ Comandos de prueba, opciones de la e2e (`SOLO`, `BASE`, `CHROME`) y stack: ver e
 | 8 | El cliente consulta sus reportes | **Hecho:** portal del cliente (reportes, cotizaciones y cuentas emitidas de su empresa) |
 | 9 | Trabajo por proyecto y por cliente | **Hecho:** módulo Proyectos con sus documentos, cotizaciones y cuentas de cobro |
 | 10 | Equipos con su historial de reportes (cliente → sistema → equipo) | **Hecho:** módulo Equipos; el técnico marca o crea los equipos atendidos en el reporte |
+| 11 | «Desde el perfil técnico no se pudo recoger la firma cliente» | **Hecho:** paso «Firma del cliente (recibido a satisfacción)» en el asistente con quién firma y «El cliente firma después»; casilla «Toca para que firme el cliente» en el formulario; «Tomar firma del cliente en sitio» desde el detalle (en revisión o aprobado). Aprobar con esa firma lo deja cerrado |
+| 12 | «El reporte después de enviado no se deja editar» | **Hecho:** «Retirar para corregir» del autor mientras está en revisión (reporte, permiso y gasto) → borrador → editar → reenviar. Aprobado ya no se retira: el revisor lo devuelve con motivo |
+| 13 | «Al querer agregar imágenes no permite, sólo abre la cámara» | **Hecho:** dos botones donde se agregan imágenes, «Tomar foto» (cámara) y «Galería / archivos» (sin `capture`); aviso claro si una imagen (HEIC) no se puede leer |
+| 14 | «Al digitar un cliente nuevo, que quede almacenado» | **Hecho:** al guardar el documento, el cliente nuevo queda en el directorio de la organización (también desde el técnico), sin duplicados por mayúsculas o tildes; si existe, se completan sus campos vacíos; el próximo reporte lo autollena |
 
 ### Pendiente
 
@@ -483,3 +542,7 @@ Comandos de prueba, opciones de la e2e (`SOLO`, `BASE`, `CHROME`) y stack: ver e
 - Requerimiento de materiales: planeado.
 - Los archivos del bucket `archivos` siguen con acceso por organización (0004),
   no por documento. (0010 y 0011 ya están aplicadas en Supabase: verificado.)
+- **0013 (`0013_campo_tecnico.sql`) aún no está aplicada en Supabase.** La app de
+  hoy (fase 1, `espacios`) no la necesita: aplica las mismas reglas en el
+  navegador. Aplicarla antes de la fase 2 con `scripts/aplicar-migracion.py`
+  (probada con `npm run test:db`).

@@ -1,0 +1,7 @@
+# Despliegue por CLI: nunca subir secretos ni artefactos locales
+.env*
+!.env.example
+.next
+node_modules
+.git
+.next-pages

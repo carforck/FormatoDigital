@@ -1780,7 +1780,7 @@ async function variantes(b, errores) {
   const vista = () =>
     p.evaluate(() => {
       const h = document.querySelector(".doc-print .hdr");
-      return { logo: Boolean(document.querySelector(".doc-print [data-logo-texto=fortox]")), fondo: h ? getComputedStyle(h).backgroundColor : "" };
+      return { logo: Boolean(document.querySelector(".doc-print[data-hoja=fortox] img[alt=FORTOX]")), fondo: h ? getComputedStyle(h).backgroundColor : "" };
     });
   const elegirEnFormulario = (indice, texto) =>
     p.evaluate(
@@ -1806,9 +1806,13 @@ async function variantes(b, errores) {
   let h = await hoja();
   let v = await vista();
   ok((await chip()).startsWith("Formato: Servicios Fortox"), "al elegir el proyecto Servicios Fortox el chip dice «Formato: Servicios Fortox»");
-  ok(v.logo && h.includes("FORTOX") && h.includes("Código por confirmar") && !h.includes("FO-GSST-22"), "la vista previa trae el encabezado de FORTOX (logo de texto, código por confirmar)");
+  ok(v.logo && h.includes("REPORTE DE MANTENIMIENTO DE SEGURIDAD ELECTRÓNICA") && h.includes("Nit. 860.046.201-2") && h.includes("I. INFORMACIÓN GENERAL") && !h.includes("FO-GSST-22"), "la vista previa sale en la hoja de FORTOX (logo, título, NIT, secciones)");
   ok(v.fondo && v.fondo !== verde, "las franjas del formato cambian de color (no el verde de SOTEC)");
-  ok(h.includes("SOTEC para FORTOX") && !h.includes("propiedad de SOTEC"), "el pie es el de la variante FORTOX");
+  ok(h.includes("FORMA: 7PA/F1-15") && h.includes("Coordinador de Tecnologia") && !h.includes("propiedad de SOTEC"), "el pie es el de FORTOX (FORMA 7PA/F1-15) con el visto bueno de Fortox");
+  // Casilla de tipo de mantenimiento y campos propios de Fortox
+  await p.evaluate(() => [...document.querySelectorAll(".doc-print[data-hoja=fortox] button")].find((b) => b.textContent.trim().startsWith("Correctivo")).click());
+  await sleep(200);
+  ok(await p.evaluate(() => [...document.querySelectorAll(".doc-print[data-hoja=fortox] button[aria-pressed=true]")].map((b) => b.textContent.trim()).join() === "CorrectivoX"), "la casilla «Correctivo» queda marcada con X");
   ok((await p.evaluate(() => document.body.innerText)).includes("Formato: Servicios Fortox. El reporte técnico sale con el encabezado de FORTOX"), "el asistente avisa el cambio de formato");
   await foto("generador-fortox-escritorio");
 
@@ -1829,15 +1833,20 @@ async function variantes(b, errores) {
   const guardado = await p.evaluate((k, id) => JSON.parse(localStorage.getItem(k)).documentos.find((d) => d.id === id), CLAVE, idFortox);
   ok(guardado && guardado.variante === "fortox" && /^RT-\d{3}-\d{2}$/.test(guardado.codigo), `el documento guarda la variante «fortox» y sigue la serie RT (${guardado && guardado.codigo})`);
   h = await hoja();
-  ok((await vista()).logo && h.includes("Código por confirmar") && (await chip()).startsWith("Formato: Servicios Fortox"), "el detalle muestra el formato de FORTOX y su chip");
+  ok((await vista()).logo && h.includes("FORMA: 7PA/F1-15") && (await chip()).startsWith("Formato: Servicios Fortox"), "el detalle muestra el formato de FORTOX y su chip");
   await foto("detalle-fortox-escritorio");
   await p.goto(`${BASE}/imprimir?doc=${idFortox}&volver=/app/documentos`, { waitUntil: "networkidle0" });
   await p.waitForSelector("[data-impresion-lista]", { timeout: 20000 });
   await sleep(300);
   h = await hoja();
   ok((await p.title()).startsWith(`${guardado.codigo} · Reporte técnico`), `el PDF se llama con el consecutivo (${await p.title()})`);
-  ok((await vista()).logo && h.includes("FORTOX") && h.includes("Código por confirmar"), "/imprimir sale con el formato de FORTOX");
+  ok((await vista()).logo && h.includes("REPORTE DE MANTENIMIENTO DE SEGURIDAD ELECTRÓNICA") && h.includes("FORMA: 7PA/F1-15"), "/imprimir sale con el formato de FORTOX");
   await foto("imprimir-fortox");
+  if (capturas) {
+    await p.emulateMediaType("print");
+    await p.pdf({ path: path.join(capturas, "imprimir-fortox.pdf"), format: "letter", printBackground: true });
+    await p.emulateMediaType(null);
+  }
 
   // 4. Un proyecto de SOTEC sale como SOTEC
   await p.goto(`${BASE}/app/documentos`, { waitUntil: "networkidle0" });
@@ -1869,7 +1878,7 @@ async function variantes(b, errores) {
   await sleep(400);
   await p.goto(`${BASE}/app/documentos/ver?id=${idFortox}`, { waitUntil: "networkidle0" });
   await sleep(500);
-  ok((await vista()).logo && (await hoja()).includes("Código por confirmar"), "cambiar el tipo del proyecto no cambia el formato de un reporte ya guardado");
+  ok((await vista()).logo && (await hoja()).includes("FORMA: 7PA/F1-15"), "cambiar el tipo del proyecto no cambia el formato de un reporte ya guardado");
   // Se deja como estaba
   await p.goto(`${BASE}/app/proyectos/editar?id=p-12`, { waitUntil: "networkidle0" });
   await sleep(500);
@@ -1922,6 +1931,7 @@ async function variantes(b, errores) {
   await p.evaluate(() => [...document.querySelectorAll("button")].find((x) => x.textContent.trim() === "Formato")?.click());
   await sleep(400);
   await foto("generador-fortox-390-formato");
+  if (capturas) await (await p.$(".doc-print[data-hoja=fortox]"))?.screenshot({ path: path.join(capturas, "hoja-fortox-390.png") });
   await p.goto(`${BASE}/app/documentos/ver?id=${idFortox}`, { waitUntil: "networkidle0" });
   await sleep(600);
   await foto("detalle-fortox-390");

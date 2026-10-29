@@ -493,8 +493,9 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium uppercase tracking-wide text-sotec-greenDeep">
-            {/* Una variante con datos provisionales trae «por confirmar» en vez de un número de versión */}
-            {f.codigo} · {/^\d/.test(f.version) ? `v${f.version}` : `versión ${f.version}`}
+            {/* Una variante puede no manejar versión (FORTOX: «—») */}
+            {f.codigo}
+            {/^\d/.test(f.version) ? ` · v${f.version}` : f.version && f.version !== "—" ? ` · versión ${f.version}` : ""}
           </p>
           <h1 className="text-xl font-semibold">
             {existente ? "Continuar" : f.nuevo} {f.corto.toLowerCase()} <span className="font-mono text-base text-slate-500">{codigoVista}</span>

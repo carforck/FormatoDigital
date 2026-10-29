@@ -38,6 +38,12 @@ export interface DatosReporte {
    */
   nombreRecibe?: string;
   cargoRecibe?: string;
+  /** Campos propios del formato de FORTOX (variante «fortox»); en el de SOTEC no salen. */
+  ciudad?: string;
+  abonado?: string;
+  an8?: string;
+  valorServicio?: string;
+  factura?: string;
   /** Registro fotográfico: sale en una hoja anexa con el mismo encabezado. */
   fotos?: FotoReporte[];
 }

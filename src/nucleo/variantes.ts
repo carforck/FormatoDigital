@@ -15,15 +15,11 @@
  * después el tipo del proyecto o del cliente no cambia los documentos ya guardados.
  * Un documento antiguo sin `variante` sale como SOTEC.
  *
- * ══ FORTOX: DATOS PROVISIONALES ══════════════════════════════════════════════════
- * Todavía no tenemos el formato oficial de Fortox (logo, código, versión, fecha ni
- * colores). Lo marcado «por confirmar» se reemplaza AQUÍ, en `VARIANTE_FORTOX`:
- *   - logo: copiar el archivo a `public/variantes/fortox-logo.png` y poner `logo: "/variantes/fortox-logo.png"`.
- *   - formatos.reporte: `codigo`, `version`, `fecha` (dd/mm/aaaa) y `nombre` del formato de Fortox.
- *   - colorEncabezado (franjas de título) y colorMarca; `pie` y `pieAnexo` (textos legales del pie).
- *   - etiquetas: si el formato de Fortox nombra distinto algún campo («Cliente» → «Puesto»…).
- *   - prefijo: solo si Fortox exige numeración propia (p. ej. "RTF"); sin él, sigue la serie RT.
- *   - quitar `provisional: true` cuando los datos sean los oficiales.
+ * ══ FORTOX ══════════════════════════════════════════════════════════════════════
+ * Formato oficial «Reporte de mantenimiento de seguridad electrónica» (FORMA 7PA/F1-15),
+ * tomado del PDF que envió Fortox (insumos/formato-reporte-tecnico-fortox.pdf, fuera del
+ * repo). Su hoja es distinta a la de SOTEC, así que el reporte la dibuja aparte
+ * (`hoja: "fortox"`, ver src/modulos/reportes/HojaFortox.tsx); logo en public/variantes.
  * ════════════════════════════════════════════════════════════════════════════════
  */
 import type { InfoFormato } from "@/modulos/contrato";
@@ -61,6 +57,8 @@ export interface VarianteFormato {
   formatos: Partial<Record<TipoDoc, FormatoVariante>>;
   /** Datos de marca aún por confirmar: se avisa en el aplicativo (no en el papel). */
   provisional?: boolean;
+  /** Hoja propia de la variante cuando su formato no es el de SOTEC con otra marca (p. ej. "fortox"). */
+  hoja?: "fortox";
 }
 
 /** Clave de la variante por defecto. */
@@ -69,23 +67,19 @@ export const VARIANTE_BASE = "sotec";
 /** SOTEC: el formato de cada módulo, sin cambios. */
 const VARIANTE_SOTEC: VarianteFormato = { clave: VARIANTE_BASE, marca: "SOTEC", etiqueta: "Servicios SOTEC", formatos: {} };
 
-/**
- * FORTOX — PROVISIONAL: sin logo, código ni colores oficiales todavía (ver el encabezado
- * de este archivo). Logo de texto y color neutro para que el cambio se vea de punta a punta.
- */
+/** FORTOX: su formato de reporte de mantenimiento (FORMA 7PA/F1-15), con hoja propia. */
 const VARIANTE_FORTOX: VarianteFormato = {
   clave: "fortox",
   marca: "FORTOX",
   etiqueta: "Servicios Fortox",
-  logo: undefined, // por confirmar: "/variantes/fortox-logo.png"
-  colorEncabezado: "#cbd5e1", // por confirmar (gris neutro mientras llega el formato oficial)
-  colorMarca: "#1e293b",
-  pie: "Servicio ejecutado por SOTEC para FORTOX. Formato provisional: pendiente el formato oficial de FORTOX.",
-  pieAnexo: "Servicio ejecutado por SOTEC para FORTOX.",
+  logo: "/variantes/fortox-logo.png",
+  colorEncabezado: "#FABF8F", // franjas salmón del formato de Fortox
+  colorMarca: "#0B2D5B",
+  hoja: "fortox",
   formatos: {
-    reporte: { nombre: "Reporte técnico de servicio", codigo: "por confirmar", version: "por confirmar", fecha: "por confirmar" },
+    // Fortox no maneja versión ni fecha del formato: solo la FORMA
+    reporte: { nombre: "Reporte de mantenimiento de seguridad electrónica", codigo: "7PA/F1-15", version: "—", fecha: "—" },
   },
-  provisional: true,
 };
 
 /** Variantes disponibles, en el orden de los selectores. */

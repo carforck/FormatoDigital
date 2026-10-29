@@ -36,8 +36,9 @@ igual("SOTEC es la base", VARIANTE_BASE, "sotec");
 igual("existe FORTOX", VARIANTES.some((v) => v.clave === "fortox"), true);
 igual("clave desconocida → SOTEC", varianteDe("otra").clave, "sotec");
 igual("documento antiguo sin variante → SOTEC", varianteDe(undefined).clave, "sotec");
-igual("FORTOX está marcado como provisional (sin datos oficiales)", varianteDe("fortox").provisional, true);
-igual("FORTOX no inventa logo", varianteDe("fortox").logo, undefined);
+igual("FORTOX ya no es provisional (formato oficial)", varianteDe("fortox").provisional, undefined);
+igual("FORTOX con su logo", varianteDe("fortox").logo, "/variantes/fortox-logo.png");
+igual("FORTOX con hoja propia", varianteDe("fortox").hoja, "fortox");
 
 // Tipos de proyecto
 igual("tipos de fábrica", tiposProyectoDe(config).map((t) => t.nombre), ["Servicios SOTEC", "Servicios Fortox"]);
@@ -67,7 +68,7 @@ const base: InfoFormato = { codigo: "FO-GSST-22", nombre: "Formato de reporte t�
 igual("SOTEC conserva el formato del módulo", formatoEnVariante(base, "reporte", "sotec"), base);
 igual("sin variante conserva el formato", formatoEnVariante(base, "reporte", undefined), base);
 const ff = formatoEnVariante(base, "reporte", "fortox");
-igual("FORTOX: código por confirmar", ff.codigo, "por confirmar");
+igual("FORTOX: FORMA 7PA/F1-15", ff.codigo, "7PA/F1-15");
 igual("FORTOX: nombre corto y concordancia del módulo", [ff.corto, ff.el, ff.plural], ["Reporte técnico", "el", "reportes"]);
 igual("FORTOX en un gasto: el formato SOTEC", formatoEnVariante({ ...base, codigo: "FO-GSST-25" }, "gasto", "fortox").codigo, "FO-GSST-25");
 igual("etiqueta sin cambio", etiquetaEnVariante("reporte", "fortox", "Cliente"), "Cliente");

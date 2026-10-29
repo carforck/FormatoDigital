@@ -38,9 +38,23 @@
   .scrollbar-thin { scrollbar-width: thin; }
 }
 
+/*
+ * iPhone: Safari acerca la pantalla al enfocar un campo con letra menor de 16 px. En el celular
+ * (< 640 px) los campos del aplicativo usan 16 px; en escritorio siguen con su tamaño. Los de
+ * las plantillas (.doc-print) conservan la letra del formato (vista previa e impresión fieles):
+ * ahí el acercamiento lo evita SinZoomIOS (maximum-scale solo en iOS).
+ */
+@media screen and (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]):not(.doc-print *),
+  select:not(.doc-print *),
+  textarea:not(.doc-print *) {
+    font-size: 16px !important;
+  }
+}
+
 /* Documentos imprimibles: siempre en Arial, como el formato original */
 .doc-print { font-family: Arial, Helvetica, sans-serif; color: #000; background: #fff; }
-.doc-print .hdr { background: #92d050; font-weight: 700; text-align: center; }
+.doc-print .hdr { background: var(--hdr-fondo, #92d050); font-weight: 700; text-align: center; }
 
 @media print {
   @page { margin: 0; }

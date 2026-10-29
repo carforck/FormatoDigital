@@ -4,7 +4,8 @@
  * Ruta /app/proyectos/editar: formulario de proyecto. Con ?id= edita uno existente;
  * sin él crea uno nuevo (?cliente= lo precarga con su sitio habitual). Permiso
  * `proyectos` (Coordinador SST y administración; AppShell bloquea al resto). Guarda con
- * demo.guardarProyecto de useDemo().
+ * demo.guardarProyecto de useDemo(). El «Tipo de proyecto» (lista de Configuración) define la
+ * variante de formato de sus documentos (p. ej. «Servicios Fortox» → formato de FORTOX).
  */
 import Link from "next/link";
 import { Suspense, useState } from "react";
@@ -21,6 +22,7 @@ import { ahora, hoy, useDemo } from "@/nucleo/datos/DemoProvider";
 import { cop } from "@/nucleo/letras";
 import { rutaProyecto } from "@/nucleo/rutas";
 import type { EstadoProyecto, Proyecto } from "@/nucleo/tipos";
+import { TIPO_PROYECTO_BASE, tiposProyectoDe, varianteDe } from "@/nucleo/variantes";
 
 /** Crear o editar un proyecto (administración y SST). */
 function Editar() {
@@ -34,7 +36,7 @@ function Editar() {
     const n = demo.nuevoCodigoProyecto();
     const clienteId = params.get("cliente") ?? "";
     const c = demo.clientes.find((x) => x.id === clienteId);
-    return { ...n, nombre: "", clienteId, sitio: c?.sitio ?? "", responsableId: u.id, fechaInicio: hoy(), estado: "activo", descripcion: "", creado: ahora(), actualizado: ahora(), historial: [] };
+    return { ...n, nombre: "", tipo: TIPO_PROYECTO_BASE, clienteId, sitio: c?.sitio ?? "", responsableId: u.id, fechaInicio: hoy(), estado: "activo", descripcion: "", creado: ahora(), actualizado: ahora(), historial: [] };
   });
   const [aviso, setAviso] = useState<string | null>(null);
   const regreso = existente ? rutaProyecto(existente.id) : "/app/proyectos";
@@ -91,6 +93,23 @@ function Editar() {
               </option>
             ))}
           </select>
+        </label>
+        <label className="block text-sm">
+          <span className="text-xs text-slate-500">Tipo de proyecto</span>
+          <select aria-label="Tipo de proyecto" className={campo} value={p.tipo ?? ""} onChange={(e) => set({ tipo: e.target.value || undefined })}>
+            {/* Proyecto anterior a los tipos: sus documentos usan el formato por defecto del cliente */}
+            {!p.tipo && <option value="">Sin tipo (formato del cliente)</option>}
+            {tiposProyectoDe(demo.config).map((t) => (
+              <option key={t.nombre} value={t.nombre}>
+                {t.nombre}
+              </option>
+            ))}
+            {/* Un tipo que ya no está en Configuración se conserva */}
+            {p.tipo && !tiposProyectoDe(demo.config).some((t) => t.nombre === p.tipo) && <option value={p.tipo}>{p.tipo}</option>}
+          </select>
+          <span className="text-xs text-slate-500">
+            Formato de sus documentos: {p.tipo ? varianteDe(tiposProyectoDe(demo.config).find((t) => t.nombre === p.tipo)?.variante).marca : "el del cliente"}
+          </span>
         </label>
         <label className="block text-sm">
           <span className="text-xs text-slate-500">Sitio o ubicación</span>

@@ -5,7 +5,8 @@
  * edición en línea, firmas del técnico y del cliente (su «recibido a satisfacción»,
  * con quién firma y su cargo), equipos atendidos y el registro fotográfico como
  * hoja(s) anexa(s) con el mismo encabezado; las fotos se toman con la cámara o se
- * eligen de la galería (`ElegirImagen`).
+ * eligen de la galería (`ElegirImagen`). Sale con la variante de formato de quien lo
+ * muestra (`ConVariante`: logo, control documental, colores, pie y etiquetas; p. ej. FORTOX).
  */
 
 import { Trash2 } from "lucide-react";
@@ -17,6 +18,7 @@ import type { DatosReporte, FotoReporte } from "@/nucleo/tipos";
 import { EditableText } from "@/components/docs/EditableText";
 import { ElegirImagen, avisoSobrantes, mensajeImagenIlegible } from "@/components/docs/ElegirImagen";
 import { Encabezado, Firma } from "@/components/docs/Encabezado";
+import { PieFormato, useEtiquetas } from "@/components/docs/VarianteFormato";
 import { EquiposEnFormato } from "@/modulos/equipos/EquiposEnFormato";
 import type { EquipoAtendido } from "@/modulos/equipos/tipos";
 
@@ -39,6 +41,8 @@ type CampoTexto = Exclude<keyof DatosReporte, "fotos">;
 /** Réplica del FO-GSST-22 · Formato de reporte técnico (carta). El anexo de fotos solo sale si hay fotos o se está editando. */
 export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, equipos = [] }: Props) {
   const fotos = datos.fotos ?? [];
+  // Etiquetas de los campos según la variante de formato (FORTOX puede nombrarlos distinto)
+  const et = useEtiquetas("reporte");
   const campo = (k: CampoTexto, opts: { multiline?: boolean; type?: "text" | "date" | "time" | "email" | "tel"; placeholder?: string } = {}) => (
     <span className={cn("rounded transition-colors", resaltar === k && "bg-sotec-green/40 ring-2 ring-sotec-green")}>
       <EditableText
@@ -56,7 +60,7 @@ export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, e
 
   const linea = (etiqueta: string, k: CampoTexto, type?: "text" | "email" | "tel") => (
     <div className="flex min-w-0 items-end gap-1">
-      <span className="shrink-0">{etiqueta}:</span>
+      <span className="shrink-0">{et(etiqueta)}:</span>
       <span className={cn("min-w-0 flex-1 border-b border-black leading-tight", type === "email" ? "[overflow-wrap:anywhere]" : "break-words")}>{campo(k, { type })}</span>
     </div>
   );
@@ -70,15 +74,15 @@ export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, e
         <table className="w-[56%] border-collapse border border-black">
           <tbody>
             <tr>
-              <td className="hdr w-1/2 border border-black py-1">FECHA:</td>
+              <td className="hdr w-1/2 border border-black py-1">{et("FECHA:")}</td>
               <td className="border border-black px-2">{campo("fecha", { type: "date" })}</td>
             </tr>
             <tr>
-              <td className="hdr border border-black py-1">HORA DE LLEGADA:</td>
+              <td className="hdr border border-black py-1">{et("HORA DE LLEGADA:")}</td>
               <td className="border border-black px-2">{campo("horaLlegada", { type: "time" })}</td>
             </tr>
             <tr>
-              <td className="hdr border border-black py-1">HORA DE SALIDA:</td>
+              <td className="hdr border border-black py-1">{et("HORA DE SALIDA:")}</td>
               <td className="border border-black px-2">{campo("horaSalida", { type: "time" })}</td>
             </tr>
           </tbody>
@@ -86,7 +90,7 @@ export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, e
       </div>
 
       <section className="mt-2 border border-black">
-        <div className="hdr border-b border-black py-0.5">DATOS GENERALES</div>
+        <div className="hdr border-b border-black py-0.5">{et("DATOS GENERALES")}</div>
         <div className="grid grid-cols-1 gap-x-8 gap-y-1.5 p-3 sm:grid-cols-2 print:grid-cols-2">
           {linea("Tipo reporte", "tipoReporte")}
           {linea("Correo", "correo", "email")}
@@ -108,12 +112,12 @@ export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, e
       </section>
 
       <section className="border-x border-b border-black">
-        <div className="hdr border-b border-black py-0.5">DESCRIPCIÓN</div>
+        <div className="hdr border-b border-black py-0.5">{et("DESCRIPCIÓN")}</div>
         <div className="min-h-[150px] p-2 text-justify print:min-h-[90px]">{campo("descripcion", { multiline: true })}</div>
       </section>
 
       <section className="mt-5 border border-black print:mt-3">
-        <div className="hdr border-b border-black py-0.5">RECOMENDACIÓN(ES)</div>
+        <div className="hdr border-b border-black py-0.5">{et("RECOMENDACIÓN(ES)")}</div>
         <div className="min-h-[100px] p-2 text-justify print:min-h-[60px]">{campo("recomendaciones", { multiline: true })}</div>
       </section>
 
@@ -141,10 +145,10 @@ export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, e
         </div>
       </div>
 
-      <p className="mt-6 text-center text-[9.5px] font-bold print:mt-3">
+      <PieFormato tipo="reporte" className="mt-6 text-center text-[9.5px] font-bold print:mt-3">
         Documento emitido por el Servicio de Calidad de la Compañía. El documento es propiedad de SOTEC. La compañía protegerá
         sus propios derechos en los tribunales civiles y penales de acuerdo con la ley.
-      </p>
+      </PieFormato>
     </article>
     {(fotos.length > 0 || editar) && <AnexoFotos fotos={fotos} codigoDoc={codigoDoc} editar={editar} resaltar={resaltar === "fotos"} />}
     </div>
@@ -260,9 +264,9 @@ function HojaFotos({
         </div>
       )}
       {editar && ultima && <ElegirImagen multiple className="mt-3" que="fotos del registro fotográfico" textoCamara="Tomar foto" textoGaleria="Galería / archivos" onElegir={subir} />}
-      <p className="mt-6 text-center text-[9.5px] font-bold print:mt-3">
+      <PieFormato tipo="reporte" anexo className="mt-6 text-center text-[9.5px] font-bold print:mt-3">
         Documento emitido por el Servicio de Calidad de la Compañía. El documento es propiedad de SOTEC.
-      </p>
+      </PieFormato>
     </article>
   );
 }

@@ -112,7 +112,11 @@ códigos QR y licencias.
 - Sistemas (`catalogo.ts`, `SISTEMAS`): CCTV, alarmas, control de acceso,
   detección de incendio, cómputo y redes, cerca eléctrica; cada uno con sus
   tipos sugeridos. Agregar un sistema = una entrada en el catálogo y su ícono
-  en `piezas.tsx` (la base de datos guarda la clave como texto).
+  en `piezas.tsx` (la base de datos guarda la clave como texto). Además, el equipo
+  puede agregar sistemas y tipos propios con «＋ Agregar otro…» en la ficha y
+  «＋ Otro sistema / Otro tipo» en el selector del reporte (listas `equipos.sistema`
+  y `equipos.tipo.<sistema>`): un sistema propio usa su nombre como clave
+  (`SistemaEquipo` admite texto; basta que no esté vacío, como el `check` de 0010).
 - Historial = los documentos que lo marcan (`Documento.equiposIds`,
   `documento_equipos` en la base). El contrato del módulo de documento tiene
   `equipos: { despuesDe }`: el reporte lo activa y el generador pregunta
@@ -235,6 +239,51 @@ proyectos y equipos siguen igual (el técnico legaliza sus gastos).
   cada elección; si una imagen no se puede leer (HEIC del iPhone fuera de
   Safari, archivo dañado) se avisa en pantalla y se agregan las demás
   (`comprimirVarias`).
+- **«＋ Agregar otro» en todas las listas de catálogo** (pedido 16): el asistente y los
+  formularios comparten un solo almacén, `config.opcionesPropias[clave]` (se guarda en el
+  estado de la empresa, demo o `espacios`), con reglas puras en `src/nucleo/opciones.ts`
+  (`LISTA`, `comparable`, `unirOpciones`, `buscarOpcion`). Lo nuevo se usa de una vez, queda
+  para todo el equipo en ambos lados y la administración lo revisa o quita en Configuración
+  (`OpcionesAgregadas`). No se repite por mayúsculas, tildes ni espacios (la ñ cuenta), se
+  recorta y el vacío no se acepta. Componentes en `src/components/ui/SelectConOtro.tsx`:
+  `SelectConOtro` (`<select>` nativo con la última opción «＋ Agregar otro…», que cambia por
+  un campo en el mismo lugar; Enter confirma, Esc cancela, no es un `<form>`),
+  `AgregarOtro` (botón para chips y casillas) y `useListaPropia`. Claves: «formato.paso» del
+  asistente (`permiso.peligros`, `gasto.items` = tipo de gasto…), `cotizacion.unidad`,
+  `equipos.sistema` y `equipos.tipo.<sistema>`.
+
+  | Lista | Dónde |
+  |---|---|
+  | Tipo de gasto | fila del FO-GSST-25 (`PlantillaGasto`) y paso de gastos del asistente («Otro tipo») |
+  | Unidad | ítems de la cotización y formulario de servicio nuevo (asistente y formato) |
+  | Servicio o producto del catálogo | cotización: «＋ Nuevo servicio o producto…» en «Del catálogo» (mismo `serviciosPropios` del asistente) |
+  | Sistema y tipo de equipo | ficha del equipo y selector de equipos del reporte |
+  | Equipo requerido, peligros, medidas, EPP | permiso (`PlantillaPermiso`): «＋ Agregar otro» marca la opción; lo marcado fuera del catálogo se imprime |
+  | Tipo de trabajo, tipo de reporte y las demás listas del asistente | ya lo tenían (`Paso.agregar`) |
+
+  Se dejan sin «otro» a propósito: roles, estados, clientes, proyectos y responsables
+  (tienen su propio alta), filtros de listados y del tablero, tarifas de IVA (19/5/0, legales),
+  tipo de cuenta bancaria (ahorros/corriente), las preguntas de verificación del permiso
+  (son del formato aprobado y se responden por posición) y «Formato por defecto» / «Tipo de
+  proyecto» (sus propias listas en Configuración).
+- **Letra de 16 px en los campos del celular (iPhone):** Safari de iOS acerca la pantalla al
+  enfocar un campo con letra menor de 16 px. Bajo 640 px, `globals.css` pone 16 px a
+  `input`, `select` y `textarea` del aplicativo; en escritorio no cambia nada. Los campos de
+  las plantillas (`.doc-print`, `EditableText`) conservan la letra del formato (vista previa
+  y PDF fieles) y en iOS `SinZoomIOS` (`src/components/ui/`, montado en el layout raíz)
+  agrega `maximum-scale=1` al viewport: iOS solo deja de acercar al enfocar y se puede seguir
+  pellizcando; en Android y escritorio el viewport no se toca. No cambia la impresión.
+- **Nombre de cliente pegado con su NIT** (`separarCliente` en `src/nucleo/clientes.ts`): en
+  los datos reales alguien pegó la razón social y el NIT de un cliente en el campo del nombre (ejemplo ficticio: «* Razón social: FARO ANDINO S.A.S. * NIT: 900123456»).
+  Al escribir o pegar el cliente en el asistente, en el formato (`Generador`) o en Clientes se
+  reconocen etiquetas («Razón social:», «NIT:», «Dirección:», «Teléfono:», «Correo:»…),
+  viñetas, saltos de línea (y las etiquetas pegadas sin salto, porque un campo de una línea
+  los quita) y el NIT dentro del texto. Queda el nombre limpio; el NIT se normaliza
+  («900.123.456», «900.123.456-8») y va al campo del formato que lo tenga (`campoNit` del
+  módulo: cotización) o, en Clientes, al campo NIT (solo si está vacío); si trae dígito de
+  verificación distinto al de la DIAN se avisa. Aviso: «Separé el NIT … del nombre del
+  cliente». Un nombre normal no cambia. En Clientes, «Nombres por revisar» lista los que ya
+  quedaron mal y «Corregir» abre el formulario ya separado (se guarda solo con «Guardar»).
 - **Trabajo de campo** (pedidos 11, 12 y 14, migración 0013):
   - *Firma del cliente en sitio* (su «recibido a satisfacción»): el asistente
     del reporte la pide justo después de la firma del técnico, con el nombre y
@@ -404,6 +453,35 @@ aporta en `ModuloDocumento` lo que el resto lee del registro con
 
 `TIPOS_DOC` fija el orden en el menú, los filtros, el tablero y los proyectos.
 
+### Variantes de formato (marca por tipo de proyecto)
+
+Un mismo módulo puede salir con otra marca (pedido de Magno: los servicios que SOTEC presta a
+**Fortox** salen en el formato de Fortox). El registro está en `src/nucleo/variantes.ts`
+(puro, con pruebas en `tests/unit/variantes.test.ts`):
+
+- `VARIANTES`: `sotec` (base: el formato del módulo tal cual) y `fortox` (provisional). Cada
+  variante define marca, logo (o logo de texto), `colorEncabezado` (franjas `.hdr`, vía
+  `--hdr-fondo`), `pie`/`pieAnexo` y, por tipo de documento en `formatos`, código, nombre, versión,
+  fecha, `etiquetas` de campos y un `prefijo` opcional. Una variante solo cambia los tipos que
+  declara (FORTOX: el reporte); los demás salen como SOTEC (`varianteParaTipo`).
+- **Elección** (`resolverVariante`): tipo del proyecto (`Proyecto.tipo` → `Config.tiposProyecto`,
+  o `TIPOS_PROYECTO_BASE`) > `Cliente.variante` («Formato por defecto») > SOTEC. Un proyecto sin
+  tipo (anterior a esto) deja decidir al cliente.
+- **Guardado**: el generador resuelve la variante en cada render (chip «Formato: …», vista previa,
+  impresión del borrador) y la guarda en `Documento.variante` al guardar; mientras es borrador se
+  recalcula, después queda fija. Sin `variante` = SOTEC (documentos antiguos). En el modo empresa
+  todo va en el JSON de `public.espacios` (sin migración).
+- **Dibujo**: quien muestra una plantilla la envuelve en `<ConVariante variante tipo>`
+  (`src/components/docs/VarianteFormato.tsx`: generador, detalle/portal, `/imprimir`, `/firmar`).
+  `Encabezado`, `LogoFormato` y `PieFormato` la leen del contexto; las plantillas usan
+  `useEtiquetas(tipo)` para los rótulos. Los datos del documento no cambian.
+- **Consecutivos**: sin `prefijo` en la variante, la misma serie del módulo (`reporte-2026`); con
+  prefijo, serie aparte (`serieConsecutivo`: `reporte.fortox-2026`), también al reconstruir
+  contadores.
+- **Configuración**: «Tipos de proyecto y formato» (`TiposProyecto`, `demo.guardarTiposProyecto`,
+  solo `config`); `actualizarConfig` no los pisa. El formato oficial de Fortox se cambia solo en
+  `VARIANTE_FORTOX` (ver README).
+
 ### Agregar un formato nuevo
 
 1. Crear `src/modulos/<clave>/` con `tipos.ts`, `catalogo.ts`, `validar.ts`,
@@ -550,6 +628,8 @@ Comandos de prueba, opciones de la e2e (`SOLO`, `BASE`, `CHROME`) y stack: ver e
 | 12 | «El reporte después de enviado no se deja editar» | **Hecho:** «Retirar para corregir» del autor mientras está en revisión (reporte, permiso y gasto) → borrador → editar → reenviar. Retirar o rechazar anula la firma del cliente en sitio (se vuelve a firmar lo corregido). Aprobado ya no se retira: el revisor lo devuelve con motivo |
 | 13 | «Al querer agregar imágenes no permite, sólo abre la cámara» | **Hecho:** dos botones donde se agregan imágenes, «Tomar foto» (cámara) y «Galería / archivos» (sin `capture`); aviso claro si una imagen (HEIC) no se puede leer |
 | 14 | «Al digitar un cliente nuevo, que quede almacenado» | **Hecho:** al guardar el documento, el cliente nuevo queda en el directorio de la organización (también desde el técnico), sin duplicados por mayúsculas, tildes, puntuación o razón social (la ñ cuenta); un nombre que solo se parece se pregunta; si existe, se completan sus campos vacíos; el próximo reporte lo autollena |
+| 15 | «Al digitar Fortox no me cambia el formato… que el cambio se haga cuando escoja el proyecto de tipo Servicios Fortox» | **Hecho (formato de Fortox provisional):** «Tipo de proyecto» en el proyecto (lista en Configuración) y «Formato por defecto» en el cliente eligen la variante de formato; chip «Formato: Servicios Fortox», vista previa, detalle, PDF y portal en FORTOX; el documento guarda su variante. Falta el formato oficial de Fortox (logo, código, versión, colores) en `src/nucleo/variantes.ts` |
+| 16 | «Si de pronto no tengo el producto creado pueda agregar otro… en todos los campos que se pueda colocar otro» | **Hecho:** «＋ Agregar otro…» en los formularios (tipo de gasto, unidad, servicio del catálogo, sistema y tipo de equipo, listas del permiso) con el mismo almacén del asistente; lista en «Capacidades del núcleo». También: campos de 16 px en el celular (iPhone no acerca) y nombre de cliente pegado con su NIT separado |
 
 ### Pendiente
 
@@ -562,6 +642,8 @@ Comandos de prueba, opciones de la e2e (`SOLO`, `BASE`, `CHROME`) y stack: ver e
 - Órdenes de servicio en la interfaz.
 - Incluir los gastos reembolsables en las cuentas de cobro.
 - Requerimiento de materiales: planeado.
+- Formato oficial de Fortox: reemplazar los datos provisionales de `VARIANTE_FORTOX`
+  (`src/nucleo/variantes.ts`; lista en el README).
 - Los archivos del bucket `archivos` siguen con acceso por organización (0004),
   no por documento. (0010 y 0011 ya están aplicadas en Supabase: verificado.)
 - **0013 (`0013_campo_tecnico.sql`) aún no está aplicada en Supabase.** La app de

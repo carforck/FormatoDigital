@@ -2,22 +2,39 @@
 /**
  * Piezas comunes de las plantillas imprimibles de formato (reporte, permiso,
  * gasto, cotización en `src/modulos/<tipo>/Plantilla….tsx`): encabezado con control
- * documental y casilla de firma. Usa `<img>` simple para que salga en el PDF/impresión.
+ * documental (según la variante de formato, `ConVariante`) y casilla de firma. Usa `<img>` simple para que salga en el PDF/impresión.
  */
 import { cn } from "@/lib/utils";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { asset } from "@/nucleo/rutas";
 import { formatoDe } from "@/modulos/registro";
 import type { TipoDoc } from "@/nucleo/tipos";
+import { VARIANTE_BASE, formatoEnVariante } from "@/nucleo/variantes";
+
+import { useVarianteActual } from "./VarianteFormato";
 
 /**
  * Logo de los formatos impresos. En el modo empresa va el logo de la organización
  * (SOTEC); en la demo va la marca ControlOne con «by SOTEC» debajo en pequeño
  * (public/controlone-logo.png, generado por scripts/generar-logo-formato.py).
  * `className` da el tamaño del logo de la empresa; `anchoDemo`, el ancho máximo de la marca.
+ * Dentro de otra variante de formato (`ConVariante`, p. ej. FORTOX) va el logo de esa
+ * variante o, mientras no lo haya, su marca como logo de texto (en la demo y en la empresa).
  */
 export function LogoFormato({ className, anchoDemo = "max-w-[190px]", alt = "SOTEC" }: { className?: string; anchoDemo?: string; alt?: string }) {
   const { modo } = useDemo();
+  const v = useVarianteActual();
+  if (v.clave !== VARIANTE_BASE) {
+    if (v.logo) return <img src={asset(v.logo)} alt={v.marca} className={className} />;
+    return (
+      <span className="inline-flex flex-col items-center" data-logo-texto={v.clave}>
+        <span className="rounded border-2 px-2 py-1 font-sans text-[15px] font-black leading-none tracking-[0.15em] sm:px-3 sm:text-[22px] sm:tracking-[0.2em] print:px-3 print:text-[22px] print:tracking-[0.2em]" style={{ color: v.colorMarca, borderColor: v.colorMarca }}>
+          {v.marca}
+        </span>
+        {v.provisional && <span className="print:hidden mt-0.5 text-[8.5px] font-medium uppercase tracking-wider text-slate-400">logo pendiente</span>}
+      </span>
+    );
+  }
   if (modo === "empresa") return <img src={asset("/sotec-logo-v3.png")} alt={alt} className={className} />;
   return (
     <span className="inline-flex flex-col items-center">
@@ -29,8 +46,10 @@ export function LogoFormato({ className, anchoDemo = "max-w-[190px]", alt = "SOT
 
 /** Encabezado del formato: logo, título y control documental (código, versión, fecha). */
 export function Encabezado({ tipo, codigoDoc }: { tipo: TipoDoc; codigoDoc?: string }) {
-  // Se lee al dibujar (no al cargar el módulo): el registro importa las plantillas
-  const f = formatoDe(tipo);
+  // Se lee al dibujar (no al cargar el módulo): el registro importa las plantillas.
+  // La variante (ConVariante) cambia código, nombre, versión y fecha si los define.
+  const v = useVarianteActual();
+  const f = formatoEnVariante(formatoDe(tipo), tipo, v.clave);
   return (
     <table className="w-full border-collapse border border-black text-[11px]">
       <tbody>

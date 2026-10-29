@@ -1,14 +1,16 @@
 "use client";
 
 /**
- * Configuración · «Opciones agregadas desde el asistente»: lo que el equipo sumó a las
- * listas de los formatos con «＋ Agregar otro» (tipos de reporte, peligros, EPP…) y los
- * servicios o productos nuevos del catálogo de la cotización. La administración los
+ * Configuración · «Opciones agregadas»: lo que el equipo sumó a las listas con «＋ Agregar
+ * otro», desde el asistente o desde los formularios (`SelectConOtro`, @/nucleo/opciones):
+ * tipos de reporte, peligros, EPP, tipos de gasto, unidades, sistemas y tipos de equipo… y
+ * los servicios o productos nuevos del catálogo de la cotización. La administración los
  * revisa y quita los que sobren (p. ej. mal escritos); quitar no cambia los documentos
  * que ya los usan.
  */
 import { ListPlus, X } from "lucide-react";
 
+import { sistemaDe } from "@/modulos/equipos/catalogo";
 import { formatoDe } from "@/modulos/registro";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { cop } from "@/nucleo/letras";
@@ -22,10 +24,14 @@ const LISTAS: Record<string, string> = {
   peligros: "Peligros identificados",
   medidas: "Medidas de seguridad",
   epp: "Elementos de protección personal (EPP)",
+  items: "Tipo de gasto",
+  unidad: "Unidad de los ítems",
 };
 
 function nombreLista(clave: string): string {
-  const [tipo, paso] = clave.split(".");
+  const [tipo, paso, sistema] = clave.split(".");
+  // Inventario de equipos (no es un formato): «equipos.sistema» y «equipos.tipo.<sistema>»
+  if (tipo === "equipos") return paso === "tipo" ? `Equipos · Tipos de ${sistemaDe(sistema ?? "").nombre}` : "Equipos · Sistemas";
   let formato = tipo;
   try {
     formato = formatoDe(tipo as TipoDoc).corto;
@@ -43,10 +49,10 @@ export function OpcionesAgregadas() {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="flex items-center gap-2 font-semibold">
-        <ListPlus className="h-4 w-4 text-sotec-greenDeep" /> Opciones agregadas desde el asistente
+        <ListPlus className="h-4 w-4 text-sotec-greenDeep" /> Opciones agregadas por el equipo
       </h2>
       <p className="text-sm text-slate-500">
-        Lo que el equipo agregó con «＋ Agregar otro» al diligenciar los formatos. Aparece en las listas para todos; quita lo que sobre. Los documentos que ya lo usan no
+        Lo que el equipo agregó con «＋ Agregar otro» en el asistente, los formatos y el inventario de equipos. Aparece en las listas para todos; quita lo que sobre. Los documentos que ya lo usan no
         cambian.
       </p>
 
@@ -60,7 +66,7 @@ export function OpcionesAgregadas() {
               <ul className="mt-1.5 flex flex-wrap gap-1.5">
                 {valores.map((v) => (
                   <li key={v} className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 py-0.5 pl-2.5 pr-1 text-sm text-slate-700">
-                    {v}
+                    {clave === "equipos.sistema" ? sistemaDe(v).nombre : v}
                     <button
                       type="button"
                       onClick={() => confirm(`¿Quitar «${v}» de la lista?`) && demo.quitarOpcion(clave, v)}

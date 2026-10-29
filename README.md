@@ -170,6 +170,7 @@ tablas relacionales con RLS (ya existen en las migraciones) y retira `espacios`.
 │   │   ├── validar.ts                Pendientes y % de avance (delegan en cada módulo)
 │   │   ├── indicadores.ts            Cálculos del tablero (períodos, KPIs, series)
 │   │   ├── proyectos.ts              Indicadores de un proyecto (resumenProyecto)
+│   │   ├── variantes.ts              Variantes de formato (SOTEC, FORTOX) y tipos de proyecto: aquí va el formato oficial de Fortox
 │   │   ├── impresion.ts              Enlaces y datos de la ruta /imprimir
 │   │   ├── rutas.ts                  basePath, assets y rutas de detalle
 │   │   ├── letras.ts                 Valor en letras y formato de pesos (cop)
@@ -190,7 +191,7 @@ tablas relacionales con RLS (ya existen en las migraciones) y retira `espacios`.
 │   │   ├── shell/AppShell.tsx        Shell del aplicativo: barras, menú móvil, avisos, «Ver como»
 │   │   ├── generador/                Generador de formatos (asistente + formulario + vista previa)
 │   │   ├── chat/                     Asistente conversacional por pasos
-│   │   ├── docs/                     Piezas de los formatos: encabezado, firma, texto editable, envío
+│   │   ├── docs/                     Piezas de los formatos: encabezado, firma, texto editable, envío, variante (ConVariante)
 │   │   ├── tablero/                  Gráficas y KPIs del tablero
 │   │   ├── proyectos/                Piezas de las pantallas de proyectos
 │   │   ├── usuarios/                 Panel de usuarios con login (modo empresa)
@@ -280,6 +281,41 @@ Retirar o rechazar un reporte anula la firma del cliente tomada en sitio.
 
 Para **agregar un formato nuevo**, ver «Agregar un formato nuevo» en
 [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
+
+### Formato según el tipo de proyecto (variantes: SOTEC, FORTOX)
+
+SOTEC también presta servicios para Fortox, y esos reportes deben salir en el **formato de Fortox**.
+Cada documento sale con una **variante de formato** (marca): la de SOTEC por defecto u otra
+registrada en `src/nucleo/variantes.ts`. Cómo se elige:
+
+1. **Proyecto**: su «Tipo de proyecto» (formulario del proyecto) apunta a una variante. Los tipos se
+   definen en **Configuración → Tipos de proyecto y formato** («Servicios SOTEC», «Servicios Fortox»
+   y los que agregue la administración).
+2. **Cliente** (sin proyecto, o con un proyecto antiguo sin tipo): su «Formato por defecto» (Clientes).
+3. Si no: SOTEC.
+
+El generador muestra el chip **«Formato: Servicios Fortox»**, la vista previa cambia en cuanto se
+elige el proyecto (en el asistente o en «Proyecto u obra»), y el documento **guarda su variante**
+(`variante`) al guardarse: el detalle, `/imprimir`, `/firmar` y el portal del cliente la usan, y
+cambiar después el tipo del proyecto no cambia lo ya guardado. Los documentos antiguos sin variante
+salen como SOTEC. Hoy FORTOX solo cambia el **reporte técnico**; permisos, gastos y cotizaciones siguen
+en el formato de SOTEC. **Consecutivo**: por defecto los reportes de Fortox siguen la misma serie RT;
+si Fortox exige numeración propia, se pone `prefijo` (p. ej. `"RTF"`) en la variante y esos reportes
+llevan su propia serie (`RTF-001-26`).
+
+**Pendiente: el formato oficial de Fortox.** La variante FORTOX es **provisional** (logo de texto
+«FORTOX», «Código: por confirmar», gris neutro). Cuando llegue el formato real, todo se cambia en
+**un solo archivo**, `src/nucleo/variantes.ts` (`VARIANTE_FORTOX`):
+
+| Dato | Dónde |
+|---|---|
+| Logo | copiar a `public/variantes/fortox-logo.png` y poner `logo: "/variantes/fortox-logo.png"` |
+| Código, versión, fecha y nombre del formato | `formatos.reporte.codigo`, `.version`, `.fecha` (dd/mm/aaaa), `.nombre` |
+| Colores | `colorEncabezado` (franjas de título) y `colorMarca` |
+| Textos del pie | `pie` (hoja principal) y `pieAnexo` (registro fotográfico) |
+| Campos con otro nombre | `formatos.reporte.etiquetas` («Cliente» → «Puesto», …) |
+| Numeración propia (opcional) | `formatos.reporte.prefijo` |
+| Quitar el aviso «provisional» | `provisional: true` → quitarlo |
 
 ---
 
@@ -520,14 +556,17 @@ para que abra sin conexión desde la instalación (si no, se guarda la primera v
 
 | Comando | Qué prueba |
 |---|---|
-| `npm run test:unit` | Valor en letras (`tests/unit/letras.test.ts`), cálculos de la cotización (`tests/unit/cotizacion.test.ts`) y directorio de clientes desde los formatos (`tests/unit/clientes.test.ts`) |
+| `npm run test:unit` | Valor en letras (`tests/unit/letras.test.ts`), cálculos de la cotización (`tests/unit/cotizacion.test.ts`), directorio de clientes desde los formatos (`tests/unit/clientes.test.ts`) y variantes de formato (`tests/unit/variantes.test.ts`) |
 | `npm run test:e2e` | La demo completa en Chrome (`tests/e2e/demo.cjs`), contra `http://localhost:3100` |
 | `npm run test:db` | Migraciones, RLS y flujo en PostgreSQL desechable |
 
 Opciones de la e2e (variables de entorno):
 
 - `SOLO=<sección>`: una sola sección (`flujo`, `responsive`, `controles`, `magno`, `proyectos`,
-  `crud`, `equipos`, `navegacion`, `comercial`, `impresion`, `campo`).
+  `crud`, `equipos`, `navegacion`, `comercial`, `impresion`, `campo`, `variantes`, `listas`).
+- `VARIANTES_CAPTURAS=<carpeta>`: con `SOLO=variantes`, guarda capturas (escritorio y 390 px).
+- `CAPTURAS_LISTAS=<carpeta>`: con `SOLO=listas` («＋ Agregar otro», 16 px en el celular y
+  cliente pegado con su NIT), guarda capturas (escritorio y 390 px).
 - `BASE=<url>`: otro servidor (por ejemplo `https://controlone.sotecse.com`).
 - `CHROME=<ruta>`: ejecutable de Chrome si no está en la ruta por defecto.
 
@@ -554,6 +593,8 @@ CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" npm run te
 - Órdenes de servicio en la interfaz.
 - Gastos reembolsables dentro de las cuentas de cobro.
 - Requerimiento de materiales (planeado).
+- Formato oficial de Fortox (logo, código, versión, fecha y colores): ver «Formato según el tipo de
+  proyecto» en [Módulos](#módulos).
 
 ## Datos de la demo
 

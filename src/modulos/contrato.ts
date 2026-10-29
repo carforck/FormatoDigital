@@ -139,6 +139,8 @@ export interface ModuloDocumento<D> {
   clienteDe?: (datos: D) => string;
   /** Campo de texto donde va el cliente escrito a mano (sin directorio). Por defecto: "cliente". */
   campoCliente?: keyof D & string;
+  /** Campo del NIT del cliente, si el formato lo tiene: recibe el NIT que venga pegado con el nombre. */
+  campoNit?: keyof D & string;
   /**
    * Lo inverso de `alElegirCliente`: los datos del cliente escritos en el formato. Con esto,
    * al GUARDAR un documento con un cliente que no está en el directorio se crea para todo el

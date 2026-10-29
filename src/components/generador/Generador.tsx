@@ -9,6 +9,9 @@
  * desde el técnico, ver @/nucleo/clientes); uno desactivado no se recrea: se ofrece usarlo;
  * uno que solo se parece («…S.A.S.», sin tildes) se pregunta antes de enlazarlo. Cambiar a
  * mano el cliente elegido quita los datos que ese cliente había llenado (y su proyecto y equipos).
+ * La variante de formato (marca: SOTEC, FORTOX…) sale del tipo del proyecto o, sin proyecto, del
+ * formato por defecto del cliente (@/nucleo/variantes); se ve en el chip «Formato: …», en la vista
+ * previa y en la impresión, y queda guardada en el documento.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -16,6 +19,7 @@ import { AlertTriangle, Cctv, CheckCircle2, Eye, FolderKanban, MessageSquare, Pr
 
 import { ChatAsistente, type ValorPaso } from "@/components/chat/ChatAsistente";
 import { FirmaPad } from "@/components/docs/FirmaPad";
+import { ChipVariante, ConVariante } from "@/components/docs/VarianteFormato";
 import { Button } from "@/components/ui/button";
 import { Volver, salirAlDetalle, useOrigen } from "@/components/ui/volver";
 import type { Paso } from "@/components/chat/ChatAsistente";
@@ -32,7 +36,9 @@ import type { Cliente, Documento, Proyecto, TipoDoc } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 import { avance, faltantes } from "@/nucleo/validar";
 import { puede } from "@/nucleo/permisos";
-import { avisoPlan, buscarCliente, claveNombre, dejarAvisoCliente, mismoNombre, planCliente, preguntaParecido } from "@/nucleo/clientes";
+import { VARIANTE_BASE, formatoEnVariante, prefijoVariante, resolverVariante, varianteDe } from "@/nucleo/variantes";
+import { avisoPlan, buscarCliente, claveNombre, dejarAvisoCliente, mismoNombre, planCliente, preguntaParecido, separarCliente } from "@/nucleo/clientes";
+import { unirOpciones } from "@/nucleo/opciones";
 
 interface Props {
   tipo: TipoDoc;
@@ -181,8 +187,19 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
    * autollena sus datos; uno distinto del elegido deja el documento sin cliente del directorio
    * (se registrará al guardar).
    */
-  const editarFormato = (cambio: object | ((datos: never) => object)) => {
+  const editarFormato = (cambio: object | ((datos: never) => object), separado = false) => {
     const c = cambio as Record<string, unknown>;
+    // Nombre pegado con su NIT u otros datos: primero se separa y se sigue con el nombre limpio
+    if (!separado && typeof cambio !== "function" && typeof c[info.campoCliente] === "string") {
+      const s = separarNombreCliente(c[info.campoCliente] as string);
+      if (s.aviso) {
+        setAvisoCliente(null);
+        editarFormato({ ...c, [info.campoCliente]: s.nombre }, true);
+        s.ponerNit();
+        setAvisoCliente((a) => [s.aviso, a].filter(Boolean).join(" "));
+        return;
+      }
+    }
     if (typeof cambio !== "function" && info.campoCliente in c && typeof c[info.campoCliente] === "string") {
       const texto = c[info.campoCliente] as string;
       const elegido = demo.clientes.find((x) => x.id === doc.clienteId);
@@ -199,9 +216,32 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     editar(cambio);
   };
 
+  /**
+   * Nombre de cliente pegado con su NIT u otros datos (caso típico: «* Razón social: FARO ANDINO S.A.S.
+   * * NIT: 900123456»): queda solo el nombre y `ponerNit` pasa el NIT al campo del formato que
+   * lo tenga (cotización), sin pisar uno ya escrito. Un nombre normal no cambia (aviso null).
+   */
+  const separarNombreCliente = (texto: string) => {
+    const s = separarCliente(texto);
+    const campoNit = info.campoNit;
+    if (!s.cambio || !s.nombre) return { nombre: texto, aviso: null, ponerNit: () => {} };
+    const ponerNit = () => {
+      if (s.nit && campoNit) editar((d: never) => (String((d as Record<string, unknown>)[campoNit] ?? "").trim() ? {} : { [campoNit]: s.nit }));
+    };
+    return { nombre: s.nombre, aviso: `${s.aviso}${s.nit && !campoNit ? " Este formato no lleva NIT: anótalo en Clientes." : ""}`, ponerNit };
+  };
+
   // Proyectos que se pueden elegir: los visibles, no cerrados, del cliente elegido (o todos si aún no hay cliente)
   const proyectosElegibles = demo.proyectosVisibles.filter((p) => (p.estado !== "cerrado" || p.id === doc.proyectoId) && (!doc.clienteId || p.clienteId === doc.clienteId));
   const proyecto = demo.proyectos.find((p) => p.id === doc.proyectoId);
+  // Variante de formato: la del tipo del proyecto; sin proyecto, la del cliente; si no, SOTEC
+  const varianteDel = (p: Proyecto | undefined, clienteId: string) => resolverVariante({ tipo, proyecto: p, cliente: demo.clientes.find((c) => c.id === clienteId), config: demo.config });
+  const variante = varianteDel(proyecto, doc.clienteId);
+  /** El documento con su variante: así se guarda y se imprime. */
+  const docV = { ...doc, variante } as Documento;
+  /** Aviso del asistente cuando el formato no es el de SOTEC. */
+  const avisoFormato = (clave: string) =>
+    clave === VARIANTE_BASE ? "" : `Formato: ${varianteDe(clave).etiqueta}. ${info.formato.el === "la" ? "La" : "El"} ${info.formato.corto.toLowerCase()} sale con el encabezado de ${varianteDe(clave).marca}.`;
 
   // El cliente escrito a mano se registra en el directorio al guardar (si el formato lo registra y el perfil puede)
   const registraClientes = Boolean(info.datosCliente) && (puede(usuario.rol, "registrar_clientes") || puede(usuario.rol, "clientes"));
@@ -232,25 +272,28 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
       return `${quitado}«${nombre}» es un cliente nuevo: al guardar ${info.formato.el} ${info.formato.corto.toLowerCase()} lo dejo en el directorio con los datos que escribas, para que la próxima vez se autocomplete.`;
     }
     const r = mod.alElegirCliente(c);
+    // Sin proyecto (o con uno de otro cliente), manda el formato por defecto del cliente
+    const proyActual = demo.proyectos.find((p) => p.id === doc.proyectoId && p.clienteId === c.id);
+    const formato = avisoFormato(varianteDel(proyActual, c.id));
     setDoc((d) => {
       const otro = d.proyectoId && demo.proyectos.find((p) => p.id === d.proyectoId)?.clienteId !== c.id;
       // Los equipos son de cada cliente: al cambiarlo se quitan los del anterior
       const equiposIds = (d.equiposIds ?? []).filter((id) => demo.equipos.some((e) => e.id === id && e.clienteId === c.id));
       return { ...conCliente(d, c), proyectoId: otro ? undefined : d.proyectoId, equiposIds } as Documento;
     });
-    return r.mensaje;
+    return [r.mensaje, formato].filter(Boolean).join(" ");
   }
 
   /** Elige el proyecto: fija el cliente y llena los campos de proyecto u obra del formato. */
   function elegirProyecto(p: Proyecto | undefined): string | undefined {
     if (!p) {
       setDoc((d) => ({ ...d, proyectoId: undefined }) as Documento);
-      return "Sin proyecto: el documento queda solo asociado al cliente.";
+      return ["Sin proyecto: el documento queda solo asociado al cliente.", avisoFormato(varianteDel(undefined, doc.clienteId))].filter(Boolean).join(" ");
     }
     setDoc((d) => conProyecto(d, p));
     const c = demo.clientes.find((x) => x.id === p.clienteId);
     const r = info.alElegirProyecto?.(p, c);
-    return [`Proyecto ${etiquetaProyecto(p)}${c ? ` de ${c.nombre}` : ""}.`, r?.mensaje].filter(Boolean).join(" ");
+    return [`Proyecto ${etiquetaProyecto(p)}${c ? ` de ${c.nombre}` : ""}.`, r?.mensaje, avisoFormato(varianteDel(p, p.clienteId))].filter(Boolean).join(" ");
   }
 
   /** Aplica la respuesta de un paso del chat; devuelve el mensaje de confirmación del asistente. */
@@ -269,7 +312,13 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
       return;
     }
     // Sin importar mayúsculas, tildes ni espacios: «ladrillera arcillas…» autollena como la del directorio
-    if (id === "cliente") return elegirCliente(confirmarCliente(v as string), v as string);
+    if (id === "cliente") {
+      // Pegado con su NIT («* Razón social: FARO ANDINO S.A.S. * NIT: …»): se usa solo el nombre
+      const s = separarNombreCliente(v as string);
+      const r = elegirCliente(confirmarCliente(s.nombre), s.nombre);
+      s.ponerNit();
+      return [s.aviso, r].filter(Boolean).join(" ") || undefined;
+    }
     if (id === "proyecto") return elegirProyecto(demo.proyectosVisibles.find((p) => etiquetaProyecto(p) === v));
     // Los equipos ya quedaron marcados en el documento desde el selector
     if (id === "equipos") {
@@ -288,11 +337,9 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     .pasos({ datos: doc.datos, clientes: demo.clientesActivos, usuarioNombre: usuario.nombre, hoy: hoy(), serviciosPropios: demo.config.serviciosPropios })
     .map((p) => {
       const extra = propias[`${tipo}.${p.id}`];
-      if (!extra?.length || !p.opciones || (p.tipo !== "select" && p.tipo !== "multi")) return p;
-      // Lo agregado va antes de «Otro» (si la lista lo tiene) y sin repetir
-      const base = p.opciones.filter((o) => o !== "Otro");
-      const nuevas = extra.filter((x) => !base.some((o) => o.toLowerCase() === x.toLowerCase()));
-      return { ...p, opciones: [...base, ...nuevas, ...(p.opciones.includes("Otro") ? ["Otro"] : [])] };
+      if (!extra?.length || !p.opciones || (p.tipo !== "select" && p.tipo !== "multi" && p.tipo !== "gastos")) return p;
+      // Lo agregado va antes de «Otro» (si la lista lo tiene) y sin repetir (ni por mayúsculas ni tildes)
+      return { ...p, opciones: unirOpciones(p.opciones, extra) };
     });
   const pasoProyecto: Paso = {
     id: "proyecto",
@@ -389,7 +436,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
       }
     }
     setGuardando(true);
-    const g = demo.guardar({ ...doc, clienteId });
+    const g = demo.guardar({ ...docV, clienteId });
     if (enviar) demo.enviar(g.id);
     const avisoDirectorio = plan && avisoPlan(plan);
     if (avisoDirectorio) dejarAvisoCliente(g.id, avisoDirectorio);
@@ -408,10 +455,10 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   /** Imprime lo que hay en pantalla, guardado o no (la página de impresión lo recibe en memoria). */
   function imprimir() {
     // Nombre del PDF: el consecutivo (sin guardar, uno provisional como en la página de impresión)
-    const codigo = existente ? doc.codigo : `${prefijoDe(demo.config, doc.tipo)}-borrador-${hoy()}`;
+    const codigo = existente ? doc.codigo : `${prefijoVariante(tipo, variante) ?? prefijoDe(demo.config, doc.tipo)}-borrador-${hoy()}`;
     const titulo = tituloArchivo([codigo, info.formato.corto, clienteDoc(doc)]);
-    if (existente && !sucio) return abrirImpresion(router, { doc: existente.id, titulo });
-    const clave = abrirImpresion(router, { borrador: doc, titulo });
+    if (existente && !sucio && existente.variante === variante) return abrirImpresion(router, { doc: existente.id, titulo });
+    const clave = abrirImpresion(router, { borrador: docV, titulo });
     // Un documento ya guardado no tiene guardado automático: al volver se recupera de aquí
     if (existente && clave) {
       try {
@@ -422,7 +469,10 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     }
   }
 
-  const f = info.formato;
+  // Código y versión del formato según la variante (FORTOX trae los suyos)
+  const f = formatoEnVariante(info.formato, tipo, variante);
+  // Con prefijo propio de la variante, el código provisional es el de su serie
+  const codigoVista = existente || !prefijoVariante(tipo, variante) ? doc.codigo : demo.nuevoId(tipo, variante).codigo;
   const Plantilla = info.Plantilla;
   const clienteSel = demo.clientes.find((c) => c.id === doc.clienteId);
   const sel = "h-10 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800";
@@ -443,11 +493,13 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium uppercase tracking-wide text-sotec-greenDeep">
-            {f.codigo} · v{f.version}
+            {/* Una variante con datos provisionales trae «por confirmar» en vez de un número de versión */}
+            {f.codigo} · {/^\d/.test(f.version) ? `v${f.version}` : `versión ${f.version}`}
           </p>
           <h1 className="text-xl font-semibold">
-            {existente ? "Continuar" : f.nuevo} {f.corto.toLowerCase()} <span className="font-mono text-base text-slate-500">{doc.codigo}</span>
+            {existente ? "Continuar" : f.nuevo} {f.corto.toLowerCase()} <span className="font-mono text-base text-slate-500">{codigoVista}</span>
           </h1>
+          <ChipVariante variante={variante} tipo={tipo} className="mt-1" />
         </div>
         <div className="flex items-center gap-2">
           <div className="hidden w-40 sm:block">
@@ -581,7 +633,9 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
           )}
           <p className="text-xs text-slate-500 print:hidden">Clic sobre cualquier campo del formato para editarlo. Los campos resaltados en verde son los que el asistente está preguntando.</p>
           <div className="overflow-x-auto rounded-lg bg-slate-100 p-2 sm:p-4">
-            <Plantilla datos={doc.datos} codigoDoc={doc.codigo} empresa={empresaDe(demo.config)} equipos={equiposAtendidos(equiposIds, demo.equipos)} editar={editarFormato} firmar={(c) => setFirmando(c)} resaltar={resaltar} />
+            <ConVariante variante={variante} tipo={tipo}>
+              <Plantilla datos={doc.datos} codigoDoc={codigoVista} empresa={empresaDe(demo.config)} equipos={equiposAtendidos(equiposIds, demo.equipos)} editar={editarFormato} firmar={(c) => setFirmando(c)} resaltar={resaltar} />
+            </ConVariante>
           </div>
           <div className="lg:hidden print:hidden">{acciones}</div>
         </div>

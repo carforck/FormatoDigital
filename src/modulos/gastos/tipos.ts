@@ -5,8 +5,11 @@
  * Las fotos de las facturas van en `archivos` (tipo 'soporte'); ver 0007_gastos_como_formato.sql.
  */
 
-/** Tipos de gasto del formato (ver `TIPOS_GASTO`). */
-export type TipoGasto = "Transporte" | "Alimentación" | "Hospedaje" | "Materiales" | "Otros";
+/**
+ * Tipos de gasto del formato (ver `TIPOS_GASTO`) o uno que la empresa agregó con
+ * «＋ Agregar otro» (lista `LISTA.tipoGasto` de @/nucleo/opciones).
+ */
+export type TipoGasto = "Transporte" | "Alimentación" | "Hospedaje" | "Materiales" | "Otros" | (string & {});
 
 /** Un gasto de la legalización (una fila del formato y, si tiene foto, un soporte anexo). */
 export interface ItemGasto {

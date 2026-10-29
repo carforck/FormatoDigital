@@ -90,6 +90,8 @@ function Detalle() {
             <p className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-sm font-semibold text-slate-500">{p.codigo}</span>
               <EstadoProyectoBadge estado={p.estado} />
+              {/* Tipo de proyecto: define el formato (variante) de sus documentos */}
+              {p.tipo && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 ring-1 ring-slate-200">{p.tipo}</span>}
             </p>
             <h1 className="mt-1 break-words text-2xl font-semibold tracking-tight text-slate-900">{p.nombre}</h1>
             <p className="break-words text-sm text-slate-600">{cliente?.nombre ?? "—"}</p>

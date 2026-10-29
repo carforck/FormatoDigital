@@ -4,7 +4,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { avisoPlan, buscarCliente, claveNombre, completarVacios, mismoNombre, nombreLimpio, planCliente } from "../../src/nucleo/clientes";
+import { avisoPlan, buscarCliente, claveNombre, completarVacios, digitoVerificacion, mismoNombre, nombreLimpio, normalizarNit, planCliente, separarCliente } from "../../src/nucleo/clientes";
+import { buscarOpcion, comparable, unirOpciones } from "../../src/nucleo/opciones";
 import type { Cliente, Documento } from "../../src/nucleo/tipos";
 
 let fallos = 0;
@@ -67,6 +68,36 @@ igual("sin nombre: nada", planCliente(clientes, reporte({ cliente: " " }), "c-n"
 igual("sin cambios: sin aviso", avisoPlan(planCliente(clientes, reporte({ cliente: "Ferretería El Tornillo" }), "c-n")), null);
 // La legalización de gastos no registra clientes («cliente u obra» puede ser interno)
 igual("gasto no registra", planCliente(clientes, { ...reporte({}), tipo: "gasto", datos: { clienteObra: "Administración" } } as unknown as Documento, "c-n").accion, "nada");
+
+// Nombre pegado con otros datos (caso típico: «* Razón social: FARO ANDINO S.A.S. * NIT: 900123456»)
+const sep = (t: string) => {
+  const r = separarCliente(t);
+  return [r.nombre, r.nit];
+};
+igual("FARO ANDINO con viñetas y etiquetas", sep("* Razón social: FARO ANDINO S.A.S. * NIT: 900123456"), ["FARO ANDINO S.A.S.", "900.123.456"]);
+igual("FARO ANDINO en dos líneas con DV", sep("Razón social: FARO ANDINO S.A.S.\nNIT: 900.123.456-8"), ["FARO ANDINO S.A.S.", "900.123.456-8"]);
+igual("FARO ANDINO pegado en un campo (el navegador quita el salto de línea)", sep("Razón social: FARO ANDINO S.A.S.NIT: 900123456"), ["FARO ANDINO S.A.S.", "900.123.456"]);
+igual("NIT al final sin dos puntos", sep("FARO ANDINO S.A.S. NIT 900123456-8"), ["FARO ANDINO S.A.S.", "900.123.456-8"]);
+igual("guion y «Nit.»", sep("FARO ANDINO S.A.S - Nit. 900.123.456-8"), ["FARO ANDINO S.A.S", "900.123.456-8"]);
+igual("NIT al inicio", sep("NIT 900123456 Constructora ABC SAS"), ["Constructora ABC SAS", "900.123.456"]);
+igual("solo viñeta", sep("• FARO ANDINO S.A.S."), ["FARO ANDINO S.A.S.", ""]);
+igual("etiqueta «Cliente:»", sep("Cliente: Conjunto Los Robles"), ["Conjunto Los Robles", ""]);
+const ficha = separarCliente("Datos del cliente:\n• Razón social: Ferretería El Tornillo Ltda.\n• NIT: 800.123.456-5\n• Dirección: Cra 5 # 10-20\n• Teléfono: 300 123 4567\n• Correo: compras@tornillo.co");
+igual("ficha completa: nombre, NIT y otros datos", [ficha.nombre, ficha.nit, ficha.otros], ["Ferretería El Tornillo Ltda.", "800.123.456-5", { direccion: "Cra 5 # 10-20", telefono: "300 123 4567", correo: "compras@tornillo.co" }]);
+igual("aviso «Separé el NIT…»", separarCliente("* Razón social: FARO ANDINO S.A.S. * NIT: 900123456").aviso?.startsWith("Separé el NIT 900.123.456"), true);
+igual("DV equivocado: se avisa", separarCliente("FARO ANDINO S.A.S. NIT 900.123.456-1").aviso?.includes("debería ser 8"), true);
+for (const n of ["Ferretería El Tornillo", "Hotel Las Américas - Sede Norte", "Ladrillera Arcillas del Caribe · Proyecto CCTV", "Peña & Hijos S. en C."])
+  igual(`nombre normal sin cambios: ${n}`, [separarCliente(n).nombre, separarCliente(n).cambio], [n, false]);
+igual("dígito de verificación DIAN", [digitoVerificacion("900123456"), digitoVerificacion("860002964")], [8, 4]);
+igual("NIT con puntos", normalizarNit("900123456").nit, "900.123.456");
+igual("C.C. de 10 dígitos", normalizarNit("1047123456").nit, "1.047.123.456");
+igual("NIT ilegible queda igual", normalizarNit("en trámite").nit, "en trámite");
+
+// Listas con «＋ Agregar otro»: sin mayúsculas, tildes ni espacios de más; la ñ cuenta
+igual("comparable sin tildes", comparable("  ALIMENTACIÓN  extra "), "alimentacion extra");
+igual("ñ no es n", comparable("Señal") === comparable("Senal"), false);
+igual("buscar opción existente", buscarOpcion(["Alimentación", "Peajes"], "alimentacion"), "Alimentación");
+igual("unir sin repetir y «Otro» al final", unirOpciones(["Transporte", "Otro"], ["transporte", " Peajes  "], ["Parqueadero"]), ["Transporte", "Peajes", "Parqueadero", "Otro"]);
 
 console.log(fallos ? `\n${fallos} de ${casos} casos fallaron` : `✓ clientes: ${casos} casos`);
 process.exit(fallos ? 1 : 0);

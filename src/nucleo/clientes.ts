@@ -167,3 +167,125 @@ export function tomarAvisoCliente(docId: string): string | null {
     return null;
   }
 }
+
+/* ---------- Nombre pegado con otros datos («* Razón social: FARO ANDINO S.A.S. * NIT: 900123456») ---------- */
+
+/** Dígito de verificación de un NIT según la DIAN (pesos 3, 7, 13… de derecha a izquierda). */
+export function digitoVerificacion(nit: string): number {
+  const PESOS = [3, 7, 13, 17, 19, 23, 29, 37, 41, 43, 47, 53, 59, 67, 71];
+  const d = nit.replace(/\D/g, "");
+  let suma = 0;
+  for (let i = 0; i < d.length; i++) suma += Number(d[d.length - 1 - i]) * PESOS[i];
+  const r = suma % 11;
+  return r > 1 ? 11 - r : r;
+}
+
+/**
+ * NIT o C.C. con puntos de miles y, si vino, el dígito de verificación: «900123456» →
+ * «900.123.456», «900123456-1» → «900.123.456-1». `dvCorrecto` es false si el dígito que
+ * vino no es el que calcula la DIAN (solo NIT de 9 dígitos). Sin 6 a 10 dígitos devuelve el texto tal cual.
+ */
+export function normalizarNit(texto: string): { nit: string; dvCorrecto: boolean; dvCalculado?: number } {
+  const t = texto.trim();
+  const m = t.match(/^([\d.\s]+?)(?:\s*-\s*(\d))?$/);
+  const base = m ? m[1].replace(/\D/g, "") : "";
+  if (!m || base.length < 6 || base.length > 10) return { nit: t, dvCorrecto: true };
+  const conPuntos = base.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  if (m[2] === undefined) return { nit: conPuntos, dvCorrecto: true };
+  const dvCalculado = digitoVerificacion(base);
+  return { nit: `${conPuntos}-${m[2]}`, dvCorrecto: base.length !== 9 || Number(m[2]) === dvCalculado, dvCalculado };
+}
+
+/** Lo que se separó de un nombre de cliente pegado con etiquetas, viñetas o saltos de línea. */
+export interface ClienteSeparado {
+  /** Nombre limpio (sin etiqueta, viñetas ni NIT). Vacío si no vino un nombre. */
+  nombre: string;
+  /** NIT normalizado (`normalizarNit`), o vacío. */
+  nit: string;
+  /** Otros datos que venían con etiqueta («Dirección: …», «Teléfono: …»). */
+  otros: Partial<Pick<Cliente, "direccion" | "telefono" | "correo" | "contacto">>;
+  /** Si el texto cambió (hay algo que avisar). */
+  cambio: boolean;
+  /** Aviso para el usuario («Separé el NIT…»), o null. */
+  aviso: string | null;
+}
+
+// Etiquetas que se reconocen en lo pegado (con «:»); el valor va al campo indicado
+const ETIQUETAS: [RegExp, "nombre" | "nit" | keyof ClienteSeparado["otros"]][] = [
+  [/^(raz[oó]n\s+social|nombre(\s+(del\s+cliente|de\s+la\s+empresa|comercial))?|cliente|empresa)$/i, "nombre"],
+  [/^(nit|n\.?\s?i\.?\s?t\.?|c\.?\s?c\.?|c[eé]dula|rut|nit\s*\/\s*c\.?\s?c\.?)$/i, "nit"],
+  [/^(direcci[oó]n|domicilio)$/i, "direccion"],
+  [/^(tel[eé]fonos?|tel\.?|celular|cel\.?|m[oó]vil)$/i, "telefono"],
+  [/^(correo(\s+electr[oó]nico)?|e-?mail)$/i, "correo"],
+  [/^(contacto|persona\s+de\s+contacto|representante(\s+legal)?)$/i, "contacto"],
+];
+// Antes de una etiqueta conocida pegada al texto anterior (el navegador quita los saltos de línea al pegar en un campo)
+const ETIQUETA_EN_LINEA = /(raz[oó]n\s+social|\bnit\b|\bn\.\s?i\.\s?t\.?|direcci[oó]n|tel[eé]fonos?|celular|correo(?:\s+electr[oó]nico)?|e-?mail|persona\s+de\s+contacto)\s*:/gi;
+// NIT dentro del texto, con o sin «:» («FARO ANDINO S.A.S. NIT 900.123.456-1»)
+const NIT_EN_TEXTO = /(?:\bnit\b|\bn\.\s?i\.\s?t\.?)\s*(?:[:#.]|no\.?|n[°º.])?\s*(\d[\d.\s]*\d(?:\s*-\s*\d)?)/i;
+// Viñetas y separadores al inicio o al final de un trozo
+const BORDES = /^[\s\-–—•*▪◦‣>·.,;:]+|[\s\-–—•*▪◦‣>·,;:]+$/g;
+
+/**
+ * Separa un nombre de cliente pegado con otros datos (lo que pasó en los datos reales:
+ * «* Razón social: FARO ANDINO S.A.S. * NIT: 900123456»): etiquetas, viñetas, saltos de línea y el
+ * NIT. Un nombre normal no cambia. Lo usan el asistente, el formato y la página de Clientes.
+ */
+export function separarCliente(texto: string): ClienteSeparado {
+  const limpio = nombreLimpio(texto);
+  const sinCambio: ClienteSeparado = { nombre: limpio, nit: "", otros: {}, cambio: false, aviso: null };
+  // Solo se analiza si hay algo que separar: saltos de línea, viñetas, «Etiqueta:» o un NIT
+  if (!/[\n\r*•▪◦‣|\t]|^\s*[-–—]\s|:|\bnit\b|\bn\.\s?i\.\s?t/i.test(texto)) return sinCambio;
+
+  const trozos = texto
+    .normalize("NFC")
+    .replace(ETIQUETA_EN_LINEA, "\n$&")
+    .split(/[\n\r*•▪◦‣|\t]+|\s[-–—]\s(?=[^:]{1,40}:)/)
+    .map((t) => t.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  let nombre = "";
+  let nitTexto = "";
+  const otros: ClienteSeparado["otros"] = {};
+  const sueltos: string[] = [];
+  for (const trozo of trozos) {
+    const m = trozo.match(/^([^:]{1,40}?)\s*:\s*(.*)$/);
+    const destino = m ? ETIQUETAS.find(([re]) => re.test(m[1].replace(BORDES, "")))?.[1] : undefined;
+    if (m && destino) {
+      let valor = m[2];
+      if (destino !== "nit") {
+        // «Razón social: FARO ANDINO S.A.S. NIT 901…» en el mismo trozo
+        const n = valor.match(NIT_EN_TEXTO);
+        if (n) {
+          nitTexto ||= n[1];
+          valor = valor.replace(n[0], " ");
+        }
+      }
+      valor = valor.replace(BORDES, "").replace(/\s+/g, " ").trim();
+      if (!valor) continue;
+      if (destino === "nombre") nombre ||= valor;
+      else if (destino === "nit") nitTexto ||= valor;
+      else otros[destino] ||= valor;
+      continue;
+    }
+    // Encabezado sin valor («Datos del cliente:») u otra etiqueta desconocida: no es el nombre
+    if (m) continue;
+    let t = trozo;
+    const n = t.match(NIT_EN_TEXTO);
+    if (n) {
+      nitTexto ||= n[1];
+      t = t.replace(n[0], " ");
+    }
+    t = t.replace(BORDES, "").replace(/\s+/g, " ").trim();
+    if (t) sueltos.push(t);
+  }
+  nombre = nombreLimpio(nombre || sueltos[0] || "");
+  // El nombre conserva su punto final («S.A.S.»): BORDES solo lo quita al inicio
+  const { nit, dvCorrecto, dvCalculado } = nitTexto ? normalizarNit(nitTexto.replace(BORDES, "")) : { nit: "", dvCorrecto: true, dvCalculado: undefined };
+  const cambio = nombre !== limpio || Boolean(nit) || Object.keys(otros).length > 0;
+  if (!cambio) return sinCambio;
+  const partes = [nit && `el NIT ${nit}`, otros.direccion && "la dirección", otros.telefono && "el teléfono", otros.correo && "el correo", otros.contacto && "el contacto"].filter(Boolean) as string[];
+  const lista = partes.length > 1 ? `${partes.slice(0, -1).join(", ")} y ${partes[partes.length - 1]}` : partes[0];
+  let aviso = lista ? `Separé ${lista} del nombre del cliente: quedó «${nombre || "(sin nombre)"}».` : `Limpié el nombre del cliente: quedó «${nombre}».`;
+  if (!dvCorrecto) aviso += ` Revisa el NIT: su dígito de verificación debería ser ${dvCalculado}.`;
+  return { nombre, nit, otros, cambio, aviso };
+}

@@ -10,6 +10,7 @@ import type { DatosReporte } from "@/modulos/reportes/tipos";
 
 import type { DatosCotizacion } from "@/modulos/cotizaciones/tipos";
 import type { ServicioCatalogo } from "@/modulos/cotizaciones/catalogo";
+import type { TipoProyecto } from "@/nucleo/variantes";
 
 // Los tipos propios de cada formato viven en su módulo; se reexportan aquí por comodidad.
 export type { DatosReporte, FotoReporte } from "@/modulos/reportes/tipos";
@@ -51,6 +52,11 @@ export interface Cliente {
   nit?: string;
   /** Inactivo: sale de los selectores del generador, pero su historial se conserva. Por defecto, activo. */
   activo?: boolean;
+  /**
+   * Formato por defecto (variante, @/nucleo/variantes) de sus documentos cuando no se elige
+   * proyecto; el tipo del proyecto manda sobre esto. Sin valor: SOTEC.
+   */
+  variante?: string;
 }
 
 export type EstadoProyecto = "activo" | "en_pausa" | "cerrado";
@@ -74,6 +80,12 @@ export interface Proyecto {
   fechaFin?: string;
   estado: EstadoProyecto;
   presupuesto?: number;
+  /**
+   * Tipo de proyecto («Servicios SOTEC», «Servicios Fortox»…; lista en Configuración):
+   * define la variante de formato de sus documentos. Sin valor (proyectos antiguos):
+   * manda el formato por defecto del cliente o SOTEC.
+   */
+  tipo?: string;
   descripcion: string;
   creado: string;
   actualizado: string;
@@ -99,6 +111,11 @@ interface DocBase {
   proyectoId?: string;
   /** Equipos atendidos (módulo Equipos; public.documento_equipos en 0010). */
   equiposIds?: string[];
+  /**
+   * Variante de formato con la que se creó (marca: «sotec», «fortox»; @/nucleo/variantes).
+   * Queda fija al guardar: no cambia si después cambia el tipo del proyecto. Sin valor: SOTEC.
+   */
+  variante?: string;
   creado: string;
   actualizado: string;
   motivoRechazo?: string;
@@ -174,10 +191,12 @@ export interface Config {
   tipoCuenta: string;
   numeroCuenta: string;
   titularCuenta: string;
-  /** Opciones agregadas desde el asistente con «＋ Agregar otro», por «formato.paso» (p. ej. «permiso.epp»). */
+  /** Opciones agregadas con «＋ Agregar otro» (asistente y formularios), por «formato.paso» (p. ej. «permiso.epp») o «equipos.sistema» / «equipos.tipo.<sistema>» (ver @/nucleo/opciones). */
   opcionesPropias?: Record<string, string[]>;
   /** Servicios o productos agregados al catálogo de la cotización desde el asistente. */
   serviciosPropios?: ServicioCatalogo[];
+  /** Tipos de proyecto y su variante de formato (sin valor: los de fábrica, `TIPOS_PROYECTO_BASE`). */
+  tiposProyecto?: TipoProyecto[];
 }
 
 /** Enlace de firma remota: el cliente firma sin cuenta. */

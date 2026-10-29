@@ -3,7 +3,7 @@
 /**
  * Ruta /app/config: datos de la empresa, prefijos de consecutivos, vigencia de permisos,
  * datos bancarios e IVA de las cuentas de cobro y reglas del flujo; lista los módulos y
- * formatos de @/modulos/registro. Solo la administración (permiso `config`). En modo demo
+ * formatos de @/modulos/registro, y los tipos de proyecto con su variante de formato (TiposProyecto). Solo la administración (permiso `config`). En modo demo
  * permite restablecer los datos de ejemplo.
  */
 import { useState } from "react";
@@ -16,6 +16,7 @@ import { MODULOS, TIPOS_DOC, formatoDe, prefijoDe } from "@/modulos/registro";
 import { CONFIG_SEED } from "@/nucleo/datos/seed";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { OpcionesAgregadas } from "@/components/config/OpcionesAgregadas";
+import { TiposProyecto } from "@/components/config/TiposProyecto";
 
 /** Formulario local (copia de demo.config) que se aplica con demo.actualizarConfig al guardar. */
 export default function Config() {
@@ -162,6 +163,8 @@ export default function Config() {
           ))}
         </ul>
       </section>
+
+      <TiposProyecto />
 
       <OpcionesAgregadas />
 

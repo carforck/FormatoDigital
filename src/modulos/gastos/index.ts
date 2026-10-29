@@ -7,7 +7,7 @@
 import type { ModuloDocumento } from "@/modulos/contrato";
 import { cop } from "@/nucleo/letras";
 
-import { gastoVacio } from "./catalogo";
+import { TIPOS_GASTO, gastoVacio } from "./catalogo";
 import { PlantillaGasto } from "./PlantillaGasto";
 import { totalGastos, type DatosGasto, type ItemGasto } from "./tipos";
 import { faltantesGasto } from "./validar";
@@ -58,6 +58,8 @@ export const moduloGastos: ModuloDocumento<DatosGasto> = {
       resaltar: "items",
       pregunta: "Registra cada gasto con la foto de su factura o recibo.",
       ayuda: "Toma la foto con el celular. Sin número de recibo ni foto, el gasto no se puede legalizar.",
+      // Tipos de gasto; el generador suma los agregados con «＋ Agregar otro» (lista «gasto.items», la misma del formato)
+      opciones: [...TIPOS_GASTO],
     },
     { id: "observaciones", tipo: "textarea", resaltar: "observaciones", opcional: true, pregunta: "¿Observaciones o justificaciones?", sugerencias: ["Gastos de la comisión de servicio en sitio del cliente.", "Se compraron materiales no previstos para terminar el trabajo."] },
     { id: "firmaColaborador", tipo: "firma", resaltar: "firmaColaborador", pregunta: "Firma del colaborador que reporta." },

@@ -69,7 +69,8 @@ function Documentos() {
   const tiposVisibles = TIPOS_DOC.filter((t) => demo.visibles.some((d) => d.tipo === t));
   const codigos = tiposVisibles.map((t) => formatoDe(t).codigo).join(" · ");
   const autor = (id: string) => demo.usuarios.find((u) => u.id === id)?.nombre ?? "—";
-  const sel = "rounded-md border border-slate-200 bg-white px-2 py-2 text-sm";
+  // max-w-full: en el celular los campos usan 16 px (iPhone) y un cliente largo no debe desbordar a 320 px
+  const sel = "max-w-full rounded-md border border-slate-200 bg-white px-2 py-2 text-sm";
 
   return (
     <div className="space-y-4">

@@ -14,13 +14,15 @@ import { Archive, ArchiveRestore, Building2, CircleAlert, CircleCheck, CircleX, 
 import { EstadoBadge, fechaCorta } from "@/components/ui/badges";
 import { Volver, marcarEdicion, regresarSiViene, useOrigen } from "@/components/ui/volver";
 import { cn } from "@/lib/utils";
-import { ESTADOS_EQUIPO, ETIQUETA_ESTADO_EQUIPO, SISTEMAS, esSistema, sistemaDe } from "@/modulos/equipos/catalogo";
+import { SelectConOtro } from "@/components/ui/SelectConOtro";
+import { CLAVES_SISTEMA, ESTADOS_EQUIPO, ETIQUETA_ESTADO_EQUIPO, sistemaDe } from "@/modulos/equipos/catalogo";
 import { equiposIdsDe, fechaDoc, historialEquipo, puedeEditarEquipos, puedeEliminarEquipos, puedeVerEquipo } from "@/modulos/equipos/logica";
 import { EstadoEquipoBadge, IconoEquipo, IconoSistema } from "@/modulos/equipos/piezas";
 import type { Equipo, EstadoEquipo, SistemaEquipo } from "@/modulos/equipos/tipos";
 import { useEquipos } from "@/modulos/equipos/useEquipos";
 import { formatoDe, tituloDoc } from "@/modulos/registro";
 import { puede } from "@/nucleo/permisos";
+import { LISTA } from "@/nucleo/opciones";
 import { rutaDoc, rutaProyecto } from "@/nucleo/rutas";
 
 /** Clases comunes de los campos del formulario. */
@@ -43,7 +45,8 @@ function Ficha() {
     return {
       id: "",
       clienteId: params.get("cliente") ?? "",
-      sistema: (esSistema(sis) ? sis : "cctv") as SistemaEquipo,
+      // Del catálogo o agregado por la empresa (?sistema= desde un grupo del inventario)
+      sistema: (sis.trim() || "cctv") as SistemaEquipo,
       tipo: "",
       nombre: "",
       marca: "",
@@ -176,22 +179,31 @@ function Ficha() {
             </label>
             <label className="block text-sm">
               <span className="text-xs font-medium text-slate-600">Sistema</span>
-              <select className={campo} value={borrador.sistema} onChange={(x) => set({ sistema: x.target.value as SistemaEquipo })}>
-                {SISTEMAS.map((s) => (
-                  <option key={s.clave} value={s.clave}>
-                    {s.nombre}
-                  </option>
-                ))}
-              </select>
+              {/* «＋ Agregar otro…»: el sistema o tipo nuevo queda para la empresa (también en el reporte) */}
+              <SelectConOtro
+                clave={LISTA.sistemaEquipo}
+                base={CLAVES_SISTEMA}
+                etiqueta={(v) => sistemaDe(v).nombre}
+                value={borrador.sistema}
+                onChange={(v) => set({ sistema: v as SistemaEquipo })}
+                placeholderOtro="Nombre del sistema (p. ej. Sonido ambiental)"
+                aria-label="Sistema"
+                className={campo}
+              />
             </label>
             <label className="block text-sm">
               <span className="text-xs font-medium text-slate-600">Tipo</span>
-              <input required list="tipos-equipo" className={campo} value={borrador.tipo} onChange={(x) => set({ tipo: x.target.value })} placeholder={sis.tipos[0] ? `Ej: ${sis.tipos[0]}` : ""} />
-              <datalist id="tipos-equipo">
-                {sis.tipos.map((t) => (
-                  <option key={t} value={t} />
-                ))}
-              </datalist>
+              <SelectConOtro
+                required
+                clave={LISTA.tipoEquipo(borrador.sistema)}
+                base={sis.tipos}
+                value={borrador.tipo}
+                onChange={(tipo) => set({ tipo })}
+                vacio="Selecciona…"
+                placeholderOtro={sis.tipos[0] ? `Ej: ${sis.tipos[0]}` : "Tipo de equipo"}
+                aria-label="Tipo de equipo"
+                className={campo}
+              />
             </label>
             <label className="block text-sm sm:col-span-2">
               <span className="text-xs font-medium text-slate-600">Nombre</span>

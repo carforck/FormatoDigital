@@ -34,6 +34,8 @@ export const CLIENTES_SEED: Cliente[] = [
   { id: "c-tango", nit: "900.300.400-2", nombre: "Constructora Horizonte Azul", direccion: "Bocagrande, Cartagena", contacto: "Arq. Laura Méndez", cargo: "Residente de obra", correo: "obra@horizonteazul.example", telefono: "3001112233", sitio: "Hotel Brisas del Mar" },
   { id: "c-puerto", nit: "900.500.600-3", nombre: "Centro Logístico Bahía", direccion: "Mamonal Km 5, Cartagena", contacto: "Jorge Salcedo", cargo: "Jefe de seguridad", correo: "seguridad@logisticabahia.example", telefono: "3014445566", sitio: "Patio 2" },
   { id: "c-conj", nit: "900.700.800-4", nombre: "Conjunto Residencial Los Robles", direccion: "Barrio Los Robles, Cartagena", contacto: "Patricia Ríos", cargo: "Administradora", correo: "admin@losrobles.example", telefono: "3157778899", sitio: "Portería principal" },
+  // Sitio donde SOTEC presta servicios para Fortox (ficticio): su proyecto es de tipo «Servicios Fortox»
+  { id: "c-mirador", nit: "900.900.100-5", nombre: "Centro Comercial Mirador de la Bahía", direccion: "Av. Pedro de Heredia, Cartagena", contacto: "Luis Arrieta Gómez", cargo: "Supervisor de seguridad", correo: "seguridad@miradorbahia.example", telefono: "3209990011", sitio: "Cuarto de monitoreo" },
 ];
 
 /** Configuración de SOTEC (prefijos RT, PT, LG, COT, CC, PRY); también es la base del modo empresa. */
@@ -73,6 +75,12 @@ export function proyectosSeed(): Proyecto[] {
     p(3, { nombre: "Videovigilancia bodega y patio 2", clienteId: "c-puerto", sitio: "Patio 2", responsableId: "u-tec2", fechaInicio: "2026-06-01", fechaFin: "2026-07-15", estado: "cerrado", presupuesto: 9800000, descripcion: "Instalación de 8 cámaras IP con su cableado en la bodega y el patio de contenedores." }),
     p(4, { nombre: "Seguridad perimetral portería", clienteId: "c-conj", sitio: "Portería principal", responsableId: "u-tec1", fechaInicio: "2026-07-01", estado: "en_pausa", presupuesto: 6200000, descripcion: "Cerca eléctrica, alarmas perimetrales y cámara PTZ de la portería. En pausa mientras la asamblea aprueba la segunda fase." }),
     p(5, { nombre: "Detección de incendio bodegas", clienteId: "c-puerto", sitio: "Bodegas 1 y 2", responsableId: "u-sup", fechaInicio: "2026-09-01", estado: "activo", presupuesto: 15000000, descripcion: "Revisión y ampliación del sistema de detección de incendio de las bodegas, con trabajos eléctricos certificados." }),
+    // Proyecto de tipo «Servicios Fortox»: sus reportes salen en el formato de Fortox (@/nucleo/variantes).
+    // Es de 2025 para no mover los consecutivos de proyecto de 2026.
+    {
+      ...p(12, { nombre: "Servicios Fortox · CCTV centro comercial", tipo: "Servicios Fortox", clienteId: "c-mirador", sitio: "Cuarto de monitoreo", responsableId: "u-sup", fechaInicio: "2025-11-03", estado: "activo", descripcion: "Mantenimiento de CCTV y alarmas que SOTEC ejecuta para Fortox en el centro comercial: los reportes salen en el formato de Fortox." }),
+      codigo: "PRY-012-25",
+    },
   ];
 }
 

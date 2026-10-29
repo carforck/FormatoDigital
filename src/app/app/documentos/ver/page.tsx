@@ -6,7 +6,8 @@
  * tomar la firma del cliente en sitio, cerrar, duplicar, pedir firma por enlace, enviar,
  * cobrar, PDF). Retirar o rechazar anula la firma del cliente tomada en sitio (se avisa antes). Cada acción se habilita según @/nucleo/permisos y el `flujo` del módulo
  * (@/modulos/registro); si otro llegó primero (p. ej. el autor retiró lo que se iba a
- * aprobar) se muestra el motivo. Params: ?desde= (regreso), ?ok=guardado|enviado.
+ * aprobar) se muestra el motivo. Sale con la variante de formato guardada en el documento
+ * (`doc.variante`, @/nucleo/variantes; sin ella, SOTEC). Params: ?desde= (regreso), ?ok=guardado|enviado.
  */
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -18,6 +19,7 @@ import { Volver, marcarEdicion, useAvisoDeRegreso, useOrigen } from "@/component
 import { fondoQueCierra, useModal } from "@/components/ui/useModal";
 
 import { FirmaPad } from "@/components/docs/FirmaPad";
+import { ChipVariante, ConVariante } from "@/components/docs/VarianteFormato";
 import { Button } from "@/components/ui/button";
 import { EstadoBadge } from "@/components/ui/badges";
 import { Input } from "@/components/ui/input";
@@ -30,6 +32,7 @@ import { equiposAtendidos, equiposIdsDe } from "@/modulos/equipos/logica";
 import { IconoEquipo } from "@/modulos/equipos/piezas";
 import type { DatosPermiso } from "@/nucleo/tipos";
 import { faltantes } from "@/nucleo/validar";
+import { VARIANTE_BASE, formatoEnVariante, varianteParaTipo } from "@/nucleo/variantes";
 import { clienteDoc, empresaDe, infoDoc, rutaNuevo } from "@/modulos/registro";
 
 /**
@@ -144,10 +147,12 @@ function Detalle() {
       <div className="print:hidden flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium uppercase tracking-wide text-sotec-greenDeep">
-            {f.codigo} · {f.corto}
+            {formatoEnVariante(f, doc.tipo, doc.variante).codigo} · {f.corto}
           </p>
           <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold">
             <span className="font-mono">{doc.codigo}</span> <EstadoBadge estado={doc.estado} tipo={doc.tipo} />
+            {/* Variante de formato distinta de SOTEC (p. ej. Servicios Fortox), solo para el equipo interno */}
+            {u.rol !== "cliente" && varianteParaTipo(doc.tipo, doc.variante).clave !== VARIANTE_BASE && <ChipVariante variante={doc.variante} tipo={doc.tipo} />}
           </h1>
           <p className="text-sm text-slate-500">
             {clienteDoc(doc)} · por {nombre(doc.autorId)}
@@ -353,15 +358,17 @@ function Detalle() {
 
       <div className="grid gap-4 xl:grid-cols-[1fr_280px]">
         <div className="overflow-x-auto rounded-lg bg-slate-100 p-2 sm:p-4">
-          <Plantilla
-            datos={datosVista}
-            codigoDoc={doc.codigo}
-            empresa={empresaDe(demo.config)}
-            equipos={atendidos}
-            editarCierre={cierraPermiso ? (p) => setCierre((c) => ({ ...c, ...(p as Partial<DatosPermiso>) })) : undefined}
-            firmar={cierraPermiso ? () => setFirma("cierre") : undefined}
-            resaltar={cierraPermiso ? "cierre" : undefined}
-          />
+          <ConVariante variante={doc.variante} tipo={doc.tipo}>
+            <Plantilla
+              datos={datosVista}
+              codigoDoc={doc.codigo}
+              empresa={empresaDe(demo.config)}
+              equipos={atendidos}
+              editarCierre={cierraPermiso ? (p) => setCierre((c) => ({ ...c, ...(p as Partial<DatosPermiso>) })) : undefined}
+              firmar={cierraPermiso ? () => setFirma("cierre") : undefined}
+              resaltar={cierraPermiso ? "cierre" : undefined}
+            />
+          </ConVariante>
         </div>
         <aside className={u.rol === "cliente" ? "hidden" : "print:hidden h-fit rounded-xl border border-slate-200 bg-white p-4"}>
           <h2 className="text-sm font-semibold">Trazabilidad</h2>

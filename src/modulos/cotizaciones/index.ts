@@ -54,6 +54,7 @@ export const moduloCotizaciones: ModuloDocumento<DatosCotizacion> = {
   requiere: "cotizar",
   clienteDe: (d) => d.cliente,
   campoCliente: "cliente",
+  campoNit: "clienteNit",
   // Cliente nuevo de la cotización: queda en el directorio con NIT, contacto y cargo de quien acepta
   datosCliente: (d) => ({ nombre: d.cliente, nit: d.clienteNit, contacto: d.contacto, cargo: d.aceptaCargo, correo: d.correo, telefono: d.telefono, direccion: d.direccion }),
   valor: (d) => totalesCotizacion(d).total,

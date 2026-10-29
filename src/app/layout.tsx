@@ -11,6 +11,7 @@ import "./globals.css";
 
 import { DemoProvider } from "@/nucleo/datos/DemoProvider";
 import { RegistroPWA } from "@/components/pwa/RegistroPWA";
+import { SinZoomIOS } from "@/components/ui/SinZoomIOS";
 
 /** URL pública del sitio; base para resolver las URLs relativas de los metadatos (og:image, etc.). */
 const SITIO = process.env.NEXT_PUBLIC_SITE_URL ?? "https://controlone.sotecse.com";
@@ -55,6 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es-CO" className={GeistSans.variable}>
       <body className="min-h-screen font-sans">
         <RegistroPWA />
+        <SinZoomIOS />
         <DemoProvider>{children}</DemoProvider>
       </body>
     </html>

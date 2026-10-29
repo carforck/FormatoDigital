@@ -37,6 +37,8 @@ import type { ApiEquipos, Equipo } from "@/modulos/equipos/tipos";
 import { CATALOGO_SERVICIOS, IVA_GENERAL, type ServicioCatalogo } from "@/modulos/cotizaciones/catalogo";
 import { infoDoc, prefijoDe } from "@/modulos/registro";
 import { planCliente } from "@/nucleo/clientes";
+import { prefijoVariante, serieConsecutivo, type TipoProyecto } from "@/nucleo/variantes";
+import { buscarOpcion, comparable, limpiarOpcion } from "@/nucleo/opciones";
 import { puede, puedeCrearTipo, puedeFirmaClienteEnSitio, puedeRetirarDoc, puedeUsarTipo, puedeVerCuenta, puedeVerDoc, puedeVerProyecto } from "@/nucleo/permisos";
 import {
   CLIENTES_SEED,
@@ -109,7 +111,11 @@ function maximos(a: Record<string, number>, b: Record<string, number>): Record<s
 function contadoresDe(docs: Documento[], cuentas: CuentaCobro[], proyectos: Proyecto[] = []): Record<string, number> {
   const c: Record<string, number> = {};
   for (const p of proyectos) c[`proyecto-${anioDe(p.creado)}`] = Math.max(c[`proyecto-${anioDe(p.creado)}`] ?? 0, p.consecutivo);
-  for (const d of docs) c[`${d.tipo}-${anioDe(d.creado)}`] = Math.max(c[`${d.tipo}-${anioDe(d.creado)}`] ?? 0, d.consecutivo);
+  // Cada documento cuenta en su serie: la del módulo o, si su variante de formato tiene prefijo propio, la de la variante
+  for (const d of docs) {
+    const k = serieConsecutivo(d.tipo, d.variante, anioDe(d.creado));
+    c[k] = Math.max(c[k] ?? 0, d.consecutivo);
+  }
   for (const x of cuentas) c[`cobro-${anioDe(x.creado)}`] = Math.max(c[`cobro-${anioDe(x.creado)}`] ?? 0, x.consecutivo);
   return c;
 }
@@ -235,8 +241,11 @@ interface Api extends Estado, ApiEquipos {
    * se enlaza y se llenan solo sus campos vacíos (`planCliente`, @/nucleo/clientes).
    */
   guardar: (doc: Documento) => Documento;
-  /** Vista previa del siguiente id y código; el definitivo se asigna en `guardar`. */
-  nuevoId: (tipo: TipoDoc) => { id: string; codigo: string; consecutivo: number };
+  /**
+   * Vista previa del siguiente id y código; el definitivo se asigna en `guardar`. Con una
+   * `variante` de formato que tenga prefijo propio (@/nucleo/variantes), el de su serie.
+   */
+  nuevoId: (tipo: TipoDoc, variante?: string) => { id: string; codigo: string; consecutivo: number };
   /** El autor lo envía a revisión (o lo aprueba de una vez si el formato tiene `aprobarAlEnviar`). */
   enviar: (id: string) => void;
   /**
@@ -272,7 +281,10 @@ interface Api extends Estado, ApiEquipos {
   eliminarCliente: (id: string) => string | null;
   /** Clientes que se pueden elegir en los formularios (activos). */
   clientesActivos: Cliente[];
+  /** Datos generales de Configuración (no toca las opciones, servicios ni tipos de proyecto, que tienen su acción). */
   actualizarConfig: (c: Config) => void;
+  /** Tipos de proyecto y su variante de formato (Configuración, solo administración). */
+  guardarTiposProyecto: (tipos: TipoProyecto[]) => void;
   /** «＋ Agregar otro» del asistente: guarda la opción para toda la empresa (clave «formato.paso»). */
   agregarOpcion: (clave: string, valor: string) => void;
   /** Quita una opción agregada (Configuración, solo administración). */
@@ -817,10 +829,10 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
       },
 
       // Vista previa del siguiente código; el definitivo se asigna al guardar (guardar)
-      nuevoId(tipo) {
+      nuevoId(tipo, variante) {
         const anio = anioDe(hoy());
-        const consecutivo = (s.consecutivos[`${tipo}-${anio}`] ?? 0) + 1;
-        return { id: uid("d"), consecutivo, codigo: codigo(prefijo(s, tipo), consecutivo, anio) };
+        const consecutivo = (s.consecutivos[serieConsecutivo(tipo, variante, anio)] ?? 0) + 1;
+        return { id: uid("d"), consecutivo, codigo: codigo(prefijoVariante(tipo, variante) ?? prefijo(s, tipo), consecutivo, anio) };
       },
 
       guardar(doc) {
@@ -831,7 +843,8 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
             // Solo el autor edita, y solo en borrador o rechazado; se conserva lo que no es contenido
             const editable = existente.autorId === prev.usuarioId && usaTipo(prev, existente.tipo) && (existente.estado === "borrador" || existente.estado === "rechazado");
             if (!editable) return prev;
-            const dir = conDirectorio(prev, { ...existente, datos: doc.datos, clienteId: doc.clienteId, proyectoId: doc.proyectoId || undefined, actualizado: ahora() } as Documento);
+            // La variante de formato se recalcula mientras es borrador (el generador la resuelve por proyecto o cliente)
+            const dir = conDirectorio(prev, { ...existente, datos: doc.datos, clienteId: doc.clienteId, proyectoId: doc.proyectoId || undefined, variante: doc.variante ?? existente.variante, actualizado: ahora() } as Documento);
             const merged = { ...dir.doc, equiposIds: equiposDelCliente(prev, dir.doc) } as Documento;
             return { ...prev, clientes: dir.clientes, auditoria: dir.auditoria, documentos: prev.documentos.map((d) => (d.id === doc.id ? merged : d)) };
           }
@@ -840,12 +853,13 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
           if (!r || !puedeCrearTipo(r, doc.tipo)) return prev;
           // Toma el consecutivo definitivo del año (no se reutiliza aunque se elimine)
           const anio = anioDe(hoy());
-          const clave = `${doc.tipo}-${anio}`;
+          // Serie del módulo (RT…) o, si la variante de formato tiene prefijo propio, la suya
+          const clave = serieConsecutivo(doc.tipo, doc.variante, anio);
           const n = (prev.consecutivos[clave] ?? 0) + 1;
           const base = {
             ...actualizado,
             consecutivo: n,
-            codigo: codigo(prefijo(prev, doc.tipo), n, anio),
+            codigo: codigo(prefijoVariante(doc.tipo, doc.variante) ?? prefijo(prev, doc.tipo), n, anio),
             autorId: prev.usuarioId ?? doc.autorId,
             estado: "borrador",
             historial: [evento(prev, "Creó el documento")],
@@ -1119,18 +1133,33 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
         // Lo agregado desde el asistente se conserva aunque el formulario de Configuración tenga una copia vieja
         setS((prev) => ({
           ...prev,
-          config: { ...c, opcionesPropias: prev.config.opcionesPropias, serviciosPropios: prev.config.serviciosPropios },
+          config: { ...c, opcionesPropias: prev.config.opcionesPropias, serviciosPropios: prev.config.serviciosPropios, tiposProyecto: prev.config.tiposProyecto },
           auditoria: registrar(prev, "Cambió configuración", "Formatos y consecutivos"),
+        }));
+      },
+
+      guardarTiposProyecto(tipos) {
+        if (!usuario || !puede(usuario.rol, "config")) return;
+        // Sin nombres vacíos ni repetidos (sin importar mayúsculas)
+        const limpios = tipos
+          .map((t) => ({ nombre: t.nombre.trim(), variante: t.variante }))
+          .filter((t, k, a) => t.nombre && a.findIndex((x) => x.nombre.toLowerCase() === t.nombre.toLowerCase()) === k);
+        if (!limpios.length) return;
+        setS((prev) => ({
+          ...prev,
+          config: { ...prev.config, tiposProyecto: limpios },
+          auditoria: registrar(prev, "Cambió los tipos de proyecto", limpios.map((t) => `${t.nombre} → ${t.variante}`).join(", ")),
         }));
       },
 
       // Opciones y servicios agregados desde el asistente: quedan en la configuración de la empresa para todo el equipo
       agregarOpcion(clave, valor) {
-        const v = valor.trim();
+        const v = limpiarOpcion(valor);
         if (!v || !usuario) return;
         setS((prev) => {
           const actuales = prev.config.opcionesPropias?.[clave] ?? [];
-          if (actuales.some((x) => x.toLowerCase() === v.toLowerCase())) return prev;
+          // Sin mayúsculas, tildes ni espacios de más: «alimentacion» ya es «Alimentación»
+          if (buscarOpcion(actuales, v)) return prev;
           return {
             ...prev,
             config: { ...prev.config, opcionesPropias: { ...prev.config.opcionesPropias, [clave]: [...actuales, v] } },
@@ -1148,8 +1177,8 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
         });
       },
       agregarServicio(m) {
-        const descripcion = m.descripcion.trim();
-        const existente = [...CATALOGO_SERVICIOS, ...(s.config.serviciosPropios ?? [])].find((x) => x.descripcion.toLowerCase() === descripcion.toLowerCase());
+        const descripcion = limpiarOpcion(m.descripcion);
+        const existente = [...CATALOGO_SERVICIOS, ...(s.config.serviciosPropios ?? [])].find((x) => comparable(x.descripcion) === comparable(descripcion));
         if (existente) return existente;
         const nuevo: ServicioCatalogo = {
           clave: uid("srv"),
@@ -1399,4 +1428,9 @@ export function useDemo(): Api {
   const v = useContext(Ctx);
   if (!v) throw new Error("useDemo fuera de DemoProvider");
   return v;
+}
+
+/** Como `useDemo`, pero sin error fuera del proveedor (piezas que también se dibujan sueltas, p. ej. las listas con «＋ Agregar otro»). */
+export function useDemoOpcional(): Api | null {
+  return useContext(Ctx);
 }

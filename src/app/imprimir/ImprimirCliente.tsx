@@ -11,6 +11,7 @@ import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowLeft, Printer } from "lucide-react";
 
+import { ConVariante } from "@/components/docs/VarianteFormato";
 import { PlantillaCuentaCobro } from "@/modulos/cobros/PlantillaCuentaCobro";
 import { equiposAtendidos, equiposIdsDe } from "@/modulos/equipos/logica";
 import { clienteDoc, empresaDe, infoDoc, prefijoDe } from "@/modulos/registro";
@@ -110,7 +111,12 @@ function Imprimir() {
         const codigo = guardado ? doc.codigo : `${prefijoDe(demo.config, doc.tipo)}-borrador-${hoy()}`;
         titulo = tituloArchivo([codigo, info.formato.corto, clienteDoc(doc)]);
         const equipos = equiposAtendidos(equiposIdsDe(doc), guardado ? demo.equiposVisibles : demo.equipos);
-        hojas = <Plantilla datos={doc.datos} codigoDoc={doc.codigo} empresa={empresaDe(demo.config)} equipos={equipos} />;
+        // Con la variante de formato del documento (o la que resolvió el generador para el borrador)
+        hojas = (
+          <ConVariante variante={doc.variante} tipo={doc.tipo}>
+            <Plantilla datos={doc.datos} codigoDoc={doc.codigo} empresa={empresaDe(demo.config)} equipos={equipos} />
+          </ConVariante>
+        );
       }
     }
   }

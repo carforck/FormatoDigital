@@ -8,8 +8,12 @@ import type { Evento } from "@/nucleo/tipos";
 
 import type { SISTEMAS } from "./catalogo";
 
-/** Clave del sistema (CCTV, alarmas, control de acceso…): sale del catálogo, así se amplía en un solo lugar. */
-export type SistemaEquipo = (typeof SISTEMAS)[number]["clave"];
+/**
+ * Clave del sistema (CCTV, alarmas, control de acceso…): sale del catálogo, así se amplía en un
+ * solo lugar, o es el nombre de un sistema que la empresa agregó con «＋ Agregar otro»
+ * (lista «equipos.sistema»; la base lo guarda como texto, sin lista cerrada).
+ */
+export type SistemaEquipo = (typeof SISTEMAS)[number]["clave"] | (string & {});
 
 /** «Retirado»: dado de baja; no se ofrece en los reportes nuevos, pero conserva su historial. */
 export type EstadoEquipo = "operativo" | "con_falla" | "fuera_servicio" | "retirado";

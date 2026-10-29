@@ -6,7 +6,7 @@
  */
 import type { Cliente, Documento, Evento, Usuario } from "@/nucleo/tipos";
 
-import { ETIQUETA_ESTADO_EQUIPO, esSistema } from "./catalogo";
+import { ETIQUETA_ESTADO_EQUIPO } from "./catalogo";
 import { equipoRepetido, equipoVacio, equiposIdsDe, faltantesEquipo, idEquipo, puedeEditarEquipos, puedeEliminarEquipos } from "./logica";
 import type { Equipo, EquipoMinimo, EstadoEquipo } from "./tipos";
 
@@ -55,7 +55,6 @@ export function guardar(equipos: Equipo[], e: Equipo, c: Ctx): Cambio {
   }
   const falta = faltantesEquipo({ ...e, clienteId: existe.clienteId });
   if (falta.length) return sinCambio(equipos, `Falta: ${falta.join(", ")}.`);
-  if (!esSistema(e.sistema)) return sinCambio(equipos, "Elige un sistema del catálogo.");
   const repetido = equipoRepetido(equipos, { ...e, clienteId: existe.clienteId });
   if (repetido) return sinCambio(equipos, `Ya existe «${repetido.nombre}» en este cliente y sistema.`);
   const act: Equipo = {

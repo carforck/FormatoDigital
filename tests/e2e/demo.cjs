@@ -17,7 +17,7 @@ const path = require("path");
 const puppeteer = require("puppeteer-core");
 
 const BASE = (process.env.BASE || "http://localhost:3100").replace(/\/$/, "");
-const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion" | "campo"
+const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion" | "campo" | "variantes" | "listas"
 const CLAVE = "sotec-demo-v9";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -845,7 +845,7 @@ async function equipos(b, errores) {
   await sleep(400);
   ok(await p.evaluate(() => document.querySelector("form select").value === "c-conj"), "«Nuevo equipo» abre el formulario con el cliente que se estaba viendo");
   await p.select("form label:nth-of-type(3) select", "alarmas");
-  await p.type('input[list="tipos-equipo"]', "Teclado");
+  await p.select('select[aria-label="Tipo de equipo"]', "Teclado");
   await p.type('input[placeholder="Ej: Cámara 7 – Portería"]', "Teclado portería vehicular");
   await clic(p, "Registrar equipo", "button[type=submit]");
   await p.waitForFunction(() => location.search.includes("ok=creado"), { timeout: 10000 });
@@ -864,7 +864,7 @@ async function equipos(b, errores) {
   // Doble creación desde la ficha: mismo nombre, mismo cliente y sistema → error, no duplica
   await p.goto(`${BASE}/app/equipos/ver?nuevo=1&cliente=c-conj&sistema=alarmas`, { waitUntil: "networkidle0" });
   await sleep(400);
-  await p.type('input[list="tipos-equipo"]', "Teclado");
+  await p.select('select[aria-label="Tipo de equipo"]', "Teclado");
   await p.type('input[placeholder="Ej: Cámara 7 – Portería"]', "teclado  portería vehicular");
   await clic(p, "Registrar equipo", "button[type=submit]");
   s = await estado();
@@ -1755,6 +1755,405 @@ async function comercial(b, errores) {
   await p.close();
 }
 
+/**
+ * Variantes de formato (pedido de Magno): el reporte de un proyecto «Servicios Fortox» sale
+ * en el formato de FORTOX (vista previa, guardado, detalle e /imprimir); uno de SOTEC sale
+ * como SOTEC; cambiar el proyecto cambia la vista previa; cambiar después el tipo del proyecto
+ * no cambia lo guardado; el cliente con «Formato por defecto» lo usa sin proyecto.
+ * Capturas en VARIANTES_CAPTURAS (carpeta) si se define.
+ */
+async function variantes(b, errores) {
+  console.log("\n— Variantes de formato (Servicios Fortox)");
+  const p = await nuevaPagina(b, errores);
+  await p.evaluateOnNewDocument(() => {
+    window.__impresiones = 0;
+    window.print = () => window.__impresiones++;
+  });
+  await p.setViewport({ width: 1440, height: 900 });
+  await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "networkidle0" });
+  const capturas = process.env.VARIANTES_CAPTURAS;
+  const foto = async (nombre) => capturas && p.screenshot({ path: path.join(capturas, `${nombre}.png`), fullPage: false });
+  const hoja = () => p.evaluate(() => [...document.querySelectorAll(".doc-print")].map((h) => h.innerText.replace(/\s+/g, " ")).join(" | "));
+  const chip = () => p.evaluate(() => document.querySelector("[data-chip-variante]")?.textContent.trim() ?? "");
+  const vista = () =>
+    p.evaluate(() => {
+      const h = document.querySelector(".doc-print .hdr");
+      return { logo: Boolean(document.querySelector(".doc-print [data-logo-texto=fortox]")), fondo: h ? getComputedStyle(h).backgroundColor : "" };
+    });
+  const elegirEnFormulario = (indice, texto) =>
+    p.evaluate(
+      (i, t) => {
+        const s = document.querySelectorAll('section[aria-label="Cliente y proyecto"] select')[i];
+        const o = [...s.options].find((x) => x.textContent.includes(t));
+        s.value = o.value;
+        s.dispatchEvent(new Event("change", { bubbles: true }));
+      },
+      indice,
+      texto,
+    );
+  const verde = "rgb(146, 208, 80)";
+
+  // 1. El técnico elige en el asistente el cliente y el proyecto «Servicios Fortox»
+  await clic(p, "Técnico de campo");
+  await p.waitForFunction(() => location.pathname.includes("/app/nuevo/reporte"));
+  await sleep(800);
+  ok((await chip()) === "Formato: Servicios SOTEC", "el generador arranca con «Formato: Servicios SOTEC»");
+  await clic(p, "Centro Comercial Mirador de la Bahía");
+  await clic(p, "PRY-012-25");
+  await sleep(300);
+  let h = await hoja();
+  let v = await vista();
+  ok((await chip()).startsWith("Formato: Servicios Fortox"), "al elegir el proyecto Servicios Fortox el chip dice «Formato: Servicios Fortox»");
+  ok(v.logo && h.includes("FORTOX") && h.includes("Código por confirmar") && !h.includes("FO-GSST-22"), "la vista previa trae el encabezado de FORTOX (logo de texto, código por confirmar)");
+  ok(v.fondo && v.fondo !== verde, "las franjas del formato cambian de color (no el verde de SOTEC)");
+  ok(h.includes("SOTEC para FORTOX") && !h.includes("propiedad de SOTEC"), "el pie es el de la variante FORTOX");
+  ok((await p.evaluate(() => document.body.innerText)).includes("Formato: Servicios Fortox. El reporte técnico sale con el encabezado de FORTOX"), "el asistente avisa el cambio de formato");
+  await foto("generador-fortox-escritorio");
+
+  // 2. Cambiar el proyecto en el formulario cambia la vista previa (y volver a elegirlo, también)
+  await elegirEnFormulario(1, "Sin proyecto");
+  await sleep(300);
+  h = await hoja();
+  ok((await chip()) === "Formato: Servicios SOTEC" && h.includes("FO-GSST-22") && !(await vista()).logo, "sin proyecto (cliente sin formato propio) vuelve al formato de SOTEC");
+  await elegirEnFormulario(1, "PRY-012-25");
+  await sleep(300);
+  ok((await chip()).startsWith("Formato: Servicios Fortox") && (await vista()).logo, "al elegir de nuevo el proyecto en «Proyecto u obra» vuelve el formato de FORTOX");
+
+  // 3. Guardar: el detalle y el PDF salen en FORTOX y el documento guarda su variante
+  await clic(p, "Guardar borrador");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"));
+  await sleep(600);
+  const idFortox = new URL(p.url()).searchParams.get("id");
+  const guardado = await p.evaluate((k, id) => JSON.parse(localStorage.getItem(k)).documentos.find((d) => d.id === id), CLAVE, idFortox);
+  ok(guardado && guardado.variante === "fortox" && /^RT-\d{3}-\d{2}$/.test(guardado.codigo), `el documento guarda la variante «fortox» y sigue la serie RT (${guardado && guardado.codigo})`);
+  h = await hoja();
+  ok((await vista()).logo && h.includes("Código por confirmar") && (await chip()).startsWith("Formato: Servicios Fortox"), "el detalle muestra el formato de FORTOX y su chip");
+  await foto("detalle-fortox-escritorio");
+  await p.goto(`${BASE}/imprimir?doc=${idFortox}&volver=/app/documentos`, { waitUntil: "networkidle0" });
+  await p.waitForSelector("[data-impresion-lista]", { timeout: 20000 });
+  await sleep(300);
+  h = await hoja();
+  ok((await p.title()).startsWith(`${guardado.codigo} · Reporte técnico`), `el PDF se llama con el consecutivo (${await p.title()})`);
+  ok((await vista()).logo && h.includes("FORTOX") && h.includes("Código por confirmar"), "/imprimir sale con el formato de FORTOX");
+  await foto("imprimir-fortox");
+
+  // 4. Un proyecto de SOTEC sale como SOTEC
+  await p.goto(`${BASE}/app/documentos`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.removeItem("fd-generador-reporte-u-tec1"));
+  await p.goto(`${BASE}/app/nuevo/reporte`, { waitUntil: "networkidle0" });
+  await sleep(800);
+  await clic(p, "Ladrillera Arcillas del Caribe");
+  await clic(p, "PRY-001-26");
+  await sleep(300);
+  h = await hoja();
+  v = await vista();
+  ok((await chip()) === "Formato: Servicios SOTEC" && h.includes("FO-GSST-22") && !v.logo && v.fondo === verde, "un proyecto de SOTEC sale con el formato de SOTEC");
+  // Cambiar a un proyecto Fortox desde el formulario (cambia el cliente también)
+  await elegirEnFormulario(0, "Centro Comercial Mirador");
+  await sleep(200);
+  await elegirEnFormulario(1, "PRY-012-25");
+  await sleep(300);
+  ok((await chip()).startsWith("Formato: Servicios Fortox") && (await vista()).logo, "cambiar a un proyecto Servicios Fortox cambia la vista previa");
+  await p.evaluate(() => localStorage.removeItem("fd-generador-reporte-u-tec1"));
+
+  // 5. La administración cambia el tipo del proyecto: lo ya guardado no cambia
+  await comoUsuario(p, "u-adm");
+  await p.goto(`${BASE}/app/proyectos/editar?id=p-12`, { waitUntil: "networkidle0" });
+  await sleep(600);
+  ok(await p.evaluate(() => document.querySelector('select[aria-label="Tipo de proyecto"]').value === "Servicios Fortox"), "el formulario del proyecto muestra su tipo «Servicios Fortox»");
+  await p.select('select[aria-label="Tipo de proyecto"]', "Servicios SOTEC");
+  await clic(p, "Guardar proyecto");
+  await p.waitForFunction(() => location.pathname.includes("/app/proyectos/ver"));
+  await sleep(400);
+  await p.goto(`${BASE}/app/documentos/ver?id=${idFortox}`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  ok((await vista()).logo && (await hoja()).includes("Código por confirmar"), "cambiar el tipo del proyecto no cambia el formato de un reporte ya guardado");
+  // Se deja como estaba
+  await p.goto(`${BASE}/app/proyectos/editar?id=p-12`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  await p.select('select[aria-label="Tipo de proyecto"]', "Servicios Fortox");
+  await clic(p, "Guardar proyecto");
+  await p.waitForFunction(() => location.pathname.includes("/app/proyectos/ver"));
+
+  // 6. Configuración: la lista de tipos se puede ampliar y sale en el formulario del proyecto
+  await p.goto(`${BASE}/app/config`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  await p.type('input[placeholder="Servicios para otra empresa"]', "Servicios Fortox nocturnos");
+  await p.select('select[aria-label="Formato del nuevo tipo"]', "fortox");
+  await clic(p, "Agregar tipo");
+  await sleep(300);
+  const tipos = await p.evaluate((k) => JSON.parse(localStorage.getItem(k)).config.tiposProyecto, CLAVE);
+  ok(Array.isArray(tipos) && tipos.some((t) => t.nombre === "Servicios Fortox nocturnos" && t.variante === "fortox"), "Configuración agrega un tipo de proyecto con su formato");
+  await p.goto(`${BASE}/app/proyectos/editar`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  ok(await p.evaluate(() => [...document.querySelector('select[aria-label="Tipo de proyecto"]').options].some((o) => o.value === "Servicios Fortox nocturnos")), "el tipo nuevo se puede elegir en el proyecto");
+
+  // 7. Cliente con «Formato por defecto» FORTOX: sin proyecto, el reporte sale en FORTOX
+  await p.goto(`${BASE}/app/clientes`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  await clic(p, "Conjunto Residencial Los Robles");
+  await p.select('select[aria-label="Formato por defecto"]', "fortox");
+  await clic(p, "Guardar", "form button[type=submit]");
+  await sleep(300);
+  ok((await p.evaluate((k) => JSON.parse(localStorage.getItem(k)).clientes.find((c) => c.id === "c-conj").variante, CLAVE)) === "fortox", "el cliente guarda su formato por defecto");
+  await comoUsuario(p, "u-tec1");
+  await p.goto(`${BASE}/app/nuevo/reporte`, { waitUntil: "networkidle0" });
+  await sleep(800);
+  await clic(p, "Conjunto Residencial Los Robles");
+  ok((await chip()).startsWith("Formato: Servicios Fortox") && (await vista()).logo, "al elegir el cliente con formato FORTOX (sin proyecto) sale el formato de FORTOX");
+  await clic(p, "Sin proyecto");
+  ok((await chip()).startsWith("Formato: Servicios Fortox"), "«Sin proyecto» conserva el formato del cliente");
+  // Proyecto antiguo sin tipo: manda el formato del cliente
+  await elegirEnFormulario(1, "PRY-004-26");
+  await sleep(300);
+  ok((await chip()).startsWith("Formato: Servicios Fortox"), "un proyecto antiguo sin tipo usa el formato del cliente");
+  await p.evaluate(() => localStorage.removeItem("fd-generador-reporte-u-tec1"));
+
+  // 8. Celular (390): el chip y el encabezado de FORTOX en la pestaña «Formato»
+  await p.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+  await p.goto(`${BASE}/app/nuevo/reporte?proyecto=p-12`, { waitUntil: "networkidle0" });
+  await sleep(900);
+  ok((await chip()).startsWith("Formato: Servicios Fortox"), "con ?proyecto= de un proyecto Fortox, el formato ya es FORTOX (celular)");
+  const desborde = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  ok(desborde <= 1, `sin desborde horizontal en 390 px (${desborde})`);
+  await foto("generador-fortox-390-asistente");
+  await p.evaluate(() => [...document.querySelectorAll("button")].find((x) => x.textContent.trim() === "Formato")?.click());
+  await sleep(400);
+  await foto("generador-fortox-390-formato");
+  await p.goto(`${BASE}/app/documentos/ver?id=${idFortox}`, { waitUntil: "networkidle0" });
+  await sleep(600);
+  await foto("detalle-fortox-390");
+  await p.evaluate(() => localStorage.removeItem("fd-generador-reporte-u-tec1"));
+  await p.close();
+}
+
+/**
+ * «＋ Agregar otro» en los formularios (mismo almacén que el asistente), letra de 16 px en los
+ * campos del celular (iPhone no acerca la pantalla) y nombres de cliente pegados con su NIT.
+ * CAPTURAS_LISTAS=/ruta guarda capturas (390 px y escritorio).
+ */
+async function listas(b, errores) {
+  console.log("\n— Listas: «＋ Agregar otro» en los formularios, 16 px en el celular y cliente pegado con su NIT");
+  const p = await nuevaPagina(b, errores);
+  await p.setViewport({ width: 1440, height: 900 });
+  await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "networkidle0" });
+  await clic(p, "Administrador");
+  await p.waitForFunction(() => location.pathname.startsWith("/app"));
+  await sleep(800);
+  const estado = () => p.evaluate((k) => JSON.parse(localStorage.getItem(k)), CLAVE);
+  const propias = async (clave) => (await estado()).config.opcionesPropias?.[clave] ?? [];
+  const ir = async (r, ms = 700) => {
+    await p.goto(`${BASE}${r}`, { waitUntil: "networkidle0" });
+    await sleep(ms);
+  };
+  const dir = process.env.CAPTURAS_LISTAS || "";
+  if (dir) fs.mkdirSync(dir, { recursive: true });
+  const foto = async (pg, n) => dir && (await pg.screenshot({ path: path.join(dir, `${n}.png`), fullPage: false }));
+  const OTRO = "__agregar_otro__";
+  const opcionesDe = (sel) => p.evaluate((s) => [...document.querySelector(s).options].map((o) => o.value), sel);
+  const valorDe = (sel) => p.evaluate((s) => document.querySelector(s)?.value ?? null, sel);
+  /** Elige «＋ Agregar otro…» en el select, escribe y confirma con Enter. */
+  async function agregarOtro(sel, texto) {
+    await p.select(sel, OTRO);
+    await sleep(200);
+    if (texto) await p.keyboard.type(texto);
+    await p.keyboard.press("Enter");
+    await sleep(350);
+  }
+  const borrarBorradores = () => p.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("fd-generador-")).forEach((k) => localStorage.removeItem(k)));
+
+  // 1. Tipo de gasto nuevo en una fila de la legalización
+  await borrarBorradores();
+  await ir("/app/nuevo/gasto", 900);
+  await clic(p, "Agregar fila");
+  const tipo1 = 'select[aria-label="Tipo gasto 1"]';
+  ok((await opcionesDe(tipo1)).includes(OTRO), "la fila del gasto ofrece «＋ Agregar otro…» en el tipo");
+  await p.select(tipo1, OTRO);
+  await sleep(200);
+  await p.keyboard.press("Enter");
+  await sleep(250);
+  ok((await p.evaluate(() => document.body.innerText.includes("Escribe la nueva opción"))) && (await propias("gasto.items")).length === 0, "una opción vacía no se agrega (avisa)");
+  await p.keyboard.press("Escape");
+  await sleep(250);
+  ok((await valorDe(tipo1)) === "Otros", "Esc cancela y vuelve a la lista con el tipo anterior");
+  await agregarOtro(tipo1, "  Peajes  ");
+  ok((await valorDe(tipo1)) === "Peajes" && JSON.stringify(await propias("gasto.items")) === '["Peajes"]', "el tipo nuevo (recortado) queda elegido y guardado para la empresa");
+  await clic(p, "Agregar fila");
+  await agregarOtro('select[aria-label="Tipo gasto 2"]', "PEAJES");
+  ok((await valorDe('select[aria-label="Tipo gasto 2"]')) === "Peajes" && (await propias("gasto.items")).length === 1, "escrito con otras mayúsculas usa el existente (no se repite)");
+  await agregarOtro('select[aria-label="Tipo gasto 2"]', "alimentacion");
+  ok((await valorDe('select[aria-label="Tipo gasto 2"]')) === "Alimentación" && (await propias("gasto.items")).length === 1, "sin tilde usa el del catálogo («Alimentación») y no se guarda");
+  await foto(p, "gasto-escritorio");
+  // La próxima vez: en el formulario y en el asistente
+  await borrarBorradores();
+  await ir("/app/nuevo/gasto", 900);
+  await clic(p, "Agregar fila");
+  ok((await opcionesDe(tipo1)).includes("Peajes"), "la próxima legalización ofrece «Peajes» en el formulario");
+  await borrarBorradores();
+  await ir("/app/nuevo/gasto", 900);
+  await responder(p, "Ladrillera Arcillas del Caribe");
+  if (await p.evaluate(() => [...document.querySelectorAll("main button")].some((x) => x.textContent.trim() === "Sin proyecto"))) await clic(p, "Sin proyecto");
+  await responder(p, "Administración");
+  await clic(p, String(new Date().getFullYear()));
+  await responder(p, "3001234567");
+  const chips = () => p.evaluate(() => [...document.querySelectorAll("main button[aria-pressed]")].map((x) => x.textContent.trim()));
+  ok((await chips()).includes("Peajes"), "el asistente también ofrece «Peajes» al registrar un gasto");
+  await clic(p, "Otro tipo");
+  await p.type('main input[aria-label="Nueva opción"]', "Lavado de vehículo");
+  await p.keyboard.press("Enter");
+  await sleep(350);
+  ok((await p.evaluate(() => [...document.querySelectorAll("main button[aria-pressed=true]")].map((x) => x.textContent.trim()))).includes("Lavado de vehículo") && (await propias("gasto.items")).includes("Lavado de vehículo"), "«Otro tipo» en el asistente lo marca y lo guarda en la misma lista");
+  await clic(p, "Agregar fila");
+  ok((await opcionesDe(tipo1)).includes("Lavado de vehículo"), "lo agregado en el asistente aparece en el formulario");
+
+  // 2. Cotización: unidad nueva y servicio nuevo desde el formato
+  await borrarBorradores();
+  await ir("/app/nuevo/cotizacion", 900);
+  await clic(p, "Agregar ítem");
+  await agregarOtro('select[aria-label="Unidad ítem 1"]', "Rollos");
+  ok((await valorDe('select[aria-label="Unidad ítem 1"]')) === "Rollos" && (await propias("cotizacion.unidad")).includes("Rollos"), "cotización: la unidad nueva («Rollos») queda en el ítem y en la lista de la empresa");
+  await p.select('select[aria-label="Agregar del catálogo"]', "__nuevo__");
+  await sleep(250);
+  await p.type('input[aria-label="Descripción del servicio o producto"]', "Cámara domo 4 MP de prueba");
+  await p.type('input[aria-label="Precio de referencia sin IVA"]', "350000");
+  await p.keyboard.press("Enter");
+  await sleep(400);
+  const s2 = await estado();
+  ok((s2.config.serviciosPropios ?? []).some((x) => x.descripcion === "Cámara domo 4 MP de prueba") && (await p.evaluate(() => document.querySelector(".doc-print").innerText.includes("Cámara domo 4 MP de prueba"))), "cotización: «＋ Nuevo servicio o producto…» lo agrega al catálogo de la empresa y como ítem");
+  await clic(p, "Agregar ítem");
+  ok((await opcionesDe('select[aria-label="Unidad ítem 3"]')).includes("Rollos"), "la unidad nueva se ofrece en los demás ítems");
+  await foto(p, "cotizacion-escritorio");
+
+  // 3. Equipos: sistema y tipo nuevos en la ficha; luego en el selector del reporte
+  await ir("/app/equipos/ver?nuevo=1&cliente=c-conj", 700);
+  await agregarOtro('select[aria-label="Sistema"]', "Sonido ambiental");
+  ok((await valorDe('select[aria-label="Sistema"]')) === "Sonido ambiental", "ficha del equipo: sistema nuevo elegido");
+  await agregarOtro('select[aria-label="Tipo de equipo"]', "Parlante de techo");
+  await p.type('input[placeholder="Ej: Cámara 7 – Portería"]', "Parlante lobby");
+  await foto(p, "equipo-escritorio");
+  await clic(p, "Registrar equipo", "button[type=submit]");
+  await p.waitForFunction(() => location.search.includes("ok=creado"), { timeout: 10000 }).catch(() => {});
+  await sleep(400);
+  const s3 = await estado();
+  ok(s3.equipos.some((e) => e.nombre === "Parlante lobby" && e.sistema === "Sonido ambiental" && e.tipo === "Parlante de techo"), "se registra el equipo con el sistema y el tipo nuevos");
+  ok((await propias("equipos.sistema")).includes("Sonido ambiental") && (await propias("equipos.tipo.Sonido ambiental")).includes("Parlante de techo"), "sistema y tipo quedan en las listas de la empresa");
+  await borrarBorradores();
+  await ir("/app/nuevo/reporte", 900);
+  await p.select('section[aria-label="Cliente y proyecto"] select', "c-conj");
+  await sleep(400);
+  await p.evaluate(() => [...document.querySelectorAll('section[aria-labelledby="titulo-equipos"] button')].find((x) => x.textContent.includes("Nuevo equipo"))?.click());
+  await sleep(300);
+  const radios = await p.evaluate(() => [...document.querySelectorAll('section[aria-labelledby="titulo-equipos"] [role=radio]')].map((x) => x.textContent.trim()));
+  ok(radios.includes("Sonido ambiental"), "el selector de equipos del reporte ofrece el sistema nuevo");
+  ok(await p.evaluate(() => [...document.querySelectorAll('section[aria-labelledby="titulo-equipos"] button')].some((x) => x.textContent.includes("Otro sistema"))), "el selector del reporte también tiene «＋ Otro sistema»");
+
+  // 4. Configuración: la administración ve lo agregado (para revisar o quitar)
+  await ir("/app/config", 700);
+  const cfg = await p.evaluate(() => document.querySelector("main").textContent);
+  ok(cfg.includes("Tipo de gasto") && cfg.includes("Peajes") && cfg.includes("Equipos · Sistemas") && cfg.includes("Rollos") && cfg.includes("Sonido ambiental"), "Configuración lista lo agregado (tipo de gasto, unidad, sistema)");
+
+  // 5. Nombre de cliente pegado con su NIT (caso típico): asistente, formato y Clientes
+  const PEGADO = "* Razón social: FARO ANDINO S.A.S. * NIT: 900123456";
+  await borrarBorradores();
+  await ir("/app/nuevo/cotizacion", 900);
+  await responder(p, PEGADO);
+  const docCot = await p.evaluate(() => document.querySelector(".doc-print").innerText);
+  const chat = await p.evaluate(() => document.querySelector("main").innerText);
+  ok(docCot.includes("FARO ANDINO S.A.S.") && !docCot.includes("Razón social") && docCot.includes("900.123.456"), "asistente: el nombre queda «FARO ANDINO S.A.S.» y el NIT pasa a su campo");
+  ok(chat.includes("Separé el NIT 900.123.456"), "asistente: avisa «Separé el NIT…»");
+  await editarCampo(p, "cliente", "Razón social: Inversiones Prueba S.A.S. NIT: 900.123.456-1");
+  const docCot2 = await p.evaluate(() => document.querySelector(".doc-print").innerText);
+  ok(docCot2.includes("Inversiones Prueba S.A.S.") && !docCot2.includes("Razón social"), "formato: el nombre escrito con su NIT también se separa");
+  await ir("/app/clientes", 600);
+  await clic(p, "Nuevo cliente");
+  await p.evaluate((t) => {
+    const i = document.querySelector("main form input");
+    const dt = new DataTransfer();
+    dt.setData("text/plain", t);
+    i.focus();
+    i.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, "Razón social: FARO ANDINO S.A.S.\nNIT: 900123456");
+  await sleep(300);
+  const campos = await p.evaluate(() => [...document.querySelectorAll("main form input")].slice(0, 2).map((x) => x.value));
+  ok(campos[0] === "FARO ANDINO S.A.S." && campos[1] === "900.123.456" && (await p.evaluate(() => document.querySelector("main").innerText.includes("Separé el NIT"))), "Clientes: al pegar se separan nombre y NIT con el aviso");
+  await clic(p, "Guardar", "button[type=submit]");
+  ok((await estado()).clientes.some((c) => c.nombre === "FARO ANDINO S.A.S." && c.nit === "900.123.456"), "Clientes: se guarda «FARO ANDINO S.A.S.» con su NIT");
+  // Un nombre que ya quedó mal guardado: «Nombres por revisar» → Corregir → Guardar
+  await p.evaluate((k) => {
+    const st = JSON.parse(localStorage.getItem(k));
+    st.clientes.push({ id: "c-mal", nombre: "* Razón social: Ferretería Prueba S.A.S. * NIT: 800123456", nit: "", direccion: "", contacto: "", cargo: "", correo: "", telefono: "", sitio: "" });
+    localStorage.setItem(k, JSON.stringify(st));
+  }, CLAVE);
+  await ir("/app/clientes", 600);
+  ok(await p.evaluate(() => document.querySelector("main").innerText.includes("Nombres por revisar")), "Clientes: muestra «Nombres por revisar»");
+  await foto(p, "clientes-por-revisar-escritorio");
+  await clic(p, "Corregir");
+  await clic(p, "Guardar", "button[type=submit]");
+  const mal = (await estado()).clientes.find((c) => c.id === "c-mal");
+  ok(mal.nombre === "Ferretería Prueba S.A.S." && mal.nit === "800.123.456", "Clientes: «Corregir» deja el nombre limpio y el NIT en su campo");
+
+  // 6. Celular (390 px): campos de 16 px (iPhone no acerca), la plantilla conserva su letra, sin desbordes a 320 px
+  const m = await nuevaPagina(b, errores);
+  await m.setUserAgent("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1");
+  await m.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+  const pequeños = [];
+  for (const r of ["/app/nuevo/gasto", "/app/nuevo/cotizacion", "/app/clientes", "/app/equipos/ver?nuevo=1&cliente=c-conj", "/app/config", "/app/nuevo/reporte"]) {
+    await m.goto(BASE + r, { waitUntil: "networkidle0" });
+    await sleep(500);
+    if (r === "/app/clientes") await m.evaluate(() => [...document.querySelectorAll("button")].find((x) => x.textContent.includes("Nuevo cliente"))?.click());
+    await sleep(200);
+    const malos = await m.evaluate(() =>
+      [...document.querySelectorAll("input, select, textarea")]
+        .filter((e) => !["checkbox", "radio", "file", "hidden", "range", "color"].includes(e.type) && !e.closest(".doc-print") && e.getClientRects().length)
+        .map((e) => [e.getAttribute("aria-label") || e.name || e.placeholder || e.tagName, parseFloat(getComputedStyle(e).fontSize)])
+        .filter(([, f]) => f < 16),
+    );
+    malos.forEach(([n, f]) => pequeños.push(`${r} ${n} ${f}px`));
+  }
+  ok(pequeños.length === 0, pequeños.length ? `campos con letra < 16 px: ${pequeños.slice(0, 5).join(", ")}` : "a 390 px todos los campos del aplicativo tienen 16 px o más");
+  await m.goto(`${BASE}/app/nuevo/gasto`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  await m.evaluate(() => [...document.querySelectorAll("button")].find((x) => x.textContent.trim() === "Formato" || x.textContent.includes("Vista"))?.click());
+  await sleep(300);
+  const letraDoc = await m.evaluate(() => parseFloat(getComputedStyle(document.querySelector(".doc-print")).fontSize));
+  ok(letraDoc < 14, `la plantilla conserva la letra del formato en el celular (${letraDoc}px)`);
+  ok(await m.evaluate(() => document.querySelector('meta[name="viewport"]').content.includes("maximum-scale=1")), "en iPhone el viewport evita el acercamiento al editar dentro de la plantilla");
+  await foto(m, "gasto-390");
+  await m.evaluate(() => [...document.querySelectorAll("button")].find((x) => x.textContent.includes("Agregar fila"))?.click());
+  await sleep(300);
+  await m.select('select[aria-label="Tipo gasto 1"]', OTRO);
+  await sleep(300);
+  await foto(m, "gasto-otro-390");
+  await m.goto(`${BASE}/app/equipos/ver?nuevo=1&cliente=c-conj`, { waitUntil: "networkidle0" });
+  await sleep(400);
+  await m.select('select[aria-label="Sistema"]', OTRO);
+  await sleep(300);
+  await foto(m, "equipo-otro-390");
+  await m.goto(`${BASE}/app/clientes`, { waitUntil: "networkidle0" });
+  await sleep(400);
+  await foto(m, "clientes-390");
+  const android = await nuevaPagina(b, errores);
+  await android.setViewport({ width: 390, height: 844, isMobile: true });
+  await android.goto(`${BASE}/app`, { waitUntil: "networkidle0" });
+  ok(!(await android.evaluate(() => document.querySelector('meta[name="viewport"]').content.includes("maximum-scale"))), "fuera de iOS el viewport no limita el zoom");
+  await android.close();
+  await m.setViewport({ width: 320, height: 700, isMobile: true, hasTouch: true });
+  const desbordes = [];
+  for (const r of ["/app/nuevo/gasto", "/app/equipos/ver?nuevo=1&cliente=c-conj", "/app/clientes", "/app/nuevo/cotizacion"]) {
+    await m.goto(BASE + r, { waitUntil: "networkidle0" });
+    await sleep(400);
+    const sw = await m.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    if (sw > 0) desbordes.push(`${r} (+${sw}px)`);
+  }
+  ok(desbordes.length === 0, desbordes.length ? `desbordes a 320 px: ${desbordes.join(", ")}` : "sin desbordes a 320 px");
+  await m.close();
+  await p.close();
+}
+
 (async () => {
   const b = await puppeteer.launch({ executablePath: chrome(), headless: true, args: ["--no-sandbox"] });
   const errores = [];
@@ -1770,6 +2169,8 @@ async function comercial(b, errores) {
     if (!SOLO || SOLO === "comercial") await comercial(b, errores);
     if (!SOLO || SOLO === "impresion") await impresion(b, errores);
     if (!SOLO || SOLO === "campo") await campo(b, errores);
+    if (!SOLO || SOLO === "variantes") await variantes(b, errores);
+    if (!SOLO || SOLO === "listas") await listas(b, errores);
   } catch (e) {
     ok(false, `error: ${e.message}`);
   } finally {

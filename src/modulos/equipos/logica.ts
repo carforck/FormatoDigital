@@ -7,7 +7,7 @@
 import { puede } from "@/nucleo/permisos";
 import type { Documento, Rol, Usuario } from "@/nucleo/tipos";
 
-import { CLAVES_SISTEMA, esSistema, sistemaDe } from "./catalogo";
+import { CLAVES_SISTEMA, sistemaDe } from "./catalogo";
 import type { Equipo, EquipoAtendido, EquipoMinimo, SistemaEquipo } from "./tipos";
 
 /** Quién registra y edita equipos (igual que la política equipos_escribir de 0010). */
@@ -58,7 +58,8 @@ export function idEquipo(m: Pick<EquipoMinimo, "clienteId" | "sistema" | "nombre
 export function faltantesEquipo(e: Pick<Equipo, "clienteId" | "sistema" | "tipo" | "nombre">): string[] {
   const f: string[] = [];
   if (!e.clienteId) f.push("Cliente");
-  if (!esSistema(e.sistema)) f.push("Sistema");
+  // Del catálogo o agregado por la empresa («＋ Agregar otro»): basta que no esté vacío (como en 0010)
+  if (!e.sistema?.trim()) f.push("Sistema");
   if (!e.tipo.trim()) f.push("Tipo de equipo");
   if (e.nombre.trim().length < 2) f.push("Nombre del equipo");
   return f;

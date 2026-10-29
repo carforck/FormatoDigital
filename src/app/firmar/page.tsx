@@ -12,6 +12,7 @@ import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Lock, PenLine, ShieldAlert } from "lucide-react";
 
 import { FirmaPad } from "@/components/docs/FirmaPad";
+import { ConVariante } from "@/components/docs/VarianteFormato";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { equiposAtendidos, equiposIdsDe } from "@/modulos/equipos/logica";
@@ -19,6 +20,7 @@ import { PlantillaReporte } from "@/modulos/reportes/PlantillaReporte";
 import { formatoDe } from "@/modulos/registro";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { asset } from "@/nucleo/rutas";
+import { formatoEnVariante } from "@/nucleo/variantes";
 
 /**
  * Firma remota del cliente: se abre desde el enlace del correo o WhatsApp,
@@ -76,7 +78,8 @@ function Firmar() {
   }
 
   const doc = v.doc;
-  const f = formatoDe("reporte");
+  // Código del formato según la variante del documento (FORTOX trae el suyo)
+  const f = formatoEnVariante(formatoDe("reporte"), "reporte", doc.variante);
   return (
     <main className="min-h-screen bg-[#F5F7F3] pb-32">
       {encabezado}
@@ -91,7 +94,9 @@ function Firmar() {
           </p>
         </div>
         <div className="overflow-x-auto rounded-lg bg-slate-100 p-2 sm:p-4">
-          <PlantillaReporte datos={{ ...doc.datos, firmaCliente: firma || doc.datos.firmaCliente }} codigoDoc={doc.codigo} equipos={equiposAtendidos(equiposIdsDe(doc), demo.equipos)} />
+          <ConVariante variante={doc.variante} tipo="reporte">
+            <PlantillaReporte datos={{ ...doc.datos, firmaCliente: firma || doc.datos.firmaCliente }} codigoDoc={doc.codigo} equipos={equiposAtendidos(equiposIdsDe(doc), demo.equipos)} />
+          </ConVariante>
         </div>
       </div>
 

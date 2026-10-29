@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import type { DatosPermiso, Ejecutor, SiNoNa } from "@/nucleo/tipos";
 
 import { EditableText } from "@/components/docs/EditableText";
+import { AgregarOtro, useListaPropia } from "@/components/ui/SelectConOtro";
 import { Encabezado, Firma } from "@/components/docs/Encabezado";
 
 /** Campos que se firman en el pad; `ejecutor:<i>` es la fila i del grupo ejecutor. */
@@ -75,6 +76,24 @@ export function PlantillaPermiso({ datos, codigoDoc, editar, firmar, resaltar, e
     );
   };
 
+  // Listas del formato + lo marcado que no está en el catálogo (agregado desde el asistente o el formato).
+  // Al editar también salen las opciones agregadas por la empresa, para marcarlas, y «＋ Agregar otro».
+  type Lista = "equipo" | "peligros" | "medidas" | "epp";
+  const propias = {
+    equipo: useListaPropia("permiso.equipo", EQUIPO_REQUERIDO, datos.equipo),
+    peligros: useListaPropia("permiso.peligros", PELIGROS, datos.peligros),
+    medidas: useListaPropia("permiso.medidas", MEDIDAS, datos.medidas),
+    epp: useListaPropia("permiso.epp", EPP, datos.epp),
+  };
+  const extras = (lista: Lista, base: readonly string[]) =>
+    (editar ? propias[lista].opciones : [...base, ...datos[lista]]).filter((x, i, a) => !base.includes(x) && a.indexOf(x) === i);
+  const agregarOtro = (lista: Lista, base: readonly string[]) =>
+    editar && (
+      <div className="col-span-3 print:hidden">
+        <AgregarOtro compacto clave={`permiso.${lista}`} base={base} onAgregado={(v) => !datos[lista].includes(v) && toggle(lista, v)} />
+      </div>
+    );
+
   const seccion = (titulo: string, clave: string) => (
     <div className={cn("border-x border-b border-black py-0.5 text-center text-[12px] font-bold", resaltar === clave && "bg-sotec-green/40")}>{titulo}</div>
   );
@@ -138,24 +157,32 @@ export function PlantillaPermiso({ datos, codigoDoc, editar, firmar, resaltar, e
             e === "Maquinaria" ? <span className="ml-1">· Cuál: {txt("maquinariaCual")}</span> : e === "Equipo menor" ? <span className="ml-1">· Cuál: {txt("equipoMenorCual")}</span> : null,
           ),
         )}
+        {extras("equipo", EQUIPO_REQUERIDO).map((e) => opcion("equipo", e))}
+        {agregarOtro("equipo", EQUIPO_REQUERIDO)}
         <div className="col-span-3">Otros: {txt("equipoOtros")}</div>
       </div>
 
       {seccion("PELIGROS IDENTIFICADOS:", "peligros")}
       <div className="grid grid-cols-3 gap-x-3 gap-y-1 border-x border-b border-black p-1.5">
         {PELIGROS.map((p) => opcion("peligros", p))}
+        {extras("peligros", PELIGROS).map((p) => opcion("peligros", p))}
+        {agregarOtro("peligros", PELIGROS)}
         <div className="col-span-3">Otros. Cuáles: {txt("peligrosOtros")}</div>
       </div>
 
       {seccion("MEDIDAS DE SEGURIDAD REQUERIDAS:", "medidas")}
       <div className="grid grid-cols-3 gap-x-3 gap-y-1 border-x border-b border-black p-1.5">
         {MEDIDAS.map((m) => opcion("medidas", m))}
+        {extras("medidas", MEDIDAS).map((m) => opcion("medidas", m))}
+        {agregarOtro("medidas", MEDIDAS)}
         <div className="col-span-3">Otras. Cuáles: {txt("medidasOtras")}</div>
       </div>
 
       {seccion("VERIFICACIÓN ELEMENTOS DE PROTECCIÓN", "epp")}
       <div className="grid grid-cols-3 gap-x-3 gap-y-1 border-x border-b border-black p-1.5">
         {EPP.map((e) => opcion("epp", e))}
+        {extras("epp", EPP).map((e) => opcion("epp", e))}
+        {agregarOtro("epp", EPP)}
         <div className="col-span-3">Otro: {txt("eppOtro")}</div>
       </div>
 

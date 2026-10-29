@@ -7,16 +7,20 @@
  * valor en letras, condiciones comerciales y aceptación con la firma del cliente.
  */
 
-import { Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Check, Plus, Trash2, X } from "lucide-react";
 
 import { EditableText } from "@/components/docs/EditableText";
+import { SelectConOtro } from "@/components/ui/SelectConOtro";
 import { Firma, LogoFormato } from "@/components/docs/Encabezado";
 import { cn } from "@/lib/utils";
 import type { PropsPlantilla } from "@/modulos/contrato";
+import { useDemoOpcional } from "@/nucleo/datos/DemoProvider";
 import { cop, pesosEnLetras } from "@/nucleo/letras";
+import { LISTA } from "@/nucleo/opciones";
 
 import { cantidadTexto, diasEntre, fechaCorta, importeItem, totalesCotizacion } from "./calculos";
-import { CATALOGO_SERVICIOS, EMPRESA_COTIZACION, FORMATO_COTIZACION, TARIFAS_IVA, UNIDADES, itemDeCatalogo, itemVacio, type EmpresaCotizacion } from "./catalogo";
+import { CATALOGO_SERVICIOS, EMPRESA_COTIZACION, FORMATO_COTIZACION, TARIFAS_IVA, UNIDADES, itemDeCatalogo, itemVacio, type EmpresaCotizacion, type ServicioCatalogo } from "./catalogo";
 import type { DatosCotizacion, ItemCotizacion } from "./tipos";
 
 /** Props de la plantilla: las comunes más los datos de empresa propios de la cotización (lema, web). */
@@ -73,6 +77,10 @@ export function PlantillaCotizacion({ datos, codigoDoc, editar, firmar, resaltar
   const k = datos.items.length > 6;
   const pk = (clases: string) => (k ? clases : "");
   const sel = "max-w-full bg-transparent text-inherit outline-none hover:bg-amber-50 print:appearance-none";
+  // Catálogo: el del formato + lo que la empresa agregó (asistente o «＋ Nuevo servicio o producto…»)
+  const demo = useDemoOpcional();
+  const catalogo = [...CATALOGO_SERVICIOS, ...(demo?.config.serviciosPropios ?? [])];
+  const [nuevoServicio, setNuevoServicio] = useState(false);
 
   return (
     <div className="doc-zona space-y-4">
@@ -175,11 +183,7 @@ export function PlantillaCotizacion({ datos, codigoDoc, editar, firmar, resaltar
                   <td className={cn("whitespace-nowrap py-2 text-right tabular-nums", pk("print:py-[3px]"))}>
                     <EditableText value={String(i.cantidad)} type="number" disabled={!editar} displayValue={cantidadTexto(i.cantidad)} ariaLabel={`Cantidad ítem ${k + 1}`} onCommit={(v) => item(i.id, { cantidad: numero(v) })} />{" "}
                     {editar ? (
-                      <select value={i.unidad} onChange={(e) => item(i.id, { unidad: e.target.value })} className={sel} aria-label={`Unidad ítem ${k + 1}`}>
-                        {[...new Set([i.unidad, ...UNIDADES])].map((u) => (
-                          <option key={u}>{u}</option>
-                        ))}
-                      </select>
+                      <SelectConOtro compacto clave={LISTA.unidad} base={UNIDADES} value={i.unidad} onChange={(unidad) => item(i.id, { unidad })} placeholderOtro="Unidad" className={sel} aria-label={`Unidad ítem ${k + 1}`} />
                     ) : (
                       i.unidad
                     )}
@@ -220,22 +224,35 @@ export function PlantillaCotizacion({ datos, codigoDoc, editar, firmar, resaltar
               <button type="button" onClick={() => editar({ items: [...datos.items, itemVacio()] })} className="inline-flex items-center gap-1 rounded px-2 py-1 font-semibold text-[#2E7D32] hover:bg-[#F1F8E9]">
                 <Plus className="h-3.5 w-3.5" /> Agregar ítem
               </button>
-              <select
-                value=""
-                aria-label="Agregar del catálogo"
-                onChange={(e) => {
-                  const s = CATALOGO_SERVICIOS.find((x) => x.clave === e.target.value);
-                  if (s) editar({ items: [...datos.items, itemDeCatalogo(s)] });
-                }}
-                className="max-w-[16rem] rounded border border-slate-200 bg-white px-1 py-1 text-[11px] text-slate-700"
-              >
-                <option value="">+ Del catálogo (precio de referencia)…</option>
-                {CATALOGO_SERVICIOS.map((s) => (
-                  <option key={s.clave} value={s.clave}>
-                    {s.descripcion} · {cop(s.precioReferencia)}
-                  </option>
-                ))}
-              </select>
+              {nuevoServicio && demo ? (
+                <NuevoServicio
+                  onCancelar={() => setNuevoServicio(false)}
+                  onGuardar={(m) => {
+                    // Queda en el catálogo de la empresa (Configuración · opciones agregadas) y como ítem
+                    editar({ items: [...datos.items, itemDeCatalogo(demo.agregarServicio(m))] });
+                    setNuevoServicio(false);
+                  }}
+                />
+              ) : (
+                <select
+                  value=""
+                  aria-label="Agregar del catálogo"
+                  onChange={(e) => {
+                    if (e.target.value === "__nuevo__") return setNuevoServicio(true);
+                    const s = catalogo.find((x) => x.clave === e.target.value);
+                    if (s) editar({ items: [...datos.items, itemDeCatalogo(s)] });
+                  }}
+                  className="max-w-[16rem] rounded border border-slate-200 bg-white px-1 py-1 text-[11px] text-slate-700"
+                >
+                  <option value="">+ Del catálogo (precio de referencia)…</option>
+                  {catalogo.map((s) => (
+                    <option key={s.clave} value={s.clave}>
+                      {s.descripcion} · {cop(s.precioReferencia)}
+                    </option>
+                  ))}
+                  {demo?.usuario && <option value="__nuevo__">＋ Nuevo servicio o producto…</option>}
+                </select>
+              )}
             </div>
           )}
         </div>
@@ -358,6 +375,39 @@ export function PlantillaCotizacion({ datos, codigoDoc, editar, firmar, resaltar
           <p className="shrink-0 text-slate-500">{FORMATO_COTIZACION.codigo}</p>
         </footer>
       </article>
+    </div>
+  );
+}
+
+/**
+ * Servicio o producto nuevo para el catálogo de la empresa (el mismo que agrega el asistente):
+ * descripción, unidad (con «＋ Agregar otro…») y precio de referencia sin IVA. No es un `<form>`
+ * (la plantilla puede ir dentro de otro); Enter guarda y Esc cancela.
+ */
+function NuevoServicio({ onGuardar, onCancelar }: { onGuardar: (m: Pick<ServicioCatalogo, "descripcion" | "unidad" | "precioReferencia">) => void; onCancelar: () => void }) {
+  const [descripcion, setDescripcion] = useState("");
+  const [unidad, setUnidad] = useState<string>("Unidades");
+  const [precio, setPrecio] = useState("");
+  const listo = descripcion.trim().length > 1 && Number(precio.replace(/\D/g, "")) > 0;
+  const guardar = () => listo && onGuardar({ descripcion: descripcion.trim().replace(/\s+/g, " "), unidad, precioReferencia: Number(precio.replace(/\D/g, "")) });
+  const teclas = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      guardar();
+    } else if (e.key === "Escape") onCancelar();
+  };
+  const campo = "h-8 rounded border border-slate-300 bg-white px-1.5 text-[11px] text-slate-800";
+  return (
+    <div role="group" aria-label="Nuevo servicio o producto" className="flex w-full flex-wrap items-center gap-1.5 rounded border border-dashed border-[#3BA10E] bg-[#EFF7EC] p-1.5" onKeyDown={teclas}>
+      <input autoFocus value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Servicio o producto (p. ej. Cámara domo 4 MP)" aria-label="Descripción del servicio o producto" className={cn(campo, "min-w-[12rem] flex-1")} />
+      <SelectConOtro clave={LISTA.unidad} base={UNIDADES} value={unidad} onChange={setUnidad} placeholderOtro="Unidad" aria-label="Unidad del servicio" className={campo} />
+      <input inputMode="numeric" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="Precio sin IVA" aria-label="Precio de referencia sin IVA" className={cn(campo, "w-28")} />
+      <button type="button" disabled={!listo} onClick={guardar} className="inline-flex h-8 items-center gap-1 rounded bg-[#3BA10E] px-2 text-[11px] font-semibold text-white disabled:opacity-50">
+        <Check className="h-3.5 w-3.5" aria-hidden /> Agregar
+      </button>
+      <button type="button" onClick={onCancelar} aria-label="Cancelar" className="inline-flex h-8 w-8 items-center justify-center rounded text-slate-500 hover:bg-white">
+        <X className="h-3.5 w-3.5" aria-hidden />
+      </button>
     </div>
   );
 }

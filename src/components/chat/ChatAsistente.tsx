@@ -21,6 +21,8 @@ import { comprimirImagen, comprimirVarias } from "@/nucleo/imagenes";
 import type { Ejecutor, FotoReporte, ItemGasto } from "@/nucleo/tipos";
 import { TIPOS_GASTO } from "@/modulos/gastos/catalogo";
 import { UNIDADES } from "@/modulos/cotizaciones/catalogo";
+import { SelectConOtro } from "@/components/ui/SelectConOtro";
+import { LISTA, buscarOpcion } from "@/nucleo/opciones";
 
 /** Control que muestra el asistente para responder el paso. */
 export type TipoPaso = "texto" | "textarea" | "fecha" | "hora" | "email" | "tel" | "select" | "multi" | "firma" | "ejecutores" | "verificacion" | "fotos" | "gastos" | "componente";
@@ -191,9 +193,9 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
     avanzar(v, v);
   }
 
-  /** Lista con «＋ Agregar otro»: select avanza con lo nuevo; multi lo deja marcado. */
+  /** Lista con «＋ Agregar otro»: select avanza con lo nuevo; multi lo deja marcado; gastos lo pone como tipo del gasto. */
   const agregaAqui =
-    paso && (paso.tipo === "select" || paso.tipo === "multi") && paso.agregar !== false && (paso.agregar === "servicio" ? Boolean(onAgregarServicio) : Boolean(onAgregarOpcion));
+    paso && (paso.tipo === "select" || paso.tipo === "multi" || paso.tipo === "gastos") && paso.agregar !== false && (paso.agregar === "servicio" ? Boolean(onAgregarServicio) : Boolean(onAgregarOpcion));
 
   function agregarOtro(e: React.FormEvent) {
     e.preventDefault();
@@ -205,14 +207,15 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
       const precio = Number(servicio.precio.replace(/\D/g, ""));
       opcion = onAgregarServicio!({ descripcion: v, unidad: servicio.unidad, precioReferencia: precio });
     } else {
-      // Si ya existe con otras mayúsculas se usa la existente (no se duplica)
-      opcion = paso.opciones?.find((x) => x.toLowerCase() === v.toLowerCase()) ?? v;
+      // Si ya existe con otras mayúsculas o tildes se usa la existente (no se duplica)
+      opcion = buscarOpcion(paso.opciones ?? (paso.tipo === "gastos" ? TIPOS_GASTO : []), v) ?? v;
       onAgregarOpcion!(paso.id, opcion);
     }
     setOtroAbierto(false);
     setOtro("");
     setServicio({ unidad: "Unidades", precio: "" });
     if (paso.tipo === "select") avanzar(opcion, opcion);
+    else if (paso.tipo === "gastos") setGasto((g) => ({ ...g, tipo: opcion }));
     else setMulti((p) => (p.includes(opcion) ? p : [...p, opcion]));
   }
 
@@ -223,13 +226,7 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
         <Input autoFocus value={otro} onChange={(e) => setOtro(e.target.value)} placeholder={paso?.agregar === "servicio" ? "Servicio o producto (p. ej. Cámara domo 4 MP)" : "Escribe la nueva opción"} aria-label="Nueva opción" />
         {paso?.agregar === "servicio" && (
           <div className="grid grid-cols-2 gap-2">
-            <select value={servicio.unidad} onChange={(e) => setServicio({ ...servicio, unidad: e.target.value })} aria-label="Unidad" className="h-10 rounded-md border border-slate-200 bg-white px-2 text-sm">
-              {UNIDADES.map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ))}
-            </select>
+            <SelectConOtro clave={LISTA.unidad} base={UNIDADES} value={servicio.unidad} onChange={(unidad) => setServicio({ ...servicio, unidad })} aria-label="Unidad" placeholderOtro="Unidad" className="h-10 min-w-0 rounded-md border border-slate-200 bg-white px-2 text-sm" />
             <Input inputMode="numeric" value={servicio.precio} onChange={(e) => setServicio({ ...servicio, precio: e.target.value })} placeholder="Precio sin IVA" aria-label="Precio de referencia sin IVA" />
           </div>
         )}
@@ -248,7 +245,7 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
         onClick={() => setOtroAbierto(true)}
         className="flex items-center gap-1 rounded-full border border-dashed border-sotec-greenDeep/60 px-2.5 py-1 text-[11px] font-semibold text-sotec-greenDeep transition hover:bg-sotec-soft"
       >
-        <Plus className="h-3 w-3" /> {paso?.agregar === "servicio" ? "Agregar servicio o producto" : "Agregar otro"}
+        <Plus className="h-3 w-3" /> {paso?.agregar === "servicio" ? "Agregar servicio o producto" : paso?.tipo === "gastos" ? "Otro tipo" : "Agregar otro"}
       </button>
     )
   ) : null;
@@ -453,12 +450,14 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
                   </div>
                 ))}
                 <div className="space-y-1.5 rounded-lg border border-slate-200 p-2">
+                  {/* Tipos del formato + los agregados por la empresa (el generador los suma en `opciones`) */}
                   <div className="flex flex-wrap gap-1">
-                    {TIPOS_GASTO.map((t) => (
-                      <button key={t} type="button" onClick={() => setGasto({ ...gasto, tipo: t })} className={cn("rounded-full border px-2 py-0.5 text-[11px] font-medium", gasto.tipo === t ? "border-sotec bg-sotec text-white" : "border-slate-200")}>
+                    {(paso.opciones ?? TIPOS_GASTO).map((t) => (
+                      <button key={t} type="button" aria-pressed={gasto.tipo === t} onClick={() => setGasto({ ...gasto, tipo: t })} className={cn("rounded-full border px-2 py-0.5 text-[11px] font-medium", gasto.tipo === t ? "border-sotec bg-sotec text-white" : "border-slate-200")}>
                         {t}
                       </button>
                     ))}
+                    {bloqueAgregar && <div className={otroAbierto ? "w-full" : ""}>{bloqueAgregar}</div>}
                   </div>
                   <Input className="h-8 text-xs" placeholder="Descripción o motivo" value={gasto.descripcion} onChange={(e) => setGasto({ ...gasto, descripcion: e.target.value })} />
                   <div className="grid grid-cols-2 gap-1.5">

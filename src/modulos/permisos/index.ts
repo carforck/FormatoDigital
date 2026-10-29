@@ -93,6 +93,8 @@ export const moduloPermisos: ModuloDocumento<DatosPermiso> = {
           mensaje: `Precargué ${t.peligros.length} peligros, ${t.medidas.length} medidas y ${t.epp.length} EPP para «${v}». Revísalos en los siguientes pasos.`,
         };
       }
+      // Un tipo de trabajo agregado con «＋ Agregar otro» se escribe tal cual (sin plantilla que precargar)
+      if (v && v !== "Otro") return { cambio: { puestoProyecto: v as string }, mensaje: "Marca los peligros, medidas y EPP de este trabajo en los siguientes pasos." };
       return { cambio: { puestoProyecto: "" }, mensaje: "Escribe el puesto o proyecto directamente en el formato (clic sobre el campo)." };
     }
     // El formato imprime la hora en 12 h con casilla AM/PM

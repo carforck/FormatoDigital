@@ -13,11 +13,13 @@ import { Plus, Receipt, Trash2 } from "lucide-react";
 
 import { EditableText } from "@/components/docs/EditableText";
 import { ElegirImagen } from "@/components/docs/ElegirImagen";
+import { SelectConOtro } from "@/components/ui/SelectConOtro";
 import { Firma, LogoFormato } from "@/components/docs/Encabezado";
 import { cn } from "@/lib/utils";
 import { formatoDe } from "@/modulos/registro";
 import { comprimirImagen } from "@/nucleo/imagenes";
 import { cop } from "@/nucleo/letras";
+import { LISTA } from "@/nucleo/opciones";
 
 import { TIPOS_GASTO } from "./catalogo";
 import { totalGastos, totalItemGasto, type DatosGasto, type ItemGasto, type TipoGasto } from "./tipos";
@@ -178,11 +180,17 @@ export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: P
                 </td>
                 <td className="border border-slate-300 px-1 text-center">
                   {editar ? (
-                    <select value={i.tipo} onChange={(e) => item(i.id, { tipo: e.target.value as TipoGasto })} className="w-full bg-transparent text-center text-[10.5px] outline-none print:appearance-none" aria-label={`Tipo gasto ${k + 1}`}>
-                      {TIPOS_GASTO.map((t) => (
-                        <option key={t}>{t}</option>
-                      ))}
-                    </select>
+                    // «＋ Agregar otro…»: el tipo nuevo queda para la empresa (también en el asistente)
+                    <SelectConOtro
+                      compacto
+                      clave={LISTA.tipoGasto}
+                      base={TIPOS_GASTO}
+                      value={i.tipo}
+                      onChange={(v) => item(i.id, { tipo: v as TipoGasto })}
+                      placeholderOtro="Tipo de gasto"
+                      className="w-full bg-transparent text-center text-[10.5px] outline-none print:appearance-none"
+                      aria-label={`Tipo gasto ${k + 1}`}
+                    />
                   ) : (
                     i.tipo
                   )}

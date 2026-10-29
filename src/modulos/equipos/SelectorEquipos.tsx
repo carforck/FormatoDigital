@@ -8,9 +8,11 @@
 import { useId, useMemo, useRef, useState } from "react";
 import { Check, Plus, Search, X } from "lucide-react";
 
+import { AgregarOtro, useListaPropia } from "@/components/ui/SelectConOtro";
 import { cn } from "@/lib/utils";
+import { LISTA } from "@/nucleo/opciones";
 
-import { SISTEMAS, sistemaDe } from "./catalogo";
+import { CLAVES_SISTEMA, sistemaDe } from "./catalogo";
 import { coincide, porSistema } from "./logica";
 import { IconoEquipo, IconoSistema } from "./piezas";
 import type { Equipo, EquipoMinimo, ResultadoEquipo, SistemaEquipo } from "./tipos";
@@ -46,6 +48,10 @@ export function SelectorEquipos({ equipos, seleccion, onCambiar, crear, proyecto
   const [ubicacion, setUbicacion] = useState("");
   const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null);
   const creando = useRef(false);
+  // Sistemas y tipos del catálogo + los agregados por la empresa («＋ Agregar otro», como en la ficha)
+  const sistemas = useListaPropia(LISTA.sistemaEquipo, CLAVES_SISTEMA, [], (v) => sistemaDe(v).nombre);
+  const sis = sistemaDe(sistema);
+  const tipos = useListaPropia(LISTA.tipoEquipo(sistema), sis.tipos);
 
   // Los retirados no se ofrecen, salvo que el documento ya los tenga marcados
   const visibles = useMemo(() => equipos.filter((e) => (e.estado !== "retirado" || seleccion.includes(e.id)) && (!soloProyecto || e.proyectoId === proyectoId) && coincide(e, q)), [equipos, seleccion, soloProyecto, proyectoId, q]);
@@ -63,7 +69,8 @@ export function SelectorEquipos({ equipos, seleccion, onCambiar, crear, proyecto
     if (!crear || creando.current) return; // un solo equipo aunque se haga doble clic
     creando.current = true;
     try {
-      const r = crear({ sistema, tipo, nombre, ubicacion });
+      // El tipo escrito a mano también queda en la lista de la empresa (sin repetir)
+      const r = crear({ sistema, tipo: tipos.agregar(tipo) ?? tipo, nombre, ubicacion });
       if (!r.equipo) {
         setAviso({ ok: false, texto: r.error ?? "No se pudo crear el equipo." });
         return;
@@ -77,7 +84,6 @@ export function SelectorEquipos({ equipos, seleccion, onCambiar, crear, proyecto
     }
   }
 
-  const sis = sistemaDe(sistema);
   const campo = "h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800";
 
   return (
@@ -160,28 +166,40 @@ export function SelectorEquipos({ equipos, seleccion, onCambiar, crear, proyecto
           {abierto && (
             <form id={`${uid}-nuevo`} onSubmit={enviarNuevo} className="space-y-2 border-t border-slate-100 p-3">
               <div role="radiogroup" aria-label="Sistema" className="flex flex-wrap gap-1">
-                {SISTEMAS.map((s) => (
+                {sistemas.opciones.map((clave) => (
                   <button
-                    key={s.clave}
+                    key={clave}
                     type="button"
                     role="radio"
-                    aria-checked={sistema === s.clave}
+                    aria-checked={sistema === clave}
                     onClick={() => {
-                      setSistema(s.clave);
+                      setSistema(clave);
                       setTipo("");
                     }}
-                    className={cn("flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium", sistema === s.clave ? "border-sotec bg-sotec text-white" : "border-slate-200 bg-white text-slate-600")}
+                    className={cn("flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium", sistema === clave ? "border-sotec bg-sotec text-white" : "border-slate-200 bg-white text-slate-600")}
                   >
-                    <IconoSistema sistema={s.clave} className="h-3 w-3" /> {s.corto}
+                    <IconoSistema sistema={clave} className="h-3 w-3" /> {sistemaDe(clave).corto}
                   </button>
                 ))}
+                <AgregarOtro
+                  clave={LISTA.sistemaEquipo}
+                  base={CLAVES_SISTEMA}
+                  etiqueta={(v) => sistemaDe(v).nombre}
+                  texto="Otro sistema"
+                  placeholder="Nombre del sistema"
+                  onAgregado={(v) => {
+                    setSistema(v);
+                    setTipo("");
+                  }}
+                />
               </div>
               <div className="flex flex-wrap gap-1" aria-label={`Tipos de ${sis.nombre}`}>
-                {sis.tipos.map((t) => (
+                {tipos.opciones.map((t) => (
                   <button key={t} type="button" aria-pressed={tipo === t} onClick={() => setTipo(t)} className={cn("flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px]", tipo === t ? "border-sotec-greenDeep bg-sotec-soft font-semibold text-sotec-greenDeep" : "border-slate-200 text-slate-600")}>
                     {tipo === t && <Check className="h-3 w-3" aria-hidden />} {t}
                   </button>
                 ))}
+                <AgregarOtro clave={LISTA.tipoEquipo(sistema)} base={sis.tipos} texto="Otro tipo" placeholder="Tipo de equipo" onAgregado={setTipo} />
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <label className="block text-xs">

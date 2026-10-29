@@ -36,7 +36,7 @@ import type { Cliente, Documento, Proyecto, TipoDoc } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 import { avance, faltantes } from "@/nucleo/validar";
 import { puede } from "@/nucleo/permisos";
-import { VARIANTE_BASE, formatoEnVariante, prefijoVariante, resolverVariante, varianteDe } from "@/nucleo/variantes";
+import { VARIANTE_BASE, formatoEnVariante, prefijoVariante, resolverVariante, sinProyectoPorTipo, varianteDe } from "@/nucleo/variantes";
 import { avisoPlan, buscarCliente, claveNombre, dejarAvisoCliente, mismoNombre, planCliente, preguntaParecido, separarCliente } from "@/nucleo/clientes";
 import { unirOpciones } from "@/nucleo/opciones";
 
@@ -234,9 +234,13 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   // Proyectos que se pueden elegir: los visibles, no cerrados, del cliente elegido (o todos si aún no hay cliente)
   const proyectosElegibles = demo.proyectosVisibles.filter((p) => (p.estado !== "cerrado" || p.id === doc.proyectoId) && (!doc.clienteId || p.clienteId === doc.clienteId));
   const proyecto = demo.proyectos.find((p) => p.id === doc.proyectoId);
-  // Variante de formato: la del tipo del proyecto; sin proyecto, la del cliente; si no, SOTEC
-  const varianteDel = (p: Proyecto | undefined, clienteId: string) => resolverVariante({ tipo, proyecto: p, cliente: demo.clientes.find((c) => c.id === clienteId), config: demo.config });
-  const variante = varianteDel(proyecto, doc.clienteId);
+  // Variante de formato: la del tipo del proyecto; sin proyecto, la elegida («Sin proyecto · Servicios
+  // Fortox», guardada en doc.variante) o la del cliente; si no, SOTEC
+  const varianteDel = (p: Proyecto | undefined, clienteId: string, elegida?: string) =>
+    resolverVariante({ tipo, proyecto: p, cliente: demo.clientes.find((c) => c.id === clienteId), config: demo.config, elegida });
+  const variante = varianteDel(proyecto, doc.clienteId, doc.variante);
+  /** «Sin proyecto · Servicios SOTEC / Servicios Fortox»: el técnico elige el formato sin crear proyecto. */
+  const sinProyecto = sinProyectoPorTipo(tipo, demo.config);
   /** El documento con su variante: así se guarda y se imprime. */
   const docV = { ...doc, variante } as Documento;
   /** Aviso del asistente cuando el formato no es el de SOTEC. */
@@ -279,18 +283,21 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
       const otro = d.proyectoId && demo.proyectos.find((p) => p.id === d.proyectoId)?.clienteId !== c.id;
       // Los equipos son de cada cliente: al cambiarlo se quitan los del anterior
       const equiposIds = (d.equiposIds ?? []).filter((id) => demo.equipos.some((e) => e.id === id && e.clienteId === c.id));
-      return { ...conCliente(d, c), proyectoId: otro ? undefined : d.proyectoId, equiposIds } as Documento;
+      return { ...conCliente(d, c), proyectoId: otro ? undefined : d.proyectoId, equiposIds, variante: undefined } as Documento;
     });
     return [r.mensaje, formato].filter(Boolean).join(" ");
   }
 
-  /** Elige el proyecto: fija el cliente y llena los campos de proyecto u obra del formato. */
-  function elegirProyecto(p: Proyecto | undefined): string | undefined {
+  /**
+   * Elige el proyecto: fija el cliente y llena los campos de proyecto u obra del formato.
+   * Sin proyecto, `elegida` es la variante de «Sin proyecto · <tipo>» (undefined: la del cliente).
+   */
+  function elegirProyecto(p: Proyecto | undefined, elegida?: string): string | undefined {
     if (!p) {
-      setDoc((d) => ({ ...d, proyectoId: undefined }) as Documento);
-      return ["Sin proyecto: el documento queda solo asociado al cliente.", avisoFormato(varianteDel(undefined, doc.clienteId))].filter(Boolean).join(" ");
+      setDoc((d) => ({ ...d, proyectoId: undefined, variante: elegida }) as Documento);
+      return ["Sin proyecto: el documento queda solo asociado al cliente.", avisoFormato(varianteDel(undefined, doc.clienteId, elegida))].filter(Boolean).join(" ");
     }
-    setDoc((d) => conProyecto(d, p));
+    setDoc((d) => ({ ...conProyecto(d, p), variante: undefined }) as Documento);
     const c = demo.clientes.find((x) => x.id === p.clienteId);
     const r = info.alElegirProyecto?.(p, c);
     return [`Proyecto ${etiquetaProyecto(p)}${c ? ` de ${c.nombre}` : ""}.`, r?.mensaje, avisoFormato(varianteDel(p, p.clienteId))].filter(Boolean).join(" ");
@@ -319,7 +326,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
       s.ponerNit();
       return [s.aviso, r].filter(Boolean).join(" ") || undefined;
     }
-    if (id === "proyecto") return elegirProyecto(demo.proyectosVisibles.find((p) => etiquetaProyecto(p) === v));
+    if (id === "proyecto") return elegirProyecto(demo.proyectosVisibles.find((p) => etiquetaProyecto(p) === v), sinProyecto.find((o) => o.etiqueta === v)?.variante);
     // Los equipos ya quedaron marcados en el documento desde el selector
     if (id === "equipos") {
       const n = (doc.equiposIds ?? []).length;
@@ -348,8 +355,11 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     resaltar: "proyecto",
     pregunta: "¿A qué proyecto u obra pertenece?",
     agregar: false,
-    ayuda: proyectosElegibles.length ? "Al elegirlo, el documento aparece en el proyecto y se llenan los campos de obra del formato." : "Este cliente no tiene proyectos abiertos; puedes seguir sin proyecto.",
-    opciones: [...proyectosElegibles.map(etiquetaProyecto), SIN_PROYECTO],
+    ayuda: [
+      proyectosElegibles.length ? "Al elegirlo, el documento aparece en el proyecto y se llenan los campos de obra del formato." : "Este cliente no tiene proyectos abiertos; puedes seguir sin proyecto.",
+      sinProyecto.length ? `Sin proyecto, elige el servicio: define el formato (${sinProyecto.map((o) => varianteDe(o.variante).marca).join(" o ")}).` : "",
+    ].filter(Boolean).join(" "),
+    opciones: [...proyectosElegibles.map(etiquetaProyecto), ...(sinProyecto.length ? sinProyecto.map((o) => o.etiqueta) : [SIN_PROYECTO])],
   };
   const iCliente = pasosModulo.findIndex((p) => p.id === "cliente");
   const pasos = [...pasosModulo.slice(0, iCliente + 1), pasoProyecto, ...pasosModulo.slice(iCliente + 1)];
@@ -607,8 +617,20 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
               <span className="flex items-center gap-1 text-xs font-medium text-slate-600">
                 <FolderKanban className="h-3.5 w-3.5" aria-hidden /> Proyecto u obra
               </span>
-              <select className={sel} value={doc.proyectoId ?? ""} onChange={(e) => elegirProyecto(demo.proyectosVisibles.find((p) => p.id === e.target.value))}>
-                <option value="">{SIN_PROYECTO}</option>
+              <select
+                className={sel}
+                value={doc.proyectoId ?? (sinProyecto.length ? `sin:${variante}` : "")}
+                onChange={(e) => elegirProyecto(demo.proyectosVisibles.find((p) => p.id === e.target.value), e.target.value.startsWith("sin:") ? e.target.value.slice(4) : undefined)}
+              >
+                {sinProyecto.length ? (
+                  sinProyecto.map((o) => (
+                    <option key={o.variante} value={`sin:${o.variante}`}>
+                      {o.etiqueta}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">{SIN_PROYECTO}</option>
+                )}
                 {proyectosElegibles.map((p) => (
                   <option key={p.id} value={p.id}>
                     {etiquetaProyecto(p)}

@@ -9,6 +9,7 @@ import {
   formatoEnVariante,
   prefijoVariante,
   resolverVariante,
+  sinProyectoPorTipo,
   serieConsecutivo,
   tiposProyectoDe,
   varianteDe,
@@ -62,6 +63,16 @@ igual(
   resolverVariante({ tipo: "reporte", proyecto: { tipo: "Servicios Otra" }, config: { tiposProyecto: [{ nombre: "Servicios Otra", variante: "fortox" }] } }),
   "fortox",
 );
+
+// Sin proyecto: el técnico elige el servicio («Sin proyecto · Servicios Fortox»)
+igual("sin proyecto, la elegida manda sobre el cliente", resolverVariante({ tipo: "reporte", cliente: { variante: "sotec" }, config, elegida: "fortox" }), "fortox");
+igual("con proyecto, la elegida no cuenta", resolverVariante({ tipo: "reporte", proyecto: sotec, config, elegida: "fortox" }), "sotec");
+igual("elegida Fortox en un gasto → sotec", resolverVariante({ tipo: "gasto", config, elegida: "fortox" }), "sotec");
+igual("opciones sin proyecto del reporte", sinProyectoPorTipo("reporte", config), [
+  { etiqueta: "Sin proyecto · Servicios SOTEC", variante: "sotec" },
+  { etiqueta: "Sin proyecto · Servicios Fortox", variante: "fortox" },
+]);
+igual("el gasto no ofrece elegir formato", sinProyectoPorTipo("gasto", config), []);
 
 // Control documental y etiquetas
 const base: InfoFormato = { codigo: "FO-GSST-22", nombre: "Formato de reporte técnico", version: "01", fecha: "01/03/2020", corto: "Reporte técnico", el: "el", nuevo: "Nuevo", plural: "reportes" };

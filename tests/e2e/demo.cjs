@@ -1825,6 +1825,16 @@ async function variantes(b, errores) {
   await sleep(300);
   ok((await chip()).startsWith("Formato: Servicios Fortox") && (await vista()).logo, "al elegir de nuevo el proyecto en «Proyecto u obra» vuelve el formato de FORTOX");
 
+  // 2b. Sin proyecto, el técnico elige el servicio (no puede crear proyectos): «Sin proyecto · Servicios Fortox»
+  await elegirEnFormulario(1, "Sin proyecto · Servicios Fortox");
+  await sleep(300);
+  ok((await chip()).startsWith("Formato: Servicios Fortox") && (await vista()).logo, "«Sin proyecto · Servicios Fortox» sale en el formato de FORTOX sin crear proyecto");
+  await elegirEnFormulario(1, "Sin proyecto · Servicios SOTEC");
+  await sleep(300);
+  ok((await chip()) === "Formato: Servicios SOTEC" && !(await vista()).logo, "«Sin proyecto · Servicios SOTEC» vuelve al formato de SOTEC");
+  await elegirEnFormulario(1, "PRY-012-25");
+  await sleep(300);
+
   // 3. Guardar: el detalle y el PDF salen en FORTOX y el documento guarda su variante
   await clic(p, "Guardar borrador");
   await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"));
@@ -1912,13 +1922,40 @@ async function variantes(b, errores) {
   await sleep(800);
   await clic(p, "Conjunto Residencial Los Robles");
   ok((await chip()).startsWith("Formato: Servicios Fortox") && (await vista()).logo, "al elegir el cliente con formato FORTOX (sin proyecto) sale el formato de FORTOX");
-  await clic(p, "Sin proyecto");
-  ok((await chip()).startsWith("Formato: Servicios Fortox"), "«Sin proyecto» conserva el formato del cliente");
+  ok(await p.evaluate(() => ["Sin proyecto · Servicios SOTEC", "Sin proyecto · Servicios Fortox"].every((t) => [...document.querySelectorAll("button")].some((b) => b.textContent.trim() === t))), "el asistente ofrece «Sin proyecto · Servicios SOTEC / Fortox»");
+  await clic(p, "Sin proyecto · Servicios Fortox");
+  await sleep(300);
+  ok((await chip()).startsWith("Formato: Servicios Fortox") && (await vista()).logo, "en el asistente, «Sin proyecto · Servicios Fortox» deja el formato de FORTOX");
   // Proyecto antiguo sin tipo: manda el formato del cliente
   await elegirEnFormulario(1, "PRY-004-26");
   await sleep(300);
   ok((await chip()).startsWith("Formato: Servicios Fortox"), "un proyecto antiguo sin tipo usa el formato del cliente");
   await p.evaluate(() => localStorage.removeItem("fd-generador-reporte-u-tec1"));
+
+  // 7b. El caso de Magno: técnico, cliente escrito en el chat sin proyectos, «Sin proyecto · Servicios Fortox»,
+  // guardar: el documento queda en FORTOX sin proyecto y así sale en /imprimir
+  await p.evaluate(() => localStorage.removeItem("fd-generador-reporte-u-tec1"));
+  await p.goto(`${BASE}/app/nuevo/reporte`, { waitUntil: "networkidle0" });
+  await sleep(800);
+  await responder(p, "Oficina Faro Andino Sur");
+  await sleep(300);
+  ok((await chip()) === "Formato: Servicios SOTEC", "cliente nuevo sin formato propio: arranca en SOTEC");
+  await clic(p, "Sin proyecto · Servicios Fortox");
+  await sleep(300);
+  ok((await chip()).startsWith("Formato: Servicios Fortox") && (await vista()).logo, "el técnico cambia a FORTOX sin crear proyecto (cliente escrito en el chat)");
+  await clic(p, "Guardar borrador");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"));
+  await sleep(600);
+  const idSin = new URL(p.url()).searchParams.get("id");
+  const sinProy = await p.evaluate((k, id) => JSON.parse(localStorage.getItem(k)).documentos.find((d) => d.id === id), CLAVE, idSin);
+  ok(sinProy && sinProy.variante === "fortox" && !sinProy.proyectoId, "el reporte sin proyecto se guarda con el formato FORTOX");
+  ok((await vista()).logo, "el detalle del reporte sin proyecto sale en FORTOX");
+  await p.goto(`${BASE}/imprimir?doc=${idSin}&volver=/app/documentos`, { waitUntil: "networkidle0" });
+  await p.waitForSelector("[data-impresion-lista]", { timeout: 20000 });
+  ok((await vista()).logo, "/imprimir del reporte sin proyecto sale en FORTOX");
+  // Al continuar el borrador, conserva el formato elegido
+  await p.goto(`${BASE}/app/documentos/ver?id=${idSin}`, { waitUntil: "networkidle0" });
+  await sleep(400);
 
   // 8. Celular (390): el chip y el encabezado de FORTOX en la pestaña «Formato»
   await p.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });

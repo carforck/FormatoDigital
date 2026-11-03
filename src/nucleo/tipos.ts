@@ -8,6 +8,7 @@ import type { DatosEpp } from "@/modulos/epp/tipos";
 import type { DatosGasto } from "@/modulos/gastos/tipos";
 import type { DatosPermiso } from "@/modulos/permisos/tipos";
 import type { DatosReporte } from "@/modulos/reportes/tipos";
+import type { DatosRequerimiento } from "@/modulos/requerimientos/tipos";
 
 import type { DatosCotizacion } from "@/modulos/cotizaciones/tipos";
 import type { ServicioCatalogo } from "@/modulos/cotizaciones/catalogo";
@@ -18,6 +19,7 @@ export type { DatosReporte, FotoReporte } from "@/modulos/reportes/tipos";
 export type { DatosPermiso, Ejecutor, SiNoNa } from "@/modulos/permisos/tipos";
 export type { DatosGasto, ItemGasto } from "@/modulos/gastos/tipos";
 export type { DatosEpp, ItemEpp } from "@/modulos/epp/tipos";
+export type { DatosRequerimiento, ItemRequerimiento } from "@/modulos/requerimientos/tipos";
 export type { DatosCotizacion, ItemCotizacion } from "@/modulos/cotizaciones/tipos";
 export type { Equipo, EstadoEquipo, SistemaEquipo } from "@/modulos/equipos/tipos";
 
@@ -28,7 +30,7 @@ export type Rol = "tecnico" | "supervisor" | "admin" | "cliente";
 export type Estado = "borrador" | "en_revision" | "aprobado" | "rechazado" | "cerrado";
 
 /** Tipos de documento; cada uno es un módulo en src/modulos/registro.ts. */
-export type TipoDoc = "reporte" | "permiso" | "gasto" | "cotizacion" | "epp";
+export type TipoDoc = "reporte" | "permiso" | "gasto" | "cotizacion" | "epp" | "requerimiento";
 
 export interface Usuario {
   id: string;
@@ -118,6 +120,11 @@ interface DocBase {
    * Queda fija al guardar: no cambia si después cambia el tipo del proyecto. Sin valor: SOTEC.
    */
   variante?: string;
+  /**
+   * Documento del que salió (cotización convertida desde un requerimiento: su id). Uno solo por
+   * origen: un requerimiento no se convierte dos veces (ver @/modulos/requerimientos/conversion).
+   */
+  origenId?: string;
   creado: string;
   actualizado: string;
   motivoRechazo?: string;
@@ -149,8 +156,13 @@ export interface DocEpp extends DocBase {
   datos: DatosEpp;
 }
 
+export interface DocRequerimiento extends DocBase {
+  tipo: "requerimiento";
+  datos: DatosRequerimiento;
+}
+
 /** Documento de cualquier formato; `tipo` determina la forma de `datos`. */
-export type Documento = DocReporte | DocPermiso | DocGasto | DocCotizacion | DocEpp;
+export type Documento = DocReporte | DocPermiso | DocGasto | DocCotizacion | DocEpp | DocRequerimiento;
 /** Contenido del formato según el tipo de documento. */
 export type DatosDe<T extends TipoDoc> = Extract<Documento, { tipo: T }>["datos"];
 

@@ -10,7 +10,8 @@
  * firma por enlace, envío, cuenta de cobro); trabajo de campo (firma del cliente
  * en sitio, retirar para corregir —anula la firma del cliente—, cámara o galería,
  * clientes nuevos al directorio y los que solo se parecen se preguntan); corregir en revisión
- * mientras nadie lo haya revisado (sigue en revisión; ya aprobado no se modifica); que ninguna pantalla se desborde en 8 anchos y los controles del shell.
+ * mientras nadie lo haya revisado (sigue en revisión; ya aprobado no se modifica); requerimiento del técnico que la
+ * administración convierte en cotización una sola vez; que ninguna pantalla se desborde en 8 anchos y los controles del shell.
  */
 const fs = require("fs");
 const os = require("os");
@@ -18,8 +19,8 @@ const path = require("path");
 const puppeteer = require("puppeteer-core");
 
 const BASE = (process.env.BASE || "http://localhost:3100").replace(/\/$/, "");
-const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion" | "campo" | "revision" | "variantes" | "listas" | "epp" | "paginacion" | "logos" | "asistente"
-const CLAVE = "sotec-demo-v9";
+const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion" | "campo" | "revision" | "variantes" | "listas" | "epp" | "paginacion" | "logos" | "asistente" | "requerimiento"
+const CLAVE = "sotec-demo-v10";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function chrome() {
@@ -1109,8 +1110,11 @@ async function navegacion(b, errores) {
 
   // 7. Celular: la hoja «Nuevo» trae todo lo que el perfil crea y se cierra con Esc y tocando fuera
   await p.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
-  await comoUsuario(p, "u-adm");
+  // Primero se sale del generador (su guardado pisaría el cambio de perfil hecho a mano)
   await p.goto(`${BASE}/app/documentos`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  await comoUsuario(p, "u-adm");
+  await p.reload({ waitUntil: "networkidle0" });
   await sleep(500);
   const abrirNuevo = () => p.evaluate(() => [...document.querySelectorAll("nav button")].find((x) => x.textContent.includes("Nuevo")).click());
   const hoja = () => p.evaluate(() => [...document.querySelectorAll('[aria-label="Nuevo documento"] a')].map((a) => a.textContent.trim()));
@@ -1179,9 +1183,9 @@ async function logos(b, errores) {
     for (const v of ["fortox", "sevin"]) s.documentos.push({ ...r, id: `d-logo-${v}`, variante: v });
     localStorage.setItem(k, JSON.stringify(s));
     const de = (t) => s.documentos.find((d) => d.tipo === t)?.id;
-    return { reporte: r.id, permiso: de("permiso"), gasto: de("gasto"), cotizacion: de("cotizacion"), epp: de("epp"), cuenta: s.cuentas[0]?.id };
+    return { reporte: r.id, permiso: de("permiso"), gasto: de("gasto"), cotizacion: de("cotizacion"), epp: de("epp"), requerimiento: de("requerimiento"), cuenta: s.cuentas[0]?.id };
   }, CLAVE);
-  for (const [nombre, id] of Object.entries({ reporte: ids.reporte, "reporte FORTOX": "d-logo-fortox", "reporte SEVIN": "d-logo-sevin", permiso: ids.permiso, gasto: ids.gasto, cotización: ids.cotizacion, "entrega de EPP": ids.epp })) {
+  for (const [nombre, id] of Object.entries({ reporte: ids.reporte, "reporte FORTOX": "d-logo-fortox", "reporte SEVIN": "d-logo-sevin", permiso: ids.permiso, gasto: ids.gasto, cotización: ids.cotizacion, "entrega de EPP": ids.epp, requerimiento: ids.requerimiento })) {
     if (!id) {
       console.log(`  (sin ${nombre} en la semilla: se revisa en el generador)`);
       continue;
@@ -1204,7 +1208,7 @@ async function logos(b, errores) {
     const r = await revisar();
     ok(r.hojas > 0 && r.app && !r.empresa.length, `detalle del reporte ${v.toUpperCase()}: marca de la app (${r.empresa.join(", ") || "sin logos de empresa"})`);
   }
-  for (const t of ["reporte", "permiso", "gasto", "cotizacion", "epp"]) {
+  for (const t of ["reporte", "permiso", "gasto", "cotizacion", "epp", "requerimiento"]) {
     await p.goto(`${BASE}/app/nuevo/${t}`, { waitUntil: "networkidle0" });
     await sleep(700);
     const r = await revisar();
@@ -2775,6 +2779,135 @@ async function revision(b, errores) {
   await p.close();
 }
 
+/**
+ * Requerimiento (pedido de Magno): el técnico pide ítems con la tabla de la cotización sin lo
+ * comercial y lo envía a revisión; la administración lo convierte en cotización (cliente, proyecto
+ * e ítems precargados, precio de referencia del catálogo), una sola vez; el técnico y SST no convierten.
+ */
+async function requerimiento(b, errores) {
+  console.log("\n— Requerimiento: el técnico lo envía y la administración lo convierte en cotización");
+  const p = await nuevaPagina(b, errores);
+  // Las rutas nuevas tardan en compilar la primera vez en el servidor de desarrollo
+  p.setDefaultNavigationTimeout(120000);
+  await p.setViewport({ width: 1440, height: 900 });
+  await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "networkidle0" });
+  const hoja = () => p.evaluate(() => [...document.querySelectorAll(".doc-print")].map((h) => h.innerText.replace(/\s+/g, " ")).join(" | "));
+  const principal = () => p.evaluate(() => document.querySelector("main").innerText.replace(/\s+/g, " "));
+  const botones = () => p.evaluate(() => [...document.querySelectorAll("main button")].map((x) => x.textContent.trim()));
+  const ir = async (r, ms = 600) => {
+    await p.goto(`${BASE}${r}`, { waitUntil: "networkidle0" });
+    await sleep(ms);
+  };
+  const leer = (id) => p.evaluate((k, i) => JSON.parse(localStorage.getItem(k)).documentos.find((d) => d.id === i), CLAVE, id);
+
+  // 1. Técnico: «Nuevo requerimiento» en el menú; la hoja no tiene nada comercial
+  await clic(p, "Técnico de campo");
+  await p.waitForFunction(() => location.pathname.startsWith("/app"));
+  await sleep(800);
+  const menu = await p.evaluate(() => [...document.querySelectorAll("aside a")].map((a) => [a.getAttribute("href"), a.textContent.trim()]));
+  ok(menu.some(([h, t]) => h === "/app/nuevo/requerimiento" && t.includes("Nuevo requerimiento")), "técnico: «Nuevo requerimiento» en el menú");
+  await ir("/app/nuevo/requerimiento", 900);
+  let h = await hoja();
+  ok(h.includes("Requerimiento # RQ-") && h.includes("Andrés Camacho Ruiz"), "la hoja del requerimiento se ve con quien solicita prellenado");
+  ok(!/Precio unitario|Subtotal|IVA|Condiciones comerciales|Vencimiento|Vendedor/.test(h), "la hoja no trae el encabezado ni lo comercial de la cotización");
+
+  // 2. Asistente: cliente, proyecto, sitio, asunto, catálogo e ítems (uno fuera del catálogo)
+  await clic(p, "Ladrillera Arcillas del Caribe");
+  await clic(p, "PRY-001-26");
+  await formatoSugerido(p);
+  await clic(p, "Área de hornos");
+  await clic(p, "Materiales para ampliación de CCTV");
+  await clic(p, "Instalación de cámara IP");
+  await clic(p, "Cableado UTP categoría 6");
+  await clic(p, "Continuar con 2");
+  await p.evaluate((t) => {
+    const a = document.querySelector("main form textarea");
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(a, t);
+    a.dispatchEvent(new Event("input", { bubbles: true }));
+  }, "3 unidades x Instalación de cámara IP | Patio norte\n80 metros x Cableado UTP categoría 6\n1 x Switch PoE de 8 puertos | Gabinete del patio");
+  await clic(p, "Enviar", "form button");
+  await clic(p, "Omitir");
+  await clic(p, "Omitir");
+  await clic(p, "Firmar ahora");
+  await firmar(p);
+  await clic(p, "Continuar");
+  await sleep(300);
+  h = await hoja();
+  ok(h.includes("Ladrillera Arcillas del Caribe") && h.includes("PRY-001-26") && h.includes("Área de hornos") && h.includes("Switch PoE de 8 puertos") && h.includes("Patio norte") && h.includes("80,00"), "la tabla trae los 3 ítems con cantidad y observación");
+
+  // 3. Enviar a revisión: sin «Convertir a cotización» para el técnico
+  await clic(p, "Enviar a revisión");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
+  await sleep(700);
+  const id = new URL(p.url()).searchParams.get("id");
+  let req = await leer(id);
+  ok(req && req.tipo === "requerimiento" && req.estado === "en_revision" && /^RQ-003-\d{2}$/.test(req.codigo) && JSON.stringify(req.datos.items.map((i) => [i.cantidad, i.unidad])) === JSON.stringify([[3, "Unidades"], [80, "Metros"], [1, "Unidades"]]) && req.datos.firmaSolicitante, `el técnico lo envía a revisión con consecutivo RQ y sus ítems (${req && req.codigo})`);
+  ok(!(await botones()).some((t) => t.includes("Convertir a cotización")), "técnico: no ve «Convertir a cotización»");
+
+  // 4. SST: lo revisa pero no lo convierte (no cotiza)
+  await comoUsuario(p, "u-sup");
+  await ir(`/app/documentos/ver?id=${id}`);
+  let bt = await botones();
+  ok(bt.some((t) => t.includes("Aprobar requerimiento")) && !bt.some((t) => t.includes("Convertir a cotización")), "SST: puede aprobarlo pero no convertirlo");
+
+  // 5. Administración: convierte; la cotización llega con cliente, proyecto e ítems
+  await comoUsuario(p, "u-adm");
+  await ir(`/app/documentos/ver?id=${id}`);
+  await clic(p, "Convertir a cotización");
+  await p.waitForFunction(() => location.pathname.includes("/app/nuevo/cotizacion") && location.search.includes("requerimiento="), { timeout: 15000 });
+  await sleep(900);
+  h = await hoja();
+  const t = await principal();
+  ok(h.includes("Cotización #") && h.includes("Ladrillera Arcillas del Caribe") && h.includes("sistemas@arcillasdelcaribe.example"), "la cotización llega con el cliente y sus datos del directorio");
+  ok(h.includes("Materiales para ampliación de CCTV") && h.includes("Instalación de cámara IP") && h.includes("120.000") && h.includes("6.500") && h.includes("Switch PoE de 8 puertos"), "trae los ítems con el precio de referencia del catálogo");
+  ok(t.includes(`Desde el requerimiento ${req.codigo}`) && t.includes("Falta el precio de 1 ítem"), "avisa de dónde viene y cuántos precios faltan");
+  ok(!h.includes("Patio norte"), "las observaciones internas del técnico no pasan a la cotización");
+  const proyectoSel = await p.evaluate(() => [...document.querySelectorAll("main select")].map((s) => s.selectedOptions[0]?.textContent || "").join(" | "));
+  ok(proyectoSel.includes("PRY-001-26"), "el proyecto queda elegido");
+  await editarCampo(p, "Precio ítem 3", "380000");
+  await clic(p, "Guardar borrador");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
+  await sleep(700);
+  const cotId = new URL(p.url()).searchParams.get("id");
+  const cot = await leer(cotId);
+  req = await leer(id);
+  ok(cot && cot.tipo === "cotizacion" && cot.origenId === id && cot.proyectoId === "p-1" && JSON.stringify(cot.datos.items.map((i) => i.precioUnitario)) === JSON.stringify([120000, 6500, 380000]), `la cotización ${cot && cot.codigo} queda enlazada al requerimiento, con los precios`);
+  const conv = req.historial.find((e) => e.accion === "Convertido en cotización");
+  ok(req.estado === "cerrado" && req.historial.some((e) => e.accion === "Aprobó") && conv && conv.detalle === cot.codigo, "convertirlo lo aprueba y lo deja atendido con el evento en el historial");
+  ok((await principal()).includes(`Viene del requerimiento ${req.codigo}`), "la cotización muestra el requerimiento de origen");
+
+  // 6. No se convierte dos veces
+  await ir(`/app/documentos/ver?id=${id}`);
+  ok((await principal()).includes(`Convertido en la cotización ${cot.codigo}`) && (await principal()).includes("Atendido"), "el requerimiento muestra la cotización y el estado «Atendido»");
+  ok(!(await botones()).some((x) => x.includes("Convertir a cotización")), "ya convertido: sin «Convertir a cotización»");
+  await ir(`/app/nuevo/cotizacion?requerimiento=${id}`);
+  ok((await principal()).includes(`ya se convirtió en la cotización ${cot.codigo}`) && (await principal()).includes(`Ver la cotización ${cot.codigo}`), "por URL: avisa que ya se convirtió y lleva a la cotización existente");
+
+  // 7. Técnico: ve que se atendió, no convierte ni abre la cotización
+  await comoUsuario(p, "u-tec1");
+  await ir(`/app/documentos/ver?id=${id}`);
+  ok((await principal()).includes("ya lo convirtió en cotización") && !(await botones()).some((x) => x.includes("Convertir a cotización")), "técnico: ve que se convirtió, sin el botón");
+  await ir(`/app/nuevo/cotizacion?requerimiento=${id}`);
+  ok((await principal()).includes("Acceso restringido"), "técnico: la conversión por URL está restringida");
+
+  // 8. Eliminar el borrador de la cotización: el requerimiento vuelve a quedar por cotizar
+  await comoUsuario(p, "u-adm");
+  await ir(`/app/documentos/ver?id=${cotId}`);
+  await p.evaluate(() => document.querySelector('main button[aria-label="Eliminar"]').click());
+  await sleep(700);
+  req = await leer(id);
+  ok(req.estado === "aprobado" && !(await leer(cotId)), "al eliminar el borrador de la cotización, el requerimiento vuelve a aprobado");
+  await ir(`/app/documentos/ver?id=${id}`);
+  ok((await botones()).some((x) => x.includes("Convertir a cotización")), "y se puede convertir de nuevo");
+
+  // 9. Semilla: RQ-001-26 ya convertido en COT-003-26
+  await ir("/app/documentos/ver?id=d-rq-1");
+  ok((await principal()).includes("Convertido en la cotización COT-003-26"), "semilla: RQ-001-26 enlazado a COT-003-26");
+  await p.close();
+}
+
 (async () => {
   const b = await puppeteer.launch({ executablePath: chrome(), headless: true, args: ["--no-sandbox"] });
   const errores = [];
@@ -2797,6 +2930,7 @@ async function revision(b, errores) {
     if (!SOLO || SOLO === "paginacion") await paginacion(b, errores);
     if (!SOLO || SOLO === "logos") await logos(b, errores);
     if (!SOLO || SOLO === "asistente") await asistente(b, errores);
+    if (!SOLO || SOLO === "requerimiento") await requerimiento(b, errores);
   } catch (e) {
     ok(false, `error: ${e.message}`);
   } finally {

@@ -16,6 +16,7 @@ import {
   Building2,
   ChevronDown,
   ClipboardCheck,
+  ClipboardList,
   FileSignature,
   FileText,
   FolderKanban,
@@ -72,6 +73,8 @@ const GRUPOS: { titulo: string; items: Item[] }[] = [
       { href: "/app/nuevo/reporte", label: "Nuevo reporte técnico", icon: FileText, tipo: "reporte" },
       { href: "/app/nuevo/permiso", label: "Nuevo permiso de trabajo", icon: HardHat, tipo: "permiso" },
       { href: "/app/nuevo/gasto", label: "Legalizar gastos", icon: Wallet, tipo: "gasto" },
+      // Pedido de Magno: el técnico pide ítems y la administración lo convierte en cotización
+      { href: "/app/nuevo/requerimiento", label: "Nuevo requerimiento", icon: ClipboardList, tipo: "requerimiento" },
       { href: "/app/nuevo/cotizacion", label: "Nueva cotización", icon: FileSignature, tipo: "cotizacion" },
       { href: "/app/documentos", label: "Documentos", icon: FolderOpen, contador: "borradores" },
     ],
@@ -119,6 +122,7 @@ const TITULOS: [string, string][] = [
   ["/app/nuevo/permiso", "Nuevo permiso de trabajo"],
   ["/app/nuevo/gasto", "Legalización de gastos"],
   ["/app/nuevo/cotizacion", "Nueva cotización"],
+  ["/app/nuevo/requerimiento", "Nuevo requerimiento"],
   ["/app/proyectos/editar", "Proyecto"],
   ["/app/proyectos/ver", "Detalle del proyecto"],
   ["/app/proyectos", "Proyectos"],
@@ -681,6 +685,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 { tipo: "gasto", t: "Legalización de gastos", d: "FO-GSST-25 · gastos con foto de la factura", icon: Wallet },
                 { tipo: "cotizacion", t: "Cotización", d: "Propuesta económica al cliente, con aceptación firmada", icon: FileSignature },
                 { tipo: "epp", t: "Entrega de EPP", d: "Elementos de protección entregados, con la firma del trabajador", icon: ShieldCheck },
+                { tipo: "requerimiento", t: "Requerimiento", d: "Ítems que necesita el cliente; la administración lo convierte en cotización", icon: ClipboardList },
               ] as { tipo: TipoDoc; t: string; d: string; icon: typeof FileText }[]
             )
               .filter((o) => puedeCrearTipo(usuario.rol, o.tipo))

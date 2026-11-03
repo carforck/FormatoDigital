@@ -14,6 +14,7 @@ import { moduloEpp } from "./epp";
 import { moduloGastos } from "./gastos";
 import { moduloPermisos } from "./permisos";
 import { moduloReportes } from "./reportes";
+import { moduloRequerimientos } from "./requerimientos";
 import { ETIQUETA_ESTADO } from "@/nucleo/catalogos";
 import type { Accion } from "@/nucleo/permisos";
 import type { Cliente, Config, DatosDe, Documento, Estado, Proyecto, TipoDoc } from "@/nucleo/tipos";
@@ -46,7 +47,14 @@ export const MODULOS: InfoModulo[] = [
   { clave: "epp", nombre: "Entrega de EPP", descripcion: "Registro de entrega de elementos de protección personal a cada trabajador: elementos, cantidad, talla y motivo, con la firma de recibido del trabajador y la de quien entrega. Interno.", estado: "activo", formato: "por confirmar", relaciona: ["proyectos", "permisos"] },
   { clave: "cotizaciones", nombre: "Cotizaciones", descripcion: "Propuesta económica al cliente por proyecto: la administración la aprueba y la envía al portal, y el cliente la acepta con su firma. Solo la administración (comercial).", estado: "activo", relaciona: ["proyectos", "cobros"], requiere: "cotizar" },
   { clave: "cobros", nombre: "Cuentas de cobro", descripcion: "SOTEC le cobra a su cliente por el servicio, con ítems tomados de los reportes técnicos, IVA y valor en letras. Solo la administración (comercial).", estado: "activo", relaciona: ["proyectos", "ordenes", "reportes"], requiere: "cobros" },
-  { clave: "requerimientos", nombre: "Requerimiento de materiales", descripcion: "Solicitud de materiales para un proyecto, con aprobación y entrega; interno, el cliente no lo ve.", estado: "planeado", relaciona: ["proyectos", "gastos"] },
+  {
+    clave: "requerimientos",
+    nombre: "Requerimientos",
+    descripcion: "El técnico pide los materiales, equipos o servicios que necesita un cliente o proyecto, con la tabla de ítems de la cotización y sin lo comercial (precios, IVA, condiciones); lo envía a revisión y la administración lo convierte en cotización con un clic. Interno: el cliente no lo ve.",
+    estado: "activo",
+    formato: "por confirmar",
+    relaciona: ["proyectos", "cotizaciones"],
+  },
   {
     clave: "equipos",
     nombre: "Equipos",
@@ -63,13 +71,14 @@ export const DOCUMENTOS: { [T in TipoDoc]: ModuloDocumento<DatosDe<T>> } = {
   gasto: moduloGastos,
   cotizacion: moduloCotizaciones,
   epp: moduloEpp,
+  requerimiento: moduloRequerimientos,
 };
 
 /** Orden en el menú, el tablero, los filtros y los proyectos. */
-export const TIPOS_DOC: TipoDoc[] = ["reporte", "permiso", "gasto", "cotizacion", "epp"];
+export const TIPOS_DOC: TipoDoc[] = ["reporte", "permiso", "gasto", "cotizacion", "epp", "requerimiento"];
 
 // Paleta de series (globals.css), en el orden de TIPOS_DOC
-const PALETA = ["var(--serie-a)", "var(--serie-b)", "var(--serie-c)", "var(--serie-d)", "var(--serie-e)"];
+const PALETA = ["var(--serie-a)", "var(--serie-b)", "var(--serie-c)", "var(--serie-d)", "var(--serie-e)", "var(--serie-f)"];
 
 /** Lo que el resto de la aplicación lee de un módulo, con los valores por defecto ya puestos. */
 export interface InfoDoc {

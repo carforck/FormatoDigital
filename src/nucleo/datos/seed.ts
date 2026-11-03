@@ -7,6 +7,8 @@
 import { CATALOGO_SERVICIOS, cotizacionVacia } from "@/modulos/cotizaciones/catalogo";
 import { PLANTILLAS_ACTIVIDAD, permisoVacio } from "@/modulos/permisos/catalogo";
 import { reporteVacio } from "@/modulos/reportes/catalogo";
+import { requerimientoVacio } from "@/modulos/requerimientos/catalogo";
+import { CONVERTIDO_EN } from "@/modulos/requerimientos/conversion";
 import { EQUIPOS_DE_DOC } from "@/modulos/equipos/seed";
 import type { CuentaCobro } from "@/modulos/cobros/tipos";
 import type { Auditoria, Cliente, Config, Documento, Estado, Notificacion, Proyecto, Usuario } from "@/nucleo/tipos";
@@ -92,6 +94,7 @@ const PROYECTO_DE: Record<string, string> = {
   "d-rt-1": "p-4", "d-rt-5": "p-4", "d-rt-8": "p-4",
   "d-rt-4": "p-5", "d-pt-1": "p-5",
   "d-cot-0": "p-2", "d-cot-1": "p-1", "d-cot-2": "p-5",
+  "d-rq-0": "p-1", "d-rq-1": "p-5",
 };
 
 /** Cuentas de cobro de ejemplo: SOTEC le cobra a sus clientes por servicios ya cerrados. */
@@ -450,6 +453,64 @@ export function documentosSeed(): Documento[] {
     });
   });
 
+  // Requerimientos del técnico: uno ya convertido en la cotización COT-003-26 (borrador) y uno en revisión
+  // para convertir (ítems del catálogo, que toman su precio de referencia, y uno que no está)
+  const rq = (descripcion: string, cantidad: number, unidad: string, observacion: string, k: string, detalle = "") => ({ id: `rq-it-${k}`, descripcion, detalle, cantidad, unidad, observacion });
+  const requerimientos = [
+    {
+      id: "d-rq-1", autor: tec2, cliente: puerto, fecha: "2026-10-20", estado: "cerrado" as Estado, proyecto: "PRY-005-26 · Detección de incendio bodegas", sitio: "Bodegas 1 y 2",
+      asunto: "Visitas de diagnóstico de la detección de incendio",
+      items: [rq("Visita técnica de diagnóstico", 2, "Visitas", "Una por bodega", "1a")],
+      cotizacion: "d-cot-2",
+    },
+    {
+      id: "d-rq-0", autor: tec1, cliente: clay, fecha: "2026-10-28", estado: "en_revision" as Estado, proyecto: "PRY-001-26 · CCTV hornos y patio de secado", sitio: "Patio de secado",
+      asunto: "Materiales para ampliación de CCTV en el patio de secado",
+      items: [
+        rq("Instalación de cámara IP", 3, "Unidades", "Esquinas norte y sur del patio", "0a"),
+        rq("Cableado UTP categoría 6", 120, "Metros", "Desde el cuarto de control", "0b"),
+        rq("Switch PoE de 8 puertos", 1, "Unidades", "Gabinete del patio", "0c", "Administrable, 120 W"),
+      ],
+      cotizacion: undefined as string | undefined,
+    },
+  ];
+  requerimientos.forEach((r, i) => {
+    const n = i + 1;
+    const h = [
+      { fecha: `${r.fecha}T08:30:00`, usuarioId: r.autor.id, accion: "Creó el documento" },
+      { fecha: `${r.fecha}T09:10:00`, usuarioId: r.autor.id, accion: "Envió a revisión" },
+    ] as Documento["historial"];
+    const cot = r.cotizacion && docs.find((d) => d.id === r.cotizacion);
+    if (cot) {
+      h.push({ fecha: `${cot.creado.slice(0, 10)}T09:00:00`, usuarioId: adm.id, accion: "Aprobó" });
+      h.push({ fecha: `${cot.creado.slice(0, 10)}T09:00:00`, usuarioId: adm.id, accion: CONVERTIDO_EN, detalle: cot.codigo });
+      cot.origenId = r.id;
+    }
+    docs.push({
+      id: r.id,
+      tipo: "requerimiento",
+      codigo: codigo("RQ", n, r.fecha),
+      consecutivo: n,
+      estado: r.estado,
+      autorId: r.autor.id,
+      clienteId: r.cliente.id,
+      creado: `${r.fecha}T08:30:00`,
+      actualizado: `${r.fecha}T09:10:00`,
+      historial: h,
+      datos: {
+        ...requerimientoVacio(r.fecha),
+        cliente: r.cliente.nombre,
+        proyecto: r.proyecto,
+        sitio: r.sitio,
+        asunto: r.asunto,
+        items: r.items,
+        solicitante: r.autor.nombre,
+        cargo: r.autor.cargo,
+        firmaSolicitante: firmaDemo(140 + i),
+      },
+    });
+  });
+
   // Cada documento queda en su proyecto; el reporte lo muestra en «Proyecto»
   const proyectos = proyectosSeed();
   // y los reportes marcan sus equipos atendidos (módulo Equipos) y su hora de llegada y salida
@@ -466,6 +527,8 @@ export function documentosSeed(): Documento[] {
 /** Avisos de ejemplo, coherentes con los documentos de la semilla. */
 export function notificacionesSeed(): Notificacion[] {
   return [
+    { id: "n7", para: "admin", texto: "Andrés Camacho envió el requerimiento RQ-002-26 a revisión", docId: "d-rq-0", fecha: "2026-10-28T09:10:00", leida: false },
+    { id: "n8", para: "supervisor", texto: "Andrés Camacho envió el requerimiento RQ-002-26 a revisión", docId: "d-rq-0", fecha: "2026-10-28T09:10:00", leida: false },
     { id: "n1", para: "supervisor", texto: "Andrés Camacho envió el permiso PT-005-26 a revisión", docId: "d-pt-3", fecha: "2026-10-20T07:45:00", leida: false },
     { id: "n2", para: "supervisor", texto: "Andrés Camacho envió el reporte RT-009-26 a revisión", docId: "d-rt-7", fecha: "2026-10-17T15:20:00", leida: false },
     { id: "n3", para: "u-tec1", texto: "Tu reporte RT-007-26 fue rechazado: falta detallar las recomendaciones", docId: "d-rt-5", fecha: "2026-09-25T11:00:00", leida: false },

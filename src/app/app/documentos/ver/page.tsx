@@ -4,7 +4,7 @@
  * Ruta /app/documentos/ver?id=<doc>: detalle de un documento con su plantilla y todas las
  * acciones del flujo (editar, enviar, retirar para corregir, aprobar/rechazar, firmar,
  * tomar la firma del cliente en sitio, cerrar, duplicar, pedir firma por enlace, enviar,
- * cobrar, PDF). Retirar o rechazar anula la firma del cliente tomada en sitio (se avisa antes). Cada acción se habilita según @/nucleo/permisos y el `flujo` del módulo
+ * cobrar, convertir un requerimiento en cotización, PDF). Retirar o rechazar anula la firma del cliente tomada en sitio (se avisa antes). Cada acción se habilita según @/nucleo/permisos y el `flujo` del módulo
  * (@/modulos/registro); si otro llegó primero (p. ej. el autor retiró lo que se iba a
  * aprobar) se muestra el motivo. Sale con la variante de formato guardada en el documento
  * (`doc.variante`, @/nucleo/variantes; sin ella, SOTEC). Params: ?desde= (regreso), ?ok=guardado|enviado.
@@ -12,7 +12,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { AlertTriangle, Cctv, Check, CheckCircle2, Copy, FolderKanban, Info, Link2, Lock, PenLine, Printer, Receipt, Send, SendHorizonal, Signature, Trash2, Undo2, UserPlus, X } from "lucide-react";
+import { AlertTriangle, Cctv, Check, CheckCircle2, ClipboardList, Copy, FileSignature, FolderKanban, Info, Link2, Lock, PenLine, Printer, Receipt, Send, SendHorizonal, Signature, Trash2, Undo2, UserPlus, X } from "lucide-react";
 
 import { EnviarDocumento } from "@/components/docs/EnviarDocumento";
 import { Volver, marcarEdicion, useAvisoDeRegreso, useOrigen } from "@/components/ui/volver";
@@ -24,16 +24,17 @@ import { Button } from "@/components/ui/button";
 import { EstadoBadge } from "@/components/ui/badges";
 import { Input } from "@/components/ui/input";
 import { tomarAvisoCliente } from "@/nucleo/clientes";
-import { CORRIGIO_EN_REVISION, puede, puedeCrearTipo, puedeEditarDoc, puedeFirmaClienteEnSitio, puedeRetirarDoc, puedeRevisarDoc, puedeVerDoc } from "@/nucleo/permisos";
+import { CORRIGIO_EN_REVISION, puede, puedeConvertirRequerimiento, puedeCrearTipo, puedeEditarDoc, puedeFirmaClienteEnSitio, puedeRetirarDoc, puedeRevisarDoc, puedeVerDoc } from "@/nucleo/permisos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { abrirImpresion, tituloArchivo } from "@/nucleo/impresion";
-import { rutaCuenta, rutaEquipo, rutaProyecto, urlPublica } from "@/nucleo/rutas";
+import { rutaCuenta, rutaDoc, rutaEquipo, rutaProyecto, urlPublica } from "@/nucleo/rutas";
 import { equiposAtendidos, equiposIdsDe } from "@/modulos/equipos/logica";
 import { IconoEquipo } from "@/modulos/equipos/piezas";
 import type { DatosPermiso } from "@/nucleo/tipos";
 import { faltantes } from "@/nucleo/validar";
 import { VARIANTE_BASE, formatoEnVariante, varianteParaTipo } from "@/nucleo/variantes";
 import { clienteDoc, empresaDe, infoDoc, rutaNuevo } from "@/modulos/registro";
+import { cotizacionDe } from "@/modulos/requerimientos/conversion";
 
 /**
  * Contenido del detalle. Reglas clave: solo el autor edita (borrador, rechazado o en revisión
@@ -117,6 +118,10 @@ function Detalle() {
   const puedeCobrar = doc.tipo === "reporte" && (doc.estado === "aprobado" || doc.estado === "cerrado") && !cuenta && puede(u.rol, "cobros");
   const empresa = demo.config.empresa;
   const contacto = datosLibres.personaContactada || cliente?.contacto;
+  // Requerimiento → cotización (pedido de Magno): la administración lo convierte una sola vez
+  const cotizacionReq = doc.tipo === "requerimiento" ? cotizacionDe(doc.id, demo.documentos) : undefined;
+  const convierte = puedeConvertirRequerimiento(u, doc, demo.documentos);
+  const origenReq = doc.origenId ? demo.documentos.find((x) => x.id === doc.origenId) : undefined;
 
   return (
     <div className="space-y-4">
@@ -225,6 +230,16 @@ function Detalle() {
               </Button>
             </>
           )}
+          {convierte && (
+            <Button
+              onClick={() => {
+                marcarEdicion();
+                router.push(rutaNuevo("cotizacion", `requerimiento=${doc.id}&desde=doc:${doc.id}`));
+              }}
+            >
+              <FileSignature className="h-4 w-4" /> Convertir a cotización
+            </Button>
+          )}
           {firmaCliente && (
             <Button onClick={() => setFirma("cliente")}>
               <PenLine className="h-4 w-4" /> {flujo.cerrar}
@@ -299,6 +314,27 @@ function Detalle() {
       {cuenta && puede(u.rol, "ver_cobros") && (
         <Link href={`${rutaCuenta(cuenta.id)}&desde=doc:${doc.id}`} className="print:hidden flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 hover:bg-sky-100">
           <Receipt className="h-4 w-4" /> Este reporte ya se cobró en la cuenta de cobro <strong className="font-mono">{cuenta.codigo}</strong> →
+        </Link>
+      )}
+
+      {cotizacionReq &&
+        (puedeVerDoc(u, cotizacionReq) ? (
+          <Link href={rutaDoc(cotizacionReq.id, `&desde=doc:${doc.id}`)} className="print:hidden flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 hover:bg-sky-100">
+            <FileSignature className="h-4 w-4 shrink-0" /> Convertido en la cotización <strong className="font-mono">{cotizacionReq.codigo}</strong> →
+          </Link>
+        ) : (
+          <p className="print:hidden flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+            <FileSignature className="h-4 w-4 shrink-0" /> La administración ya lo convirtió en cotización para el cliente.
+          </p>
+        ))}
+      {convierte && doc.estado === "en_revision" && (
+        <p className="print:hidden flex items-center gap-2 text-xs text-slate-500">
+          <Info className="h-3.5 w-3.5 shrink-0" /> «Convertir a cotización» abre la cotización con el cliente, el proyecto y los ítems; al guardarla, el requerimiento queda aprobado y atendido.
+        </p>
+      )}
+      {origenReq && puedeVerDoc(u, origenReq) && (
+        <Link href={rutaDoc(origenReq.id, `&desde=doc:${doc.id}`)} className="print:hidden flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 hover:bg-slate-50">
+          <ClipboardList className="h-4 w-4 shrink-0" /> Viene del requerimiento <strong className="font-mono">{origenReq.codigo}</strong> →
         </Link>
       )}
 

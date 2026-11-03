@@ -12,7 +12,7 @@ import { Check, Plus, Trash2, X } from "lucide-react";
 
 import { EditableText } from "@/components/docs/EditableText";
 import { SelectConOtro } from "@/components/ui/SelectConOtro";
-import { Firma, LogoFormato } from "@/components/docs/Encabezado";
+import { Firma } from "@/components/docs/Encabezado";
 import { cn } from "@/lib/utils";
 import type { PropsPlantilla } from "@/modulos/contrato";
 import { useDemoOpcional } from "@/nucleo/datos/DemoProvider";
@@ -21,6 +21,7 @@ import { LISTA } from "@/nucleo/opciones";
 
 import { cantidadTexto, diasEntre, fechaCorta, importeItem, totalesCotizacion } from "./calculos";
 import { CATALOGO_SERVICIOS, EMPRESA_COTIZACION, FORMATO_COTIZACION, TARIFAS_IVA, UNIDADES, itemDeCatalogo, itemVacio, type EmpresaCotizacion, type ServicioCatalogo } from "./catalogo";
+import { FranjaEncabezado, GRIS_FILA, PieFormato, VERDE, VERDE_ETIQUETA } from "./piezas";
 import type { DatosCotizacion, ItemCotizacion } from "./tipos";
 
 /** Props de la plantilla: las comunes más los datos de empresa propios de la cotización (lema, web). */
@@ -28,12 +29,6 @@ export interface PropsPlantillaCotizacion extends PropsPlantilla<DatosCotizacion
   /** Datos de la empresa para el encabezado y el pie (teléfono, NIT…). Por defecto: `EMPRESA_COTIZACION`. */
   empresa?: Partial<EmpresaCotizacion>;
 }
-
-// Colores de la cotización de Odoo enviada por SOTEC
-const VERDE = "#3BA10E";
-const VERDE_ETIQUETA = "#688C5A";
-const FRANJA = "#EFF7EC";
-const GRIS_FILA = "#F4F5F7";
 
 type CampoTexto = Exclude<keyof DatosCotizacion, "items">;
 type OpcCampo = { multiline?: boolean; type?: "text" | "date" | "email" | "tel"; placeholder?: string; display?: string; className?: string };
@@ -93,27 +88,7 @@ export function PlantillaCotizacion({ datos, codigoDoc, editar, firmar, resaltar
         )}
       >
         {/* Franja verde del encabezado: va de borde a borde, también al imprimir */}
-        <header className="relative -mx-5 sm:-mx-10 print:-mx-[1cm] print:-mt-[0.8cm]" style={{ background: FRANJA }}>
-          <div className={cn("flex items-start justify-between gap-3 px-5 pt-5 sm:px-10 sm:pt-7", pk("print:pt-4"))}>
-            <LogoFormato className={cn("h-16 w-auto object-contain sm:h-[88px]", pk("print:h-14"))} anchoDemo="max-w-[200px] sm:max-w-[240px]" />
-            <div className="text-right text-[11px] leading-[1.6] sm:text-[12.5px]">
-              <p>{empresa.nombre}</p>
-              {empresa.direccion.map((l) => (
-                <p key={l}>{l}</p>
-              ))}
-            </div>
-          </div>
-          <div className="relative flex flex-wrap items-end justify-between gap-x-3 px-5 pb-2 pt-2 sm:px-10 sm:pb-3">
-            <p className="relative z-10 text-[11px] sm:text-[13px]" style={{ color: VERDE }}>
-              {empresa.lema}
-            </p>
-            {/* Recorte blanco con chaflán, detrás del título (como en Odoo) */}
-            <span aria-hidden="true" className="absolute bottom-0 right-0 h-[62%] w-[48%] bg-white" style={{ clipPath: "polygon(11% 0, 100% 0, 100% 100%, 0 100%)" }} />
-            <h1 className="relative z-10 ml-auto whitespace-nowrap text-[20px] font-normal leading-none sm:text-[26px]" style={{ color: VERDE }}>
-              Cotización # {codigoDoc || "borrador"}
-            </h1>
-          </div>
-        </header>
+        <FranjaEncabezado empresa={empresa} titulo={`Cotización # ${codigoDoc || "borrador"}`} compacto={k} />
 
         {/* Cliente */}
         <section className={cn("mt-5 space-y-0.5", pk("print:mt-3"), marca("cliente"))}>
@@ -364,16 +339,7 @@ export function PlantillaCotizacion({ datos, codigoDoc, editar, firmar, resaltar
 
         </div>
 
-        {/* Pie de página: en pantalla al final de la hoja; al imprimir se repite en cada hoja
-            (posición fija: Chrome y Safari la dibujan en todas las páginas; el margen inferior
-            de la hoja deja su espacio, ver .doc-pie-fijo en globals.css) */}
-        <div aria-hidden="true" className="min-h-8 flex-1 print:hidden" />
-        <footer className="pie-cotizacion flex items-end gap-3 border-t border-slate-400 pt-2 text-[9.5px] text-slate-700 sm:text-[10.5px]">
-          <p className="flex-1 text-center">
-            {empresa.telefonos} · {empresa.correo} · {empresa.web} · {empresa.nit}
-          </p>
-          <p className="shrink-0 text-slate-500">{FORMATO_COTIZACION.codigo}</p>
-        </footer>
+        <PieFormato empresa={empresa} codigo={FORMATO_COTIZACION.codigo} />
       </article>
     </div>
   );

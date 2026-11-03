@@ -7,6 +7,7 @@
  */
 import type { CuentaCobro } from "@/modulos/cobros/tipos";
 import { infoDoc } from "@/modulos/registro";
+import { cotizacionDe } from "@/modulos/requerimientos/conversion";
 import type { Documento, Proyecto, Rol, TipoDoc, Usuario } from "@/nucleo/tipos";
 
 /** Acciones que un rol puede tener (ver `MATRIZ` y `DESCRIPCION_ACCION`). */
@@ -42,7 +43,7 @@ const MATRIZ: Record<Rol, Accion[]> = {
 
 /** Texto de cada acción para la pantalla de usuarios y roles. */
 export const DESCRIPCION_ACCION: Record<Accion, string> = {
-  crear: "Crear reportes, permisos y legalizaciones de gastos",
+  crear: "Crear reportes, permisos, legalizaciones de gastos, entregas de EPP y requerimientos",
   cotizar: "Crear, aprobar y enviar cotizaciones al cliente (comercial)",
   ver_todos: "Ver documentos de todo el equipo",
   revisar: "Aprobar o rechazar documentos",
@@ -145,6 +146,17 @@ export function puedeFirmaClienteEnSitio(u: Usuario, d: Documento): boolean {
 /** Revisa (aprueba o rechaza) un revisor, sobre un documento en revisión que no sea suyo. */
 export function puedeRevisarDoc(u: Usuario, d: Documento): boolean {
   return puede(u.rol, "revisar") && puedeUsarTipo(u.rol, d.tipo) && d.estado === "en_revision" && d.autorId !== u.id;
+}
+
+/**
+ * Convierte un requerimiento en cotización (pedido de Magno) quien puede crear cotizaciones
+ * (la administración), una sola vez: si ya hay una cotización con ese origen, no. En revisión
+ * solo si además lo puede revisar (no es suyo): convertirlo lo aprueba. Ya aprobado (por SST o
+ * la administración), sí.
+ */
+export function puedeConvertirRequerimiento(u: Usuario, d: Documento, documentos: Documento[]): boolean {
+  if (d.tipo !== "requerimiento" || !puedeCrearTipo(u.rol, "cotizacion") || cotizacionDe(d.id, documentos)) return false;
+  return d.estado === "aprobado" || (d.estado === "en_revision" && puedeRevisarDoc(u, d));
 }
 
 /** El cliente solo ve sus cuentas ya emitidas; la administración, todas. */

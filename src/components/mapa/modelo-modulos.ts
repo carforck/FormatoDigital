@@ -117,7 +117,7 @@ const META: Record<string, Meta> = {
     ],
     notaFlujo: "El cliente solo ve sus cuentas emitidas",
   },
-  requerimientos: { rama: "abastece", padre: ["proyectos", "ordenes"] },
+  requerimientos: { rama: "se pide para", padre: ["proyectos", "clientes"], notaFlujo: "El técnico lo envía a revisión; la administración lo convierte en cotización (queda atendido) una sola vez. Interno: el cliente no lo ve" },
   equipos: {
     padre: ["proyectos", "clientes"],
     rama: "se instala en",

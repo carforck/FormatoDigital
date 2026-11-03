@@ -36,10 +36,11 @@ import * as reglasEquipos from "@/modulos/equipos/reglas";
 import type { ApiEquipos, Equipo } from "@/modulos/equipos/tipos";
 import { CATALOGO_SERVICIOS, IVA_GENERAL, type ServicioCatalogo } from "@/modulos/cotizaciones/catalogo";
 import { infoDoc, prefijoDe } from "@/modulos/registro";
+import { COTIZACION_ELIMINADA, CONVERTIDO_EN } from "@/modulos/requerimientos/conversion";
 import { planCliente } from "@/nucleo/clientes";
 import { prefijoVariante, serieConsecutivo, type TipoProyecto } from "@/nucleo/variantes";
 import { buscarOpcion, comparable, limpiarOpcion } from "@/nucleo/opciones";
-import { CORRIGIO_EN_REVISION, puede, puedeCrearTipo, puedeEditarDoc, puedeFirmaClienteEnSitio, puedeRetirarDoc, puedeUsarTipo, puedeVerCuenta, puedeVerDoc, puedeVerProyecto } from "@/nucleo/permisos";
+import { CORRIGIO_EN_REVISION, puede, puedeConvertirRequerimiento, puedeCrearTipo, puedeEditarDoc, puedeFirmaClienteEnSitio, puedeRetirarDoc, puedeUsarTipo, puedeVerCuenta, puedeVerDoc, puedeVerProyecto } from "@/nucleo/permisos";
 import {
   CLIENTES_SEED,
   CONFIG_SEED,
@@ -72,7 +73,7 @@ import {
 } from "@/nucleo/datos/empresa";
 
 // Subir la versión al cambiar la semilla: los navegadores cargan los datos nuevos
-const KEY = "sotec-demo-v9";
+const KEY = "sotec-demo-v10";
 /** Evento del historial cuando la firma del cliente en sitio se anula al salir de revisión (igual en 0013). */
 const CERRADO_EN_SITIO = "Cerrado con la firma del cliente en sitio";
 export const FIRMA_ANULADA = "Se anuló la firma del cliente (el contenido cambió)";
@@ -886,13 +887,33 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
             historial: [evento(prev, "Creó el documento")],
           } as Documento;
           const dir = conDirectorio(prev, base);
-          const nuevo = { ...dir.doc, equiposIds: equiposDelCliente(prev, dir.doc) } as Documento;
+          let nuevo = { ...dir.doc, equiposIds: equiposDelCliente(prev, dir.doc) } as Documento;
+          let auditoria = registrar({ ...prev, auditoria: dir.auditoria }, "Creó", nuevo.codigo);
+          let notificaciones = prev.notificaciones;
+          let documentos = prev.documentos;
+          // Cotización convertida desde un requerimiento (pedido de Magno): una sola vez por requerimiento.
+          // Convertirlo lo aprueba si seguía en revisión y lo deja cerrado («Atendido») con el enlace.
+          if (nuevo.origenId) {
+            const autor = prev.usuarios.find((x) => x.id === prev.usuarioId);
+            const req = prev.documentos.find((x) => x.id === nuevo.origenId);
+            if (nuevo.tipo === "cotizacion" && autor && req && puedeConvertirRequerimiento(autor, req, prev.documentos)) {
+              const eventos = [...(req.estado === "en_revision" ? [evento(prev, "Aprobó")] : []), evento(prev, CONVERTIDO_EN, nuevo.codigo)];
+              const convertido = { ...req, estado: "cerrado", actualizado: ahora(), historial: [...req.historial, ...eventos] } as Documento;
+              documentos = documentos.map((d) => (d.id === req.id ? convertido : d));
+              notificaciones = notificar(prev, req.autorId, `${req.codigo} fue aprobado y la administración lo pasó a cotización`, req.id);
+              auditoria = registrar({ ...prev, auditoria }, CONVERTIDO_EN, `${req.codigo} → ${nuevo.codigo}`);
+            } else {
+              // Ya convertido (otra pestaña u otro equipo) o sin permiso: la cotización queda suelta
+              nuevo = { ...nuevo, origenId: undefined } as Documento;
+            }
+          }
           return {
             ...prev,
             clientes: dir.clientes,
             consecutivos: { ...prev.consecutivos, [clave]: n },
-            documentos: [nuevo, ...prev.documentos],
-            auditoria: registrar({ ...prev, auditoria: dir.auditoria }, "Creó", nuevo.codigo),
+            documentos: [nuevo, ...documentos],
+            notificaciones,
+            auditoria,
           };
         });
         return actualizado;
@@ -1078,7 +1099,8 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
         const n = api.nuevoId(d.tipo);
         // Cada módulo decide qué se limpia al duplicar (fechas y firmas)
         const datos = infoDoc(d.tipo).duplicar(d.datos, hoy());
-        const copia = { ...d, ...n, datos, estado: "borrador", autorId: usuario.id, creado: ahora(), actualizado: ahora(), motivoRechazo: undefined, historial: [] } as Documento;
+        // La copia no hereda el origen (una cotización convertida desde un requerimiento queda suelta)
+        const copia = { ...d, ...n, datos, estado: "borrador", autorId: usuario.id, creado: ahora(), actualizado: ahora(), motivoRechazo: undefined, origenId: undefined, historial: [] } as Documento;
         api.guardar(copia);
         return copia.id;
       },
@@ -1088,7 +1110,20 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
           const d = prev.documentos.find((x) => x.id === id);
           // Solo borradores propios; el consecutivo no se libera
           if (!d || d.estado !== "borrador" || d.autorId !== prev.usuarioId || !usaTipo(prev, d.tipo)) return prev;
-          return { ...prev, documentos: prev.documentos.filter((x) => x.id !== id), auditoria: registrar(prev, "Eliminó", d.codigo) };
+          const documentos = prev.documentos.filter((x) => x.id !== id);
+          // Borrador de una cotización convertida: su requerimiento vuelve a quedar por cotizar (aprobado)
+          const req = d.origenId ? prev.documentos.find((x) => x.id === d.origenId && x.tipo === "requerimiento") : undefined;
+          const conv = req?.historial.filter((e) => e.accion === CONVERTIDO_EN).pop();
+          if (req && req.estado === "cerrado" && conv?.detalle === d.codigo) {
+            const pendiente = { ...req, estado: "aprobado", actualizado: ahora(), historial: [...req.historial, evento(prev, COTIZACION_ELIMINADA, d.codigo)] } as Documento;
+            return {
+              ...prev,
+              documentos: documentos.map((x) => (x.id === req.id ? pendiente : x)),
+              notificaciones: notificar(prev, req.autorId, `${req.codigo} volvió a quedar pendiente de cotizar`, req.id),
+              auditoria: registrar({ ...prev, auditoria: registrar(prev, "Eliminó", d.codigo) }, COTIZACION_ELIMINADA, `${req.codigo} · ${d.codigo}`),
+            };
+          }
+          return { ...prev, documentos, auditoria: registrar(prev, "Eliminó", d.codigo) };
         });
       },
 

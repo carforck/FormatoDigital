@@ -15,7 +15,8 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Cctv, CheckCircle2, Eye, FilePlus2, FolderKanban, MessageSquare, Printer, Save, SendHorizonal } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, Cctv, CheckCircle2, ClipboardList, Eye, FilePlus2, FolderKanban, MessageSquare, Printer, Save, SendHorizonal } from "lucide-react";
 
 import { ChatAsistente, type ValorPaso } from "@/components/chat/ChatAsistente";
 import { FirmaPad } from "@/components/docs/FirmaPad";
@@ -23,7 +24,8 @@ import { ChipVariante, ConVariante } from "@/components/docs/VarianteFormato";
 import { Button } from "@/components/ui/button";
 import { Volver, salirAlDetalle, useOrigen } from "@/components/ui/volver";
 import type { Paso } from "@/components/chat/ChatAsistente";
-import { etiquetaServicio, type ServicioCatalogo } from "@/modulos/cotizaciones/catalogo";
+import { CATALOGO_SERVICIOS, etiquetaServicio, type ServicioCatalogo } from "@/modulos/cotizaciones/catalogo";
+import { cotizacionDesdeRequerimiento } from "@/modulos/requerimientos/conversion";
 import { equiposAtendidos, puedeEditarEquipos } from "@/modulos/equipos/logica";
 import { SelectorEquipos } from "@/modulos/equipos/SelectorEquipos";
 import type { EquipoMinimo } from "@/modulos/equipos/tipos";
@@ -52,6 +54,11 @@ interface Props {
   clienteInicial?: string;
   /** Equipo preseleccionado (`?equipo=`, desde su ficha): queda marcado como atendido. */
   equipoInicial?: string;
+  /**
+   * Requerimiento que se convierte en esta cotización (`?requerimiento=`, ya validado por
+   * PaginaGenerador): precarga cliente, proyecto e ítems y la enlaza con `origenId`.
+   */
+  desde?: Documento;
 }
 
 const SIN_PROYECTO = "Sin proyecto";
@@ -63,7 +70,7 @@ const etiquetaProyecto = (p: Proyecto) => `${p.codigo} · ${p.nombre}`;
  * en src/modulos/<clave>/. El generador intercala dos pasos comunes: el
  * proyecto (justo después del cliente) y, si el formato los registra, los equipos.
  */
-export function Generador({ tipo, existente, proyectoInicial, clienteInicial, equipoInicial, onEmpezarNuevo }: Props) {
+export function Generador({ tipo, existente, proyectoInicial, clienteInicial, equipoInicial, desde, onEmpezarNuevo }: Props) {
   const demo = useDemo();
   const router = useRouter();
   const usuario = demo.usuario!;
@@ -77,7 +84,8 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     : origenLista;
   // Lo que se va diligenciando en un documento nuevo se guarda en el navegador:
   // si se recarga o se cambia de perfil a mitad, se recupera al volver.
-  const claveCache = `fd-generador-${tipo}-${usuario.id}`;
+  // La conversión de un requerimiento tiene su propia copia (no se mezcla con otra cotización a medias)
+  const claveCache = `fd-generador-${tipo}-${usuario.id}${desde ? `-${desde.id}` : ""}`;
   const recuperado = useRef(false);
   // Los módulos están tipados por formato; el generador los trata de forma uniforme.
   const mod = modulo as unknown as {
@@ -104,6 +112,18 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     return eq ? ({ ...d, equiposIds: Array.from(new Set([...(d.equiposIds ?? []), eq.id])) } as Documento) : d;
   };
 
+  // Contenido de la cotización a partir del requerimiento (precios de referencia del catálogo si coinciden)
+  const [conversion] = useState(() =>
+    desde?.tipo === "requerimiento"
+      ? cotizacionDesdeRequerimiento(desde.datos, {
+          hoy: hoy(),
+          vendedor: usuario.nombre,
+          cliente: demo.clientes.find((c) => c.id === desde.clienteId),
+          proyecto: demo.proyectos.find((p) => p.id === desde.proyectoId),
+          catalogo: [...CATALOGO_SERVICIOS, ...(demo.config.serviciosPropios ?? [])],
+        })
+      : null,
+  );
   const [doc, setDoc] = useState<Documento>(() => {
     if (existente) {
       // De vuelta de «Imprimir / PDF»: se recupera lo que no se había guardado
@@ -131,6 +151,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     }
     const n = demo.nuevoId(tipo);
     const base = { ...n, estado: "borrador" as const, autorId: usuario.id, clienteId: "", creado: hoy(), actualizado: hoy(), historial: [] };
+    if (desde?.tipo === "requerimiento") return { ...base, tipo, clienteId: desde.clienteId, proyectoId: desde.proyectoId, origenId: desde.id, datos: conversion!.datos } as Documento;
     return preseleccion({ ...base, tipo, datos: mod.vacio(hoy(), usuario) } as Documento);
   });
   const [resaltar, setResaltar] = useState<string | undefined>();
@@ -534,6 +555,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   const Plantilla = info.Plantilla;
   const clienteSel = demo.clientes.find((c) => c.id === doc.clienteId);
   const sel = "h-10 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800";
+  const nombreAutor = (id: string) => demo.usuarios.find((x) => x.id === id)?.nombre ?? "el equipo";
   const acciones = enRevision ? (
     <div className="grid grid-cols-1 gap-2">
       <Button disabled={guardando} onClick={() => guardar(false)}>
@@ -582,6 +604,15 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
         </div>
       </div>
 
+      {desde && (
+        <Link href={rutaDoc(desde.id)} className="print:hidden flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 hover:bg-sky-100">
+          <ClipboardList className="h-4 w-4 shrink-0" aria-hidden />
+          <span className="min-w-0 flex-1">
+            Desde el requerimiento <strong className="font-mono">{desde.codigo}</strong> de {nombreAutor(desde.autorId)}: al guardar la cotización, el requerimiento queda atendido y enlazado a ella.
+          </span>
+        </Link>
+      )}
+
       {recuperado.current && !existente && (
         <div role="status" className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 print:hidden">
           <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -626,9 +657,11 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
             onFirmar={(id) => setFirmando(id)}
             firmado={(id) => Boolean((doc.datos as unknown as Record<string, string>)[id])}
             ejecutoresIniciales={doc.tipo === "permiso" ? doc.datos.ejecutores : []}
-            retomando={Boolean(existente) || recuperado.current}
+            retomando={Boolean(existente) || recuperado.current || Boolean(conversion)}
             bienvenida={
-              existente
+              conversion && desde && !recuperado.current
+                ? `Convierto el requerimiento ${desde.codigo} en cotización: cargué el cliente${desde.proyectoId ? ", el proyecto" : ""} y ${conversion.datos.items.length} ítem(s)${conversion.conPrecio ? `, ${conversion.conPrecio} con el precio de referencia del catálogo` : ""}.${conversion.sinPrecio ? `\n\nFalta el precio de ${conversion.sinPrecio} ítem(s): ponlo en la tabla del formato o con «Volver a una pregunta» → ítems.` : ""}\n\nRevisa vencimiento y condiciones; al guardar, el requerimiento queda atendido y enlazado.`
+                : existente
                 ? `Retomamos ${doc.codigo}. Edita lo que necesites directamente en el formato.${enRevision ? "\n\nEstá en revisión: al guardar los cambios sigue en revisión con lo corregido." : ""}${doc.motivoRechazo ? `\n\nMotivo del rechazo: ${doc.motivoRechazo}` : ""}`
                 : recuperado.current
                   ? `Recuperé lo que estabas diligenciando en ${f.el} ${f.corto.toLowerCase()}. Revisa el formato y continúa donde quedaste.`

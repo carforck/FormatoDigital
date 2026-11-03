@@ -2,13 +2,13 @@
  * Ícono por tipo de documento. Usado en tablero, documentos, revisión y
  * proyectos (`src/app/app/**`). Tipos desconocidos caen en `FileText`.
  */
-import { FileSignature, FileText, HardHat, ShieldCheck, Wallet } from "lucide-react";
+import { ClipboardList, FileSignature, FileText, HardHat, ShieldCheck, Wallet } from "lucide-react";
 
 import type { TipoDoc } from "@/nucleo/tipos";
 
-const ICONOS: Record<TipoDoc, typeof FileText> = { reporte: FileText, permiso: HardHat, gasto: Wallet, cotizacion: FileSignature, epp: ShieldCheck };
+const ICONOS: Record<TipoDoc, typeof FileText> = { reporte: FileText, permiso: HardHat, gasto: Wallet, cotizacion: FileSignature, epp: ShieldCheck, requerimiento: ClipboardList };
 
-/** Ícono del tipo de documento (reporte, permiso, legalización de gastos, cotización, entrega de EPP). */
+/** Ícono del tipo de documento (reporte, permiso, legalización de gastos, cotización, entrega de EPP, requerimiento). */
 export function IconoDoc({ tipo, className = "h-4 w-4" }: { tipo: TipoDoc; className?: string }) {
   const I = ICONOS[tipo] ?? FileText;
   return <I className={className} aria-hidden />;

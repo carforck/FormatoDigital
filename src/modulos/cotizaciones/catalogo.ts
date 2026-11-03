@@ -149,7 +149,7 @@ export const etiquetaServicio = (s: ServicioCatalogo) =>
 
 /* ---------- Ítems en texto (paso «items» del asistente) ---------- */
 
-const quitarTildes = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+export const quitarTildes = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 /** «32,5» o «32.5» → 32.5; «1.200» (miles) → 1200; «$ 30.000» → 30000. */
 export function leerNumero(s: string, decimales: boolean): number {
@@ -167,7 +167,7 @@ export function leerNumero(s: string, decimales: boolean): number {
 }
 
 /** Unidad del catálogo que corresponde a lo escrito: sin tildes, singular o plural, o un prefijo de 3+ letras. */
-function unidadDe(token: string): string | undefined {
+export function unidadDe(token: string): string | undefined {
   const t = quitarTildes(token);
   if (!t) return undefined;
   return UNIDADES.find((u) => {

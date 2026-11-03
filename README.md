@@ -99,7 +99,7 @@ aplica los permisos, revalida el estado más reciente y guarda.
          │                              │  Supabase Auth → miembros/perfiles → espacios
          ▼                              ▼
   localStorage                   public.espacios (un JSON por organización)
-  "sotec-demo-v9"                + respaldo local "fd-empresa-respaldo"
+  "sotec-demo-v10"                + respaldo local "fd-empresa-respaldo"
          └──────────────┬───────────────┘
                         ▼
           DemoProvider (useDemo)  →  pantallas de /app, generador, PDF
@@ -109,7 +109,7 @@ aplica los permisos, revalida el estado más reciente y guarda.
 |---|---|---|
 | Entrada | `/acceso` → tarjeta de un rol, sin contraseña («Ver como» cambia de rol en vivo) | `/acceso` → usuario o correo y contraseña de Supabase Auth (`admin` = `admin@sotecse.com`) |
 | Datos | Ficticios (`src/nucleo/datos/seed.ts`, `src/modulos/equipos/seed.ts`) | Los reales de la organización; parte vacío |
-| Dónde viven | `localStorage` (`sotec-demo-v9`); se restablecen en Configuración | `public.espacios.estado` (jsonb) en Supabase |
+| Dónde viven | `localStorage` (`sotec-demo-v10`); se restablecen en Configuración | `public.espacios.estado` (jsonb) en Supabase |
 | Varias pestañas / equipos | Se sincronizan con el evento `storage` | Guardado agrupado (700 ms) con **versión optimista**; cada 15 s y al volver a la pestaña se buscan cambios de otros equipos |
 | Conflictos | — | Si otro guardó antes, la actualización no encuentra la versión y se recarga lo más reciente con un aviso |
 | Sin conexión | Funciona igual (todo es local) | Abre con la sesión y la última copia guardadas en el equipo; los cambios quedan pendientes y se sincronizan al volver la red (ver [PWA](#app-instalable-y-sin-conexión-pwa)) |

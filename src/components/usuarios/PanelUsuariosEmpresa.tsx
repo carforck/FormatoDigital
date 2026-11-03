@@ -11,6 +11,7 @@ import { KeyRound, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/corporativo";
 import { Input } from "@/components/ui/input";
+import { Paginacion, usePaginacion } from "@/components/ui/Paginacion";
 import { ETIQUETA_ROL } from "@/nucleo/catalogos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { actualizarUsuario, crearUsuario, eliminarUsuario, listarUsuarios } from "@/nucleo/datos/usuarios-api";
@@ -34,6 +35,7 @@ export function PanelUsuariosEmpresa() {
   const [nuevo, setNuevo] = useState(VACIO);
   const [editando, setEditando] = useState<UsuarioEmpresa | null>(null);
   const [claveDe, setClaveDe] = useState<{ id: string; clave: string } | null>(null);
+  const pag = usePaginacion(usuarios ?? [], 20);
 
   const cargar = useCallback(async () => {
     try {
@@ -154,7 +156,7 @@ export function PanelUsuariosEmpresa() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {usuarios.map((u) => {
+              {pag.visibles.map((u) => {
                 const propio = u.id === yo;
                 return (
                   <tr key={u.id} className={u.activo ? "" : "opacity-60"}>
@@ -203,6 +205,7 @@ export function PanelUsuariosEmpresa() {
             </tbody>
           </table>
         )}
+        <Paginacion p={pag} nombre="usuarios" className="px-4 pb-3" />
       </div>
 
       {editando && (

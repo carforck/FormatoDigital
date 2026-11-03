@@ -1,6 +1,5 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
 /**
  * Hoja del reporte en el formato de FORTOX (variante «fortox», @/nucleo/variantes):
  * «Reporte de mantenimiento de seguridad electrónica», FORMA 7PA/F1-15, réplica del PDF
@@ -12,10 +11,9 @@
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
-import { asset } from "@/nucleo/rutas";
 import type { DatosReporte } from "@/nucleo/tipos";
 
-import { Firma } from "@/components/docs/Encabezado";
+import { Firma, LogoFormato } from "@/components/docs/Encabezado";
 import { Renglones } from "@/components/docs/Renglones";
 import { EquiposEnFormato } from "@/modulos/equipos/EquiposEnFormato";
 import type { EquipoAtendido } from "@/modulos/equipos/tipos";
@@ -49,7 +47,8 @@ export function EncabezadoFortox({ codigoDoc, titulo = "REPORTE DE MANTENIMIENTO
       <h2 className="text-center text-[13px] font-bold">{titulo}</h2>
       <div className="mt-2 flex items-end justify-between gap-3">
         <div>
-          <img src={asset("/variantes/fortox-logo.png")} alt="FORTOX" className="h-9 w-auto object-contain sm:h-11 print:h-11" />
+          {/* En la demo, la marca de la app en vez del logo de Fortox (LogoFormato) */}
+          <LogoFormato className="h-9 w-auto object-contain sm:h-11 print:h-11" anchoDemo="max-w-[170px]" alt="FORTOX" />
           <div className="mt-1 text-[9.5px] font-bold">Nit. {FORTOX.nit}</div>
         </div>
         <div className="text-right font-bold">

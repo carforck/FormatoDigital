@@ -10,9 +10,10 @@
  * Nombre pegado con su NIT u otros datos («* Razón social: FARO ANDINO S.A.S. * NIT: 900123456»):
  * al pegar o salir del campo se separa (`separarCliente`) y se avisa; los clientes que ya
  * quedaron así se listan en «Nombres por revisar» para corregirlos (se guarda solo con «Guardar»).
+ * Con más de 8 clientes aparece la búsqueda; la lista pagina de a 20 (?pag=).
  */
 import { useState } from "react";
-import { Plus, Power, Trash2, Wand2 } from "lucide-react";
+import { Plus, Power, Search, Trash2, Wand2 } from "lucide-react";
 
 import { Avatar, PageHeader } from "@/components/ui/corporativo";
 
@@ -23,6 +24,7 @@ import { separarCliente } from "@/nucleo/clientes";
 import type { Cliente } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 import { VARIANTES, VARIANTE_BASE, varianteDe } from "@/nucleo/variantes";
+import { Paginacion, usePaginacion } from "@/components/ui/Paginacion";
 
 /** Cliente en blanco para el formulario de alta (el id se genera al abrir). */
 const VACIO: Cliente = { id: "", nombre: "", nit: "", direccion: "", contacto: "", cargo: "", correo: "", telefono: "", sitio: "" };
@@ -79,6 +81,11 @@ export default function Clientes() {
   };
   // Clientes guardados con el nombre pegado con su NIT (datos reales): se ofrecen para corregir
   const porRevisar = demo.clientes.filter((c) => separarCliente(c.nombre).cambio);
+  // Búsqueda y páginas de a 20: el directorio crece con cada cliente que escriben los técnicos
+  const [q, setQ] = useState("");
+  const t = q.trim().toLowerCase();
+  const lista = t ? demo.clientes.filter((c) => `${c.nombre} ${c.nit} ${c.contacto} ${c.correo} ${c.telefono} ${c.direccion}`.toLowerCase().includes(t)) : demo.clientes;
+  const pag = usePaginacion(lista, 20, t, "pag");
 
   return (
     <div className="space-y-4">
@@ -205,8 +212,16 @@ export default function Clientes() {
         </form>
       )}
 
+      {demo.clientes.length > 8 && (
+        <label className="relative block max-w-md">
+          <span className="sr-only">Buscar cliente</span>
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" aria-hidden />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nombre, NIT, contacto o teléfono…" className="w-full rounded-md border border-slate-200 bg-white py-2 pl-8 pr-2 text-sm" />
+        </label>
+      )}
+      {lista.length === 0 && <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">No hay clientes con esa búsqueda.</p>}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {demo.clientes.map((c) => {
+        {pag.visibles.map((c) => {
           const n = demo.documentos.filter((d) => d.clienteId === c.id).length;
           const np = demo.proyectos.filter((p) => p.clienteId === c.id).length;
           return (
@@ -246,6 +261,7 @@ export default function Clientes() {
           );
         })}
       </div>
+      <Paginacion p={pag} nombre="clientes" />
     </div>
   );
 }

@@ -4,12 +4,13 @@
  * Ruta /app/documentos: listado de los documentos visibles para el perfil
  * (demo.visibles, filtrados con puedeVerDoc de @/nucleo/permisos) con búsqueda y filtros
  * por formato, estado, cliente y proyecto. Query params: ?q= (búsqueda inicial) y
- * ?proyecto=<id> o ?proyecto=ninguno (sin proyecto). Todos los perfiles.
+ * ?proyecto=<id> o ?proyecto=ninguno (sin proyecto), y ?pag= (página, `usePaginacion`).
+ * Paginado de a 25, ordenable por fecha. Todos los perfiles.
  */
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Search } from "lucide-react";
+import { ArrowDown, ArrowUp, Search } from "lucide-react";
 
 import { EstadoBadge, fechaCorta } from "@/components/ui/badges";
 import { PageHeader } from "@/components/ui/corporativo";
@@ -22,6 +23,7 @@ import { avance } from "@/nucleo/validar";
 import { TIPOS_DOC, clienteDoc, formatoDe, rutaNuevo, tituloDoc } from "@/modulos/registro";
 import { puedeCrearTipo } from "@/nucleo/permisos";
 import { IconoDoc } from "@/components/ui/icono-doc";
+import { Paginacion, usePaginacion } from "@/components/ui/Paginacion";
 
 /** Suspense requerido por useSearchParams. */
 export default function Page() {
@@ -51,6 +53,8 @@ function Documentos() {
   const [tipo, setTipo] = useState<TipoDoc | "">("");
   const [estado, setEstado] = useState<Estado | "">("");
   const [cliente, setCliente] = useState("");
+  // Más recientes primero; con un toque en «Fecha», los más antiguos
+  const [antiguos, setAntiguos] = useState(false);
 
   const lista = demo.visibles
     .filter((d) => !tipo || d.tipo === tipo)
@@ -62,7 +66,8 @@ function Documentos() {
       const t = `${d.codigo} ${clienteDoc(d)} ${tituloDoc(d)} ${JSON.stringify(d.datos)}`.toLowerCase();
       return t.includes(q.toLowerCase());
     })
-    .sort((a, b) => b.creado.localeCompare(a.creado));
+    .sort((a, b) => (antiguos ? a.creado.localeCompare(b.creado) : b.creado.localeCompare(a.creado)));
+  const pag = usePaginacion(lista, 25, [q, tipo, estado, cliente, proyecto, antiguos].join("|"), "pag");
 
   const proyectos = demo.proyectosVisibles.filter((p) => !cliente || p.clienteId === cliente);
   const codigoProyecto = (id?: string) => demo.proyectos.find((p) => p.id === id)?.codigo;
@@ -135,13 +140,17 @@ function Documentos() {
               <th className="px-4 py-2">Documento</th>
               <th className="px-4 py-2">Cliente</th>
               <th className="px-4 py-2">Autor</th>
-              <th className="px-4 py-2">Fecha</th>
+              <th className="px-4 py-2" aria-sort={antiguos ? "ascending" : "descending"}>
+                <button type="button" onClick={() => setAntiguos((x) => !x)} className="inline-flex items-center gap-1 uppercase tracking-wide hover:text-slate-800" title="Ordenar por fecha">
+                  Fecha {antiguos ? <ArrowUp className="h-3 w-3" aria-hidden /> : <ArrowDown className="h-3 w-3" aria-hidden />}
+                </button>
+              </th>
               <th className="px-4 py-2">Avance</th>
               <th className="px-4 py-2">Estado</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {lista.map((d) => {
+            {pag.visibles.map((d) => {
               const pct = avance(d);
               return (
                 <tr key={d.id} className="block hover:bg-slate-50 md:table-row">
@@ -191,6 +200,7 @@ function Documentos() {
           </div>
         )}
       </div>
+      <Paginacion p={pag} nombre="documentos" />
       <p className="text-xs text-slate-500">
         {lista.length} de {demo.visibles.length} documentos visibles para tu perfil · {codigos}
       </p>

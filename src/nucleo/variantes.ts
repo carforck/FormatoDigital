@@ -8,10 +8,10 @@
  * tipos de documento que declare en `formatos`; los datos del documento no cambian.
  *
  * Cómo se elige (ver `resolverVariante`):
- *   1. El proyecto: su «Tipo de proyecto» (Configuración · tipos de proyecto) apunta a una variante.
- *   2. Sin proyecto: el tipo de servicio que elige quien diligencia («Sin proyecto · Servicios
- *      Fortox»: el técnico no crea proyectos), guardado en el documento.
- *   3. Si no eligió (o proyecto antiguo sin tipo): el «Formato por defecto» del cliente.
+ *   1. Lo que elige quien diligencia: el asistente pregunta «¿Con qué formato sale el reporte?»
+ *      (y el formulario tiene su selector «Formato»); se guarda en el documento.
+ *   2. Si no eligió: el «Tipo de proyecto» del proyecto (Configuración · tipos de proyecto).
+ *   3. Si no (o proyecto antiguo sin tipo): el «Formato por defecto» del cliente.
  *   4. Si no, el nombre del cliente: «Sevin Ltda.» → Sevin, «Oficina Fortox» → Fortox (`clientes`).
  *   5. Si no: SOTEC.
  * El documento guarda la variante con la que se creó (`Documento.variante`): cambiar
@@ -186,36 +186,29 @@ export function varianteDeTipoProyecto(config: Pick<Config, "tiposProyecto">, ti
 }
 
 /**
- * Variante con la que sale un documento nuevo o en borrador: la del tipo del proyecto;
- * sin proyecto, la elegida en el documento («Sin proyecto · Servicios Fortox»); si no, la
- * del cliente; si no, SOTEC. Siempre se
- * devuelve una que cubra el tipo de documento (FORTOX no cambia, p. ej., los gastos).
+ * Variante con la que sale un documento nuevo o en borrador: la elegida en el documento;
+ * si no, la del tipo del proyecto; si no, la del cliente (formato por defecto o su nombre);
+ * si no, SOTEC. Siempre se devuelve una que cubra el tipo de documento (FORTOX no cambia,
+ * p. ej., los gastos). Sin `elegida`, es la variante sugerida.
  */
 export function resolverVariante(a: {
   tipo: TipoDoc;
   proyecto?: Pick<Proyecto, "tipo"> | null;
   cliente?: (Pick<Cliente, "variante"> & Partial<Pick<Cliente, "nombre">>) | null;
   config: Pick<Config, "tiposProyecto">;
-  /** Variante elegida en el documento cuando no tiene proyecto. */
+  /** Variante elegida en el documento (asistente o selector «Formato»). */
   elegida?: string;
 }): string {
   const delProyecto = varianteDeTipoProyecto(a.config, a.proyecto?.tipo);
-  const clave = delProyecto ?? (a.proyecto ? undefined : a.elegida) ?? a.cliente?.variante ?? varianteDeNombreCliente(a.cliente?.nombre) ?? VARIANTE_BASE;
+  const clave = a.elegida || (delProyecto ?? a.cliente?.variante ?? varianteDeNombreCliente(a.cliente?.nombre) ?? VARIANTE_BASE);
   return varianteParaTipo(a.tipo, clave).clave;
 }
 
 /**
- * Opciones «Sin proyecto · <tipo de proyecto>» para un tipo de documento: una por variante que
- * lo cubra (la primera vez que aparece cada una). Con una sola (solo SOTEC), no hace falta elegir.
+ * Formatos que se pueden elegir para un tipo de documento: las variantes que lo cubren, en el
+ * orden de `VARIANTES`. Con una sola (solo SOTEC), no hace falta preguntar.
  */
-export function sinProyectoPorTipo(tipo: TipoDoc, config: Pick<Config, "tiposProyecto">): { etiqueta: string; variante: string }[] {
-  const vistas = new Set<string>();
-  const r: { etiqueta: string; variante: string }[] = [];
-  for (const t of tiposProyectoDe(config)) {
-    const v = varianteParaTipo(tipo, t.variante).clave;
-    if (vistas.has(v)) continue;
-    vistas.add(v);
-    r.push({ etiqueta: `Sin proyecto · ${t.nombre}`, variante: v });
-  }
+export function formatosPara(tipo: TipoDoc): VarianteFormato[] {
+  const r = VARIANTES.filter((v) => cubre(v, tipo));
   return r.length > 1 ? r : [];
 }

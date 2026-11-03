@@ -15,6 +15,7 @@ import { EstadoBadge, fechaCorta } from "@/components/ui/badges";
 import { Volver, marcarEdicion, regresarSiViene, useOrigen } from "@/components/ui/volver";
 import { cn } from "@/lib/utils";
 import { SelectConOtro } from "@/components/ui/SelectConOtro";
+import { ListaPaginada } from "@/components/ui/Paginacion";
 import { CLAVES_SISTEMA, ESTADOS_EQUIPO, ETIQUETA_ESTADO_EQUIPO, sistemaDe } from "@/modulos/equipos/catalogo";
 import { equiposIdsDe, fechaDoc, historialEquipo, puedeEditarEquipos, puedeEliminarEquipos, puedeVerEquipo } from "@/modulos/equipos/logica";
 import { EstadoEquipoBadge, IconoEquipo, IconoSistema } from "@/modulos/equipos/piezas";
@@ -389,8 +390,10 @@ function Ficha() {
               : "Sin reportes todavía. Cuando un técnico lo marque como atendido en un reporte técnico, aparecerá aquí."}
           </p>
         ) : (
+          <ListaPaginada items={historial} nombre="reportes" className="mt-4 pl-4">
+            {(pagina) => (
           <ol className="mt-4 space-y-4 border-l border-slate-200 pl-4">
-            {historial.map((d) => (
+            {pagina.map((d) => (
               <li key={d.id} className="relative">
                 <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-sotec-green ring-2 ring-white" aria-hidden />
                 <Link href={rutaDoc(d.id, `&desde=equipo:${eq.id}`)} className="block rounded-lg p-2 -m-2 hover:bg-slate-50">
@@ -407,6 +410,8 @@ function Ficha() {
               </li>
             ))}
           </ol>
+            )}
+          </ListaPaginada>
         )}
       </section>
 

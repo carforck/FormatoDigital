@@ -5,6 +5,7 @@
  * cotizado, gastos, cobrado), accesos para crear documentos o cuentas ya ligados al
  * proyecto y pestañas por tipo. Visible según puedeVerProyecto; editar, pausar, cerrar y
  * eliminar requieren `proyectos`. Todo se calcula con lo visible para el perfil (resumenProyecto).
+ * Las listas de cada pestaña paginan de a 20 (`ListaPaginada`).
  */
 import Link from "next/link";
 import { Suspense, useState } from "react";
@@ -16,6 +17,7 @@ import { Volver, marcarEdicion } from "@/components/ui/volver";
 import { EstadoBadge, EstadoProyectoBadge, fechaCorta } from "@/components/ui/badges";
 import { EstadoCuentaBadge } from "@/components/ui/estado-cuenta";
 import { IconoDoc } from "@/components/ui/icono-doc";
+import { ListaPaginada } from "@/components/ui/Paginacion";
 import { cn } from "@/lib/utils";
 import { totales } from "@/modulos/cobros/tipos";
 import { TIPOS_DOC, cantidadDoc, formatoDe, rutaNuevo, tituloDoc, valorDoc } from "@/modulos/registro";
@@ -266,8 +268,10 @@ function Detalle() {
                 )}
               </div>
             ) : (
+              <ListaPaginada items={r.cuentas} nombre="cuentas de cobro" className="border-t border-slate-100 px-4 py-3">
+                {(cuentas) => (
               <ul className="divide-y divide-slate-100">
-                {r.cuentas.map((c) => (
+                {cuentas.map((c) => (
                   <li key={c.id}>
                     <Link href={`${rutaCuenta(c.id)}&desde=proyecto:${p.id}`} className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-slate-50">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
@@ -286,6 +290,8 @@ function Detalle() {
                   </li>
                 ))}
               </ul>
+                )}
+              </ListaPaginada>
             )
           ) : lista.length === 0 ? (
             <div className="px-4 py-6 text-sm text-slate-500">
@@ -297,8 +303,10 @@ function Detalle() {
               )}
             </div>
           ) : (
+            <ListaPaginada items={lista} reinicio={pestana} nombre="documentos" className="border-t border-slate-100 px-4 py-3">
+              {(pagina) => (
             <ul className="divide-y divide-slate-100">
-              {lista.map((d) => {
+              {pagina.map((d) => {
                 const v = valorDoc(d);
                 return (
                   <li key={d.id}>
@@ -321,6 +329,8 @@ function Detalle() {
                 );
               })}
             </ul>
+              )}
+            </ListaPaginada>
           )}
         </div>
       </section>

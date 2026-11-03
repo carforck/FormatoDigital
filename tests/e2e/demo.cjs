@@ -17,7 +17,7 @@ const path = require("path");
 const puppeteer = require("puppeteer-core");
 
 const BASE = (process.env.BASE || "http://localhost:3100").replace(/\/$/, "");
-const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion" | "campo" | "variantes" | "listas" | "epp"
+const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion" | "campo" | "variantes" | "listas" | "epp" | "paginacion" | "logos"
 const CLAVE = "sotec-demo-v9";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -99,6 +99,7 @@ async function flujo(b, errores) {
   await sleep(800);
   await clic(p, "Ladrillera Arcillas del Caribe");
   await clic(p, "PRY-001-26");
+  await formatoSugerido(p);
   await clic(p, "Correctivo");
   await clic(p, String(new Date().getFullYear()));
   await clic(p, "08:00");
@@ -124,7 +125,7 @@ async function flujo(b, errores) {
   await p.goto(`${BASE}/app/nuevo/permiso`, { waitUntil: "networkidle0" });
   await sleep(600);
   await clic(p, "Constructora Horizonte Azul");
-  await clic(p, "Sin proyecto");
+  await sinProyecto(p);
   await clic(p, "Hotel Brisas del Mar");
   await clic(p, "07:30");
   await clic(p, "Trabajo en alturas");
@@ -315,7 +316,7 @@ async function magno(b, errores) {
   await p.waitForFunction(() => location.pathname.includes("/app/nuevo/reporte"));
   await sleep(800);
   await clic(p, "Ladrillera Arcillas del Caribe");
-  await clic(p, "Sin proyecto");
+  await sinProyecto(p);
   await clic(p, "Preventivo");
   await clic(p, String(new Date().getFullYear()));
   await clic(p, "08:00");
@@ -384,7 +385,7 @@ async function magno(b, errores) {
   await p.goto(`${BASE}/app/nuevo/gasto`, { waitUntil: "networkidle0" });
   await sleep(800);
   await clic(p, "Ladrillera Arcillas del Caribe");
-  await clic(p, "Sin proyecto");
+  await sinProyecto(p);
   await clic(p, "Ladrillera Arcillas del Caribe · Área de hornos");
   await clic(p, String(new Date().getFullYear()));
   await clic(p, "Omitir");
@@ -478,6 +479,7 @@ async function proyectos(b, errores) {
   ok(prellenado.sel[0] === "c-clay" && prellenado.hoja.includes("PRY-006-26") && prellenado.hoja.includes("sistemas@arcillasdelcaribe.example") && prellenado.hoja.includes("Zona Industrial"), "con ?proyecto= el formato trae cliente, contacto, correo, dirección y proyecto");
   await clic(p, "Ladrillera Arcillas del Caribe");
   await clic(p, "PRY-006-26");
+  await formatoSugerido(p);
   await clic(p, "Correctivo");
   await clic(p, String(new Date().getFullYear()));
   await clic(p, "08:00");
@@ -540,6 +542,7 @@ async function proyectos(b, errores) {
   await sleep(900);
   await clic(p, "Ladrillera Arcillas del Caribe");
   await clic(p, "PRY-001-26");
+  await formatoSugerido(p);
   await clic(p, "Instalación de cámaras IP");
   await clic(p, "Instalación de cámara IP");
   await clic(p, "Continuar con 1");
@@ -735,6 +738,7 @@ async function equipos(b, errores) {
   await sleep(900);
   await clic(p, "Ladrillera Arcillas del Caribe");
   await clic(p, "PRY-001-26");
+  await formatoSugerido(p);
   await clic(p, "Preventivo");
   await clic(p, String(new Date().getFullYear()));
   await clic(p, "08:00");
@@ -1130,6 +1134,95 @@ async function navegacion(b, errores) {
 }
 
 /** Responde el paso actual del asistente: la sugerencia con ese texto o, si no hay, lo escribe. */
+/** Si el asistente pregunta el formato (reporte: SOTEC, Fortox, Sevin), deja el sugerido (va primero). */
+async function formatoSugerido(p) {
+  await sleep(250);
+  // Las opciones del paso son botones del chat (fuera de la hoja); el selector del formulario no lo es
+  const hecho = await p.evaluate(() => {
+    const b = [...document.querySelectorAll("main button")].find((x) => !x.closest(".doc-print") && x.textContent.trim().startsWith("Servicios "));
+    b?.click();
+    return Boolean(b);
+  });
+  if (hecho) await sleep(350);
+}
+
+/**
+ * Logos en la demo: todo documento (vista previa, detalle, /imprimir, /firmar) lleva la marca
+ * de la app (ControlOne), nunca el logo de SOTEC ni el de Fortox o Sevin, también en un
+ * reporte con variante de formato FORTOX o SEVIN (se agregan copias en localStorage).
+ */
+async function logos(b, errores) {
+  console.log("\n— Logos de la app en los documentos de la demo");
+  const p = await nuevaPagina(b, errores);
+  await p.evaluateOnNewDocument(() => {
+    window.print = () => {};
+  });
+  await p.setViewport({ width: 1440, height: 900 });
+  await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "networkidle0" });
+  await clic(p, "Administrador");
+  await p.waitForFunction(() => location.pathname.startsWith("/app"));
+  await sleep(600);
+  /** Logos dentro de las hojas: la marca de la app y ninguno de empresa. */
+  const revisar = () =>
+    p.evaluate(() => {
+      const srcs = [...document.querySelectorAll(".doc-print img")].map((i) => i.getAttribute("src") || "");
+      return { hojas: document.querySelectorAll(".doc-print").length, app: srcs.some((x) => x.includes("controlone-logo")), empresa: srcs.filter((x) => /sotec-logo|fortox-logo|sevin-logo/.test(x)) };
+    });
+  const esperar = () => p.waitForSelector("[data-impresion-lista]", { timeout: 20000 });
+  // Copias de un reporte con variante FORTOX y SEVIN
+  const ids = await p.evaluate((k) => {
+    const s = JSON.parse(localStorage.getItem(k));
+    const r = s.documentos.find((d) => d.tipo === "reporte");
+    for (const v of ["fortox", "sevin"]) s.documentos.push({ ...r, id: `d-logo-${v}`, variante: v });
+    localStorage.setItem(k, JSON.stringify(s));
+    const de = (t) => s.documentos.find((d) => d.tipo === t)?.id;
+    return { reporte: r.id, permiso: de("permiso"), gasto: de("gasto"), cotizacion: de("cotizacion"), epp: de("epp"), cuenta: s.cuentas[0]?.id };
+  }, CLAVE);
+  for (const [nombre, id] of Object.entries({ reporte: ids.reporte, "reporte FORTOX": "d-logo-fortox", "reporte SEVIN": "d-logo-sevin", permiso: ids.permiso, gasto: ids.gasto, cotización: ids.cotizacion, "entrega de EPP": ids.epp })) {
+    if (!id) {
+      console.log(`  (sin ${nombre} en la semilla: se revisa en el generador)`);
+      continue;
+    }
+    await p.goto(`${BASE}/imprimir?doc=${id}&volver=/app/documentos`, { waitUntil: "networkidle0" });
+    await esperar();
+    const r = await revisar();
+    ok(r.hojas > 0 && r.app && !r.empresa.length, `/imprimir ${nombre}: marca de la app y sin logos de empresa (${r.empresa.join(", ") || "ninguno"})`);
+  }
+  if (ids.cuenta) {
+    await p.goto(`${BASE}/imprimir?cuenta=${ids.cuenta}&volver=/app/cobros`, { waitUntil: "networkidle0" });
+    await esperar();
+    const r = await revisar();
+    ok(r.hojas > 0 && r.app && !r.empresa.length, `/imprimir cuenta de cobro: marca de la app y sin logos de empresa (${r.empresa.join(", ") || "ninguno"})`);
+  }
+  // Detalle y vista previa del generador (también EPP, aunque no haya en la semilla)
+  for (const v of ["fortox", "sevin"]) {
+    await p.goto(`${BASE}/app/documentos/ver?id=d-logo-${v}`, { waitUntil: "networkidle0" });
+    await sleep(600);
+    const r = await revisar();
+    ok(r.hojas > 0 && r.app && !r.empresa.length, `detalle del reporte ${v.toUpperCase()}: marca de la app (${r.empresa.join(", ") || "sin logos de empresa"})`);
+  }
+  for (const t of ["reporte", "permiso", "gasto", "cotizacion", "epp"]) {
+    await p.goto(`${BASE}/app/nuevo/${t}`, { waitUntil: "networkidle0" });
+    await sleep(700);
+    const r = await revisar();
+    ok(r.hojas > 0 && r.app && !r.empresa.length, `vista previa de ${t} en el generador: marca de la app (${r.empresa.join(", ") || "sin logos de empresa"})`);
+  }
+  // /firmar: el encabezado de la página de firma también va con la marca de la app
+  await p.goto(`${BASE}/firmar?t=enlace-inexistente`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  const firmar = await p.evaluate(() => [...document.querySelectorAll("header img")].map((i) => i.getAttribute("src") || ""));
+  ok(firmar.some((x) => x.includes("controlone-logo")) && !firmar.some((x) => x.includes("sotec-logo")), `/firmar: el encabezado lleva la marca de la app (${firmar.join(", ")})`);
+  await p.close();
+}
+
+/** «Sin proyecto» en el asistente y, si lo pregunta, el formato sugerido. */
+async function sinProyecto(p) {
+  await clic(p, "Sin proyecto");
+  await formatoSugerido(p);
+}
+
 async function responder(p, texto) {
   await sleep(60);
   const hecho = await p.evaluate((t) => {
@@ -1186,7 +1279,7 @@ async function campo(b, errores) {
   async function reporte({ cliente, contacto = "Ing. Daniel Ortega", firmaCliente = false, enviar = true, alFotos }) {
     await ir("/app/nuevo/reporte", 800);
     await responder(p, cliente);
-    await clic(p, "Sin proyecto");
+    await sinProyecto(p);
     await clic(p, "Correctivo");
     await clic(p, String(new Date().getFullYear()));
     await clic(p, "08:00");
@@ -1377,7 +1470,7 @@ async function campo(b, errores) {
   await responder(p, "  ferreteria  el TORNILLO ");
   hoja = await p.evaluate(() => document.querySelector(".doc-print").innerText);
   ok(hoja.includes("Ferretería El Tornillo") && hoja.includes("Marta Gómez"), "escribirlo con otras mayúsculas o sin tildes autollena el cliente del directorio");
-  await clic(p, "Sin proyecto");
+  await sinProyecto(p);
   await editarCampo(p, "correo", "compras@eltornillo.example");
   await clic(p, "Guardar borrador");
   await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
@@ -1389,7 +1482,7 @@ async function campo(b, errores) {
   // Lo que ya tiene el cliente no se sobrescribe desde un formato
   await ir("/app/nuevo/reporte", 800);
   await responder(p, "Ferretería El Tornillo");
-  await clic(p, "Sin proyecto");
+  await sinProyecto(p);
   await editarCampo(p, "correo", "otro@correo.example");
   await clic(p, "Guardar borrador");
   await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
@@ -1407,7 +1500,7 @@ async function campo(b, errores) {
   await ir("/app/nuevo/reporte", 900);
   await responder(p, "centro logistico bahia");
   ok((await texto()).includes("está desactivado en el directorio"), "escribir un cliente desactivado avisa que existe (no se crea otro)");
-  await clic(p, "Sin proyecto");
+  await sinProyecto(p);
   await clic(p, "Guardar borrador");
   await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
   await sleep(600);
@@ -1459,7 +1552,7 @@ async function campo(b, errores) {
   const preguntas = await p.evaluate(() => window.__preguntas ?? []);
   ok(preguntas.some((m) => m.includes("se parece a «Ferretería El Tornillo»")), "«Ferreteria el Tornillo S.A.S.» pregunta si es «Ferretería El Tornillo»");
   ok((await texto()).includes("queda escrito a mano"), "si no es el mismo, el asistente avisa que queda escrito a mano");
-  await clic(p, "Sin proyecto");
+  await sinProyecto(p);
   await clic(p, "Guardar borrador");
   await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
   await sleep(600);
@@ -1470,6 +1563,7 @@ async function campo(b, errores) {
   await ir("/app/nuevo/reporte", 800);
   await clic(p, "Ladrillera Arcillas del Caribe");
   await clic(p, "PRY-001-26");
+  await formatoSugerido(p);
   await editarCampo(p, "cliente", "Distribuidora La Ceiba");
   const hojaN = await p.evaluate(() => document.querySelector(".doc-print").innerText);
   ok(!hojaN.includes("sistemas@arcillasdelcaribe.example") && !hojaN.includes("Ing. Daniel Ortega") && !hojaN.includes("Zona Industrial") && !hojaN.includes("PRY-001-26"), "renombrar el cliente quita correo, contacto, dirección y proyecto del anterior");
@@ -1680,6 +1774,7 @@ async function comercial(b, errores) {
   await ir("/app/nuevo/cotizacion?proyecto=p-1", 900);
   await clic(p, "Ladrillera Arcillas del Caribe");
   await clic(p, "PRY-001-26");
+  await formatoSugerido(p);
   await clic(p, "Instalación de cámaras IP");
   await clic(p, "Instalación de cámara IP");
   await clic(p, "Continuar con 1");
@@ -1780,7 +1875,7 @@ async function variantes(b, errores) {
   const vista = () =>
     p.evaluate(() => {
       const h = document.querySelector(".doc-print .hdr");
-      return { logo: Boolean(document.querySelector(".doc-print[data-hoja=fortox] img[alt=FORTOX]")), fondo: h ? getComputedStyle(h).backgroundColor : "" };
+      return { logo: Boolean(document.querySelector(".doc-print[data-hoja=fortox]")), fondo: h ? getComputedStyle(h).backgroundColor : "" };
     });
   const elegirEnFormulario = (indice, texto) =>
     p.evaluate(
@@ -1825,15 +1920,21 @@ async function variantes(b, errores) {
   await sleep(300);
   ok((await chip()).startsWith("Formato: Servicios Fortox") && (await vista()).logo, "al elegir de nuevo el proyecto en «Proyecto u obra» vuelve el formato de FORTOX");
 
-  // 2b. Sin proyecto, el técnico elige el servicio (no puede crear proyectos): «Sin proyecto · Servicios Fortox»
-  await elegirEnFormulario(1, "Sin proyecto · Servicios Fortox");
+  // 2b. Selector «Formato» del formulario: lo elegido manda (el técnico no crea proyectos)
+  await elegirEnFormulario(1, "Sin proyecto");
   await sleep(300);
-  ok((await chip()).startsWith("Formato: Servicios Fortox") && (await vista()).logo, "«Sin proyecto · Servicios Fortox» sale en el formato de FORTOX sin crear proyecto");
-  await elegirEnFormulario(1, "Sin proyecto · Servicios SOTEC");
+  await p.select('select[aria-label="Formato del documento"]', "fortox");
   await sleep(300);
-  ok((await chip()) === "Formato: Servicios SOTEC" && !(await vista()).logo, "«Sin proyecto · Servicios SOTEC» vuelve al formato de SOTEC");
+  ok((await chip()).startsWith("Formato: Servicios Fortox") && (await vista()).logo, "sin proyecto, el selector «Formato» cambia a FORTOX");
+  await p.select('select[aria-label="Formato del documento"]', "sevin");
+  await sleep(300);
+  ok((await chip()).startsWith("Formato: Servicios Sevin") && !(await vista()).logo, "el selector «Formato» cambia a SEVIN");
+  await p.select('select[aria-label="Formato del documento"]', "sotec");
+  await sleep(300);
+  ok((await chip()) === "Formato: Servicios SOTEC", "el selector «Formato» vuelve a SOTEC");
   await elegirEnFormulario(1, "PRY-012-25");
   await sleep(300);
+  ok((await chip()).startsWith("Formato: Servicios Fortox"), "al elegir de nuevo el proyecto, manda su tipo (FORTOX)");
 
   // 3. Guardar: el detalle y el PDF salen en FORTOX y el documento guarda su variante
   await clic(p, "Guardar borrador");
@@ -1923,10 +2024,14 @@ async function variantes(b, errores) {
   await sleep(800);
   await clic(p, "Conjunto Residencial Los Robles");
   ok((await chip()).startsWith("Formato: Servicios Fortox") && (await vista()).logo, "al elegir el cliente con formato FORTOX (sin proyecto) sale el formato de FORTOX");
-  ok(await p.evaluate(() => ["Sin proyecto · Servicios SOTEC", "Sin proyecto · Servicios Fortox"].every((t) => [...document.querySelectorAll("button")].some((b) => b.textContent.trim() === t))), "el asistente ofrece «Sin proyecto · Servicios SOTEC / Fortox»");
-  await clic(p, "Sin proyecto · Servicios Fortox");
+  await clic(p, "Sin proyecto");
   await sleep(300);
-  ok((await chip()).startsWith("Formato: Servicios Fortox") && (await vista()).logo, "en el asistente, «Sin proyecto · Servicios Fortox» deja el formato de FORTOX");
+  const opcionesFormato = () => p.evaluate(() => [...document.querySelectorAll("main button")].filter((b) => !b.closest(".doc-print")).map((b) => b.textContent.trim()).filter((t) => t.startsWith("Servicios ")));
+  ok(JSON.stringify(await opcionesFormato()) === JSON.stringify(["Servicios Fortox", "Servicios SOTEC", "Servicios Sevin"]), `el asistente pregunta el formato con botones, el sugerido primero (${await opcionesFormato()})`);
+  ok((await p.evaluate(() => document.body.innerText)).includes("¿Con qué formato sale el reporte técnico?"), "el asistente pregunta «¿Con qué formato sale el reporte técnico?»");
+  await clic(p, "Servicios Fortox");
+  await sleep(300);
+  ok((await chip()).startsWith("Formato: Servicios Fortox") && (await vista()).logo, "en el asistente, «Servicios Fortox» deja el formato de FORTOX");
   // Proyecto antiguo sin tipo: manda el formato del cliente
   await elegirEnFormulario(1, "PRY-004-26");
   await sleep(300);
@@ -1941,7 +2046,9 @@ async function variantes(b, errores) {
   await responder(p, "Oficina Faro Andino Sur");
   await sleep(300);
   ok((await chip()) === "Formato: Servicios SOTEC", "cliente nuevo sin formato propio: arranca en SOTEC");
-  await clic(p, "Sin proyecto · Servicios Fortox");
+  await clic(p, "Sin proyecto");
+  await sleep(300);
+  await clic(p, "Servicios Fortox");
   await sleep(300);
   ok((await chip()).startsWith("Formato: Servicios Fortox") && (await vista()).logo, "el técnico cambia a FORTOX sin crear proyecto (cliente escrito en el chat)");
   await clic(p, "Guardar borrador");
@@ -1964,14 +2071,18 @@ async function variantes(b, errores) {
   await sleep(800);
   await responder(p, "Sevin Ltda.");
   await sleep(300);
-  const sevin = () => p.evaluate(() => Boolean(document.querySelector(".doc-print[data-hoja=sevin] img[alt=SEVIN]")));
+  const sevin = () => p.evaluate(() => Boolean(document.querySelector(".doc-print[data-hoja=sevin]")));
   h = await hoja();
   ok((await chip()).startsWith("Formato: Servicios Sevin") && (await sevin()), "al escribir el cliente «Sevin Ltda.» el reporte cambia al formato de SEVIN");
   ok(h.includes("INFORME DE SERVICIOS") && h.includes("Código: GSE-FO-03") && h.includes("Versión: 03") && h.includes("Actividades realizadas") && h.includes("Sugerencias o acciones correctivas"), "la hoja de SEVIN trae su encabezado y secciones (GSE-FO-03 v03)");
   await p.evaluate(() => [...document.querySelectorAll(".doc-print[data-hoja=sevin] button")].find((b) => b.textContent.trim() === "Mantenimiento preventivo").click());
   await sleep(200);
   ok(await p.evaluate(() => [...document.querySelectorAll(".doc-print[data-hoja=sevin] button[aria-pressed=true]")].map((b) => b.textContent.trim()).join() === "Mantenimiento preventivoX"), "la casilla «Mantenimiento preventivo» queda marcada con X");
-  ok(await p.evaluate(() => (document.body.innerText.match(/Sin proyecto · Servicios Sevin/g) || []).length > 0), "el asistente ofrece «Sin proyecto · Servicios Sevin»");
+  await clic(p, "Sin proyecto");
+  await sleep(300);
+  ok((await opcionesFormato())[0] === "Servicios Sevin", "con el cliente Sevin, el asistente sugiere primero «Servicios Sevin»");
+  await clic(p, "Servicios Sevin");
+  await sleep(300);
   await clic(p, "Guardar borrador");
   await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"));
   await sleep(600);
@@ -2047,7 +2158,7 @@ async function epp(b, errores) {
 
   // 2. Asistente completo
   await clic(p, "Sede SOTEC");
-  await clic(p, "Sin proyecto");
+  await sinProyecto(p);
   await clic(p, "Andrés Camacho Ruiz");
   await responder(p, "1000000009");
   await clic(p, "Ingeniero de campo");
@@ -2186,7 +2297,7 @@ async function listas(b, errores) {
   await borrarBorradores();
   await ir("/app/nuevo/gasto", 900);
   await responder(p, "Ladrillera Arcillas del Caribe");
-  if (await p.evaluate(() => [...document.querySelectorAll("main button")].some((x) => x.textContent.trim() === "Sin proyecto"))) await clic(p, "Sin proyecto");
+  if (await p.evaluate(() => [...document.querySelectorAll("main button")].some((x) => x.textContent.trim() === "Sin proyecto"))) await sinProyecto(p);
   await responder(p, "Administración");
   await clic(p, String(new Date().getFullYear()));
   await responder(p, "3001234567");
@@ -2344,6 +2455,119 @@ async function listas(b, errores) {
   await p.close();
 }
 
+/**
+ * Paginación y listas que escalan: con volumen ficticio inyectado en la demo (60 documentos
+ * en revisión, 30 por cerrar, 35 clientes y 40 eventos de auditoría, todos inventados), la
+ * revisión sale en filas en escritorio y en tarjetas en el celular, cada lista pagina,
+ * la página queda en la URL, filtrar vuelve a la página 1 y nada desborda a 390/320 px.
+ */
+async function paginacion(b, errores) {
+  console.log("\n— Paginación y listas grandes");
+  const p = await nuevaPagina(b, errores);
+  await p.setViewport({ width: 1440, height: 900 });
+  await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "networkidle0" });
+  await clic(p, "Administrador");
+  await p.waitForFunction(() => location.pathname.startsWith("/app"));
+  await sleep(600);
+
+  // Volumen ficticio (solo en esta prueba, nunca en la semilla)
+  await p.evaluate((k) => {
+    const s = JSON.parse(localStorage.getItem(k));
+    const rep = s.documentos.find((d) => d.tipo === "reporte");
+    const gas = s.documentos.find((d) => d.tipo === "gasto") ?? rep;
+    const fecha = (i) => new Date(Date.UTC(2026, 0, 1) + i * 3600e3).toISOString();
+    const nuevos = [];
+    for (let i = 0; i < 60; i++) nuevos.push({ ...rep, id: `pg-r${i}`, codigo: `PG-${String(i + 1).padStart(3, "0")}-26`, estado: "en_revision", creado: fecha(i), actualizado: fecha(i), datos: { ...rep.datos, asunto: `Revisión ficticia número ${i + 1}` } });
+    for (let i = 0; i < 30; i++) nuevos.push({ ...gas, id: `pg-g${i}`, codigo: `PGC-${String(i + 1).padStart(3, "0")}-26`, estado: "aprobado", creado: fecha(100 + i), actualizado: fecha(100 + i) });
+    s.documentos = [...s.documentos, ...nuevos];
+    const base = s.clientes[0];
+    for (let i = 0; i < 35; i++) s.clientes.push({ ...base, id: `pg-c${i}`, nombre: `Cliente Ficticio Paginado ${String(i + 1).padStart(2, "0")}`, nit: "", variante: undefined, activo: true });
+    for (let i = 0; i < 40; i++) s.auditoria.unshift({ id: `pg-a${i}`, fecha: fecha(200 + i), usuarioId: s.usuarioId, accion: "Prueba", detalle: `Evento ficticio ${i + 1}` });
+    localStorage.setItem(k, JSON.stringify(s));
+  }, CLAVE);
+
+  const texto = (id) => p.evaluate((i) => document.querySelector(`[data-paginacion="${i}"] p`)?.textContent.trim() ?? "", id);
+  const siguiente = (id) => p.evaluate((i) => document.querySelector(`[data-paginacion="${i}"] button[aria-label="Página siguiente"]`).click(), id);
+  const visible = (sel) => p.evaluate((x) => { const e = document.querySelector(x); return Boolean(e && e.offsetParent !== null); }, sel);
+
+  // 1. Revisión en escritorio: filas, 25 por página, página en la URL
+  await p.goto(`${BASE}/app/revision`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  ok(await visible("[data-filas-revision]"), "revisión en 1440 px: filas de tabla");
+  const filas = await p.evaluate(() => document.querySelectorAll("[data-filas-revision]")[0].querySelectorAll("tbody tr").length);
+  ok(filas === 25, `revisión: 25 filas en la primera página (${filas})`);
+  let t = await texto("por-revisar");
+  ok(/^Mostrando 1–25 de \d+ documentos por revisar$/.test(t) && Number(t.match(/de (\d+)/)[1]) >= 60, `revisión: «${t}»`);
+  ok((await texto("por-cerrar")).startsWith("Mostrando 1–25 de "), "la bandeja de cierre también pagina");
+  const primera = await p.evaluate(() => document.querySelector("[data-filas-revision] tbody tr td").innerText);
+  await siguiente("por-revisar");
+  await sleep(300);
+  ok((await texto("por-revisar")).startsWith("Mostrando 26–50 de "), "«Siguiente» lleva a la página 2");
+  ok(new URL(p.url()).searchParams.get("pag") === "2", "la página queda en la URL (?pag=2)");
+  await p.reload({ waitUntil: "networkidle0" });
+  await sleep(500);
+  ok((await texto("por-revisar")).startsWith("Mostrando 26–50 de "), "al recargar (o volver del detalle) sigue en la página 2");
+  // Ordenar por fecha vuelve a la página 1 con el orden invertido
+  await p.evaluate(() => document.querySelector('[data-filas-revision] th button[title="Ordenar por fecha"]').click());
+  await sleep(300);
+  ok((await texto("por-revisar")).startsWith("Mostrando 1–25 de "), "ordenar por fecha vuelve a la página 1");
+  const primeraInvertida = await p.evaluate(() => document.querySelector("[data-filas-revision] tbody tr td").innerText);
+  ok(primera !== primeraInvertida, "ordenar por fecha invierte la lista");
+
+  // 2. Documentos: 25 por página; filtrar reinicia a la página 1
+  await p.goto(`${BASE}/app/documentos`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  const filasDoc = await p.evaluate(() => document.querySelectorAll("main table tbody tr").length);
+  ok(filasDoc === 25, `documentos: 25 filas por página (${filasDoc})`);
+  await siguiente("documentos");
+  await sleep(300);
+  ok((await texto("documentos")).startsWith("Mostrando 26–50 de "), "documentos: página 2");
+  await p.select('select[aria-label="Estado"]', "en_revision");
+  await sleep(300);
+  t = await texto("documentos");
+  ok(t.startsWith("Mostrando 1–25 de "), `filtrar por estado vuelve a la página 1 («${t}»)`);
+  await p.type('main input[placeholder^="Buscar"]', "Revisión ficticia número 5");
+  await sleep(400);
+  ok((await p.evaluate(() => document.querySelector('[data-paginacion="documentos"]'))) === null, "con pocos resultados no se muestran controles de página");
+
+  // 3. Clientes: búsqueda y páginas de 20
+  await p.goto(`${BASE}/app/clientes`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  ok((await texto("clientes")).startsWith("Mostrando 1–20 de "), "clientes: páginas de 20");
+  await p.type('main input[placeholder^="Buscar por nombre"]', "Paginado 3");
+  await sleep(300);
+  const enc = await p.evaluate(() => [...document.querySelectorAll('main button[aria-label^="Editar"]')].map((x) => x.getAttribute("aria-label")));
+  ok(enc.length >= 1 && enc.every((x) => x.includes("Paginado 3")), `la búsqueda de clientes filtra (${enc.length})`);
+
+  // 4. Auditoría: búsqueda y páginas de 25
+  await p.goto(`${BASE}/app/auditoria`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  ok((await texto("eventos")).startsWith("Mostrando 1–25 de "), "auditoría: páginas de 25");
+  await p.type('main input[placeholder^="Buscar"]', "Evento ficticio 4");
+  await sleep(300);
+  ok(await p.evaluate(() => [...document.querySelectorAll("main table tbody tr")].every((tr) => tr.innerText.includes("Evento ficticio 4"))), "la búsqueda de la auditoría filtra");
+
+  // 5. Celular: tarjetas en revisión, controles compactos y sin desborde a 390 y 320 px
+  for (const ancho of [390, 320]) {
+    await p.setViewport({ width: ancho, height: 800, isMobile: true, hasTouch: true });
+    const desbordes = [];
+    for (const r of ["/app/revision", "/app/documentos", "/app/clientes", "/app/auditoria", "/app/proyectos", "/app/equipos"]) {
+      await p.goto(BASE + r, { waitUntil: "networkidle0" });
+      await sleep(400);
+      const sw = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      if (sw > 0) desbordes.push(`${r} (+${sw}px)`);
+      if (r === "/app/revision") {
+        ok(!(await visible("[data-filas-revision]")) && (await p.evaluate(() => document.querySelectorAll('main a[href*="desde=revision"]').length)) >= 25, `revisión en ${ancho} px: tarjetas (sin tabla)`);
+        ok(await p.evaluate(() => /^\d+ \/ \d+$/.test(document.querySelector('[data-paginacion="por-revisar"] span.tabular-nums')?.textContent.trim() ?? "")), `en ${ancho} px la paginación es compacta («1 / 3»)`);
+      }
+    }
+    ok(desbordes.length === 0, desbordes.length ? `desbordes a ${ancho} px: ${desbordes.join(", ")}` : `listas sin desborde a ${ancho} px`);
+  }
+  await p.close();
+}
+
 (async () => {
   const b = await puppeteer.launch({ executablePath: chrome(), headless: true, args: ["--no-sandbox"] });
   const errores = [];
@@ -2362,6 +2586,8 @@ async function listas(b, errores) {
     if (!SOLO || SOLO === "variantes") await variantes(b, errores);
     if (!SOLO || SOLO === "listas") await listas(b, errores);
     if (!SOLO || SOLO === "epp") await epp(b, errores);
+    if (!SOLO || SOLO === "paginacion") await paginacion(b, errores);
+    if (!SOLO || SOLO === "logos") await logos(b, errores);
   } catch (e) {
     ok(false, `error: ${e.message}`);
   } finally {

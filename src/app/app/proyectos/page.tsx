@@ -5,6 +5,7 @@
  * documentos por tipo, cotizado/cobrado y presupuesto. Todos los perfiles entran; cada
  * uno ve solo demo.proyectosVisibles (puedeVerProyecto) y los módulos que puede usar.
  * Crear proyecto requiere el permiso `proyectos` (Coordinador SST y administración).
+ * Pagina de a 18 tarjetas (llenan la grilla de 2 y 3 columnas; ?pag= en la URL).
  */
 import Link from "next/link";
 import { marcarEdicion } from "@/components/ui/volver";
@@ -24,6 +25,7 @@ import { puede, puedeUsarTipo } from "@/nucleo/permisos";
 import { resumenProyecto } from "@/nucleo/proyectos";
 import { rutaProyecto } from "@/nucleo/rutas";
 import type { EstadoProyecto } from "@/nucleo/tipos";
+import { Paginacion, usePaginacion } from "@/components/ui/Paginacion";
 
 /** Tarjetas ordenadas por estado (activo, en pausa, cerrado) y, dentro de cada uno, por inicio más reciente. */
 export default function Proyectos() {
@@ -41,6 +43,7 @@ export default function Proyectos() {
     .filter((p) => !estado || p.estado === estado)
     .filter((p) => !q.trim() || `${p.codigo} ${p.nombre} ${p.sitio} ${nombreCliente(p.clienteId)}`.toLowerCase().includes(q.toLowerCase()))
     .sort((a, b) => (a.estado === b.estado ? b.fechaInicio.localeCompare(a.fechaInicio) : ["activo", "en_pausa", "cerrado"].indexOf(a.estado) - ["activo", "en_pausa", "cerrado"].indexOf(b.estado)));
+  const pag = usePaginacion(lista, 18, [q, cliente, estado].join("|"), "pag");
   // Solo los módulos del perfil: el cliente no ve gastos; el técnico y SST, nada comercial
   const tipos = TIPOS_DOC.filter((t) => puedeUsarTipo(u.rol, t));
   const verCotizado = puedeUsarTipo(u.rol, "cotizacion");
@@ -110,7 +113,7 @@ export default function Proyectos() {
         </div>
       ) : (
         <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {lista.map((p) => {
+          {pag.visibles.map((p) => {
             // Totales calculados solo con lo que el perfil puede ver (visibles y cuentasVisibles)
             const r = resumenProyecto(p, demo.visibles, demo.cuentasVisibles);
             return (
@@ -184,6 +187,7 @@ export default function Proyectos() {
           })}
         </ul>
       )}
+      <Paginacion p={pag} nombre="proyectos" />
       <p className="text-xs text-slate-500">
         {lista.length} de {demo.proyectosVisibles.length} proyectos visibles para tu perfil
       </p>

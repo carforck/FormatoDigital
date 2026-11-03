@@ -1,6 +1,5 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
 /**
  * Ruta pública /firmar?t=<token>: el cliente firma un reporte técnico sin iniciar sesión,
  * desde el enlace enviado por correo o WhatsApp. Valida el token con demo.enlaceVigente y
@@ -11,6 +10,7 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Lock, PenLine, ShieldAlert } from "lucide-react";
 
+import { LogoFormato } from "@/components/docs/Encabezado";
 import { FirmaPad } from "@/components/docs/FirmaPad";
 import { ConVariante } from "@/components/docs/VarianteFormato";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,6 @@ import { equiposAtendidos, equiposIdsDe } from "@/modulos/equipos/logica";
 import { PlantillaReporte } from "@/modulos/reportes/PlantillaReporte";
 import { formatoDe } from "@/modulos/registro";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
-import { asset } from "@/nucleo/rutas";
 import { formatoEnVariante } from "@/nucleo/variantes";
 
 /**
@@ -40,7 +39,8 @@ function Firmar() {
   const encabezado = (
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3">
-        <img src={asset("/sotec-logo-v3.png")} alt={demo.config.empresa} className="h-11 w-auto" />
+        {/* Logo de SOTEC en la empresa; en la demo, la marca de la app */}
+        <LogoFormato className="h-11 w-auto" anchoDemo="max-w-[150px]" alt={demo.config.empresa} />
         <span className="ml-auto flex items-center gap-1.5 text-xs text-slate-500">
           <Lock className="h-3.5 w-3.5" /> Firma segura de documentos
         </span>

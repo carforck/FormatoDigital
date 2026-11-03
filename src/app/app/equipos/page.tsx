@@ -6,7 +6,9 @@
  * cliente ve solo los de su empresa (puedeVerEquipo de @/modulos/equipos/logica).
  * Query params (filtros compartibles): ?cliente=<id> y ?sistema=<clave>.
  * Registrar equipos requiere `equipos` (técnico, SST, administración). Datos: useEquipos()
- * (alias de useDemo()).
+ * (alias de useDemo()). Escala: los equipos se paginan de a 24 (agrupados por sistema dentro
+ * de cada página), la grilla de clientes de a 18, y con más de 12 clientes el selector de
+ * cliente es una lista desplegable en vez de botones.
  */
 import Link from "next/link";
 import { marcarEdicion } from "@/components/ui/volver";
@@ -17,6 +19,7 @@ import { Building2, ChevronRight, FileText, MapPin, Plus, Search } from "lucide-
 import { fechaCorta } from "@/components/ui/badges";
 import { PageHeader } from "@/components/ui/corporativo";
 import { cn } from "@/lib/utils";
+import { Paginacion, usePaginacion } from "@/components/ui/Paginacion";
 import { sistemaDe } from "@/modulos/equipos/catalogo";
 import { coincide, porSistema, puedeEditarEquipos, puedeVerEquipo, resumenHistorial } from "@/modulos/equipos/logica";
 import { EstadoEquipoBadge, IconoEquipo, IconoSistema } from "@/modulos/equipos/piezas";
@@ -42,6 +45,8 @@ function Equipos() {
   const ir = (cambios: Record<string, string>) => {
     const sp = new URLSearchParams(params.toString());
     for (const [k, v] of Object.entries(cambios)) (v ? sp.set(k, v) : sp.delete(k));
+    // Otro cliente o sistema: de vuelta a la primera página
+    sp.delete("pag");
     router.replace(`${path}${sp.toString() ? `?${sp}` : ""}`, { scroll: false });
   };
 
@@ -54,7 +59,9 @@ function Equipos() {
   const activos = delCliente.filter((e) => verRetirados || e.estado !== "retirado");
   const porSis = porSistema(activos);
   const lista = activos.filter((e) => (!sistema || e.sistema === sistema) && coincide(e, q));
-  const grupos = porSistema(lista);
+  const pag = usePaginacion(lista, 24, [clienteId, sistema, q.trim(), verRetirados].join("|"), "pag");
+  const grupos = porSistema(pag.visibles);
+  const pagClientes = usePaginacion(clientes, 18, "", undefined);
   const crea = puedeEditarEquipos(u.rol);
   const nuevoHref = `/app/equipos/ver?nuevo=1${clienteId ? `&cliente=${clienteId}` : ""}${sistema ? `&sistema=${sistema}` : ""}`;
   const elegirCliente = interno && !clienteId && !q.trim();
@@ -85,7 +92,20 @@ function Equipos() {
         />
       </label>
 
-      {interno && clienteId && (
+      {interno && clienteId && clientes.length > 12 && (
+        <label className="block text-sm">
+          <span className="sr-only">Cliente</span>
+          <select value={clienteId} onChange={(e) => ir({ cliente: e.target.value, sistema: "" })} aria-label="Cliente" className="w-full max-w-full rounded-md border border-slate-200 bg-white px-2 py-2 text-sm sm:w-auto">
+            <option value="">Todos los clientes</option>
+            {clientes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre} ({todos.filter((e) => e.clienteId === c.id && e.estado !== "retirado").length})
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {interno && clienteId && clientes.length <= 12 && (
         <nav aria-label="Cliente" className="flex flex-wrap items-center gap-1.5">
           <button type="button" onClick={() => ir({ cliente: "", sistema: "" })} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
             Todos los clientes
@@ -108,7 +128,7 @@ function Equipos() {
             1. Elige el cliente
           </h2>
           <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {clientes.map((c) => {
+            {pagClientes.visibles.map((c) => {
               const eqs = todos.filter((e) => e.clienteId === c.id && e.estado !== "retirado");
               const fallas = eqs.filter((e) => e.estado === "con_falla" || e.estado === "fuera_servicio").length;
               const sis = porSistema(eqs);
@@ -140,6 +160,7 @@ function Equipos() {
               );
             })}
           </ul>
+          <Paginacion p={pagClientes} nombre="clientes" className="mt-3" />
         </section>
       ) : (
         <>
@@ -195,6 +216,7 @@ function Equipos() {
               ))}
             </div>
           )}
+          <Paginacion p={pag} nombre="equipos" />
           <p className="text-xs text-slate-500">
             {lista.length} de {delCliente.length} equipos{cliente ? ` de ${cliente.nombre}` : ""}
           </p>

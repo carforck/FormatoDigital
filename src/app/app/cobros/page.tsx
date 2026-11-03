@@ -4,7 +4,7 @@
  * Ruta /app/cobros: listado de cuentas de cobro con indicadores (por cobrar, pagado,
  * borradores). Acceso con `ver_cobros`: la administración ve y crea todas (`cobros`);
  * el cliente solo consulta las emitidas a su empresa (demo.cuentasVisibles, filtradas
- * con puedeVerCuenta de @/nucleo/permisos).
+ * con puedeVerCuenta de @/nucleo/permisos). Pagina de a 20 (?pag=); los indicadores suman todas.
  */
 import Link from "next/link";
 import { marcarEdicion } from "@/components/ui/volver";
@@ -19,12 +19,14 @@ import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { cop } from "@/nucleo/letras";
 import { puede } from "@/nucleo/permisos";
 import { rutaCuenta } from "@/nucleo/rutas";
+import { Paginacion, usePaginacion } from "@/components/ui/Paginacion";
 
 /** Listado de cuentas de cobro, de la más reciente (mayor consecutivo) a la más antigua. */
 export default function Cobros() {
   const demo = useDemo();
   const u = demo.usuario!;
   const cuentas = [...demo.cuentasVisibles].sort((a, b) => b.consecutivo - a.consecutivo);
+  const pag = usePaginacion(cuentas, 20, "", "pag");
   const cliente = (id: string) => demo.clientes.find((c) => c.id === id)?.nombre ?? "—";
   const suma = (estados: string[]) => cuentas.filter((c) => estados.includes(c.estado)).reduce((a, c) => a + totales(c).total, 0);
   const kpis = [
@@ -77,7 +79,7 @@ export default function Cobros() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {cuentas.map((c) => (
+            {pag.visibles.map((c) => (
               <tr key={c.id} className="block hover:bg-slate-50 md:table-row">
                 <td className="block px-4 pt-3 md:table-cell md:py-3">
                   <Link href={rutaCuenta(c.id)} className="font-mono font-semibold hover:underline">
@@ -109,6 +111,7 @@ export default function Cobros() {
           </div>
         )}
       </div>
+      <Paginacion p={pag} nombre="cuentas de cobro" id="cuentas" />
     </div>
   );
 }

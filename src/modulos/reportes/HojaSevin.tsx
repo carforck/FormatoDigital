@@ -1,6 +1,5 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
 /**
  * Hoja del reporte en el formato de SEVIN (variante «sevin», @/nucleo/variantes):
  * «Informe de servicios» GSE-FO-03, versión 03, octubre 2023, réplica del formato que
@@ -11,10 +10,9 @@
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
-import { asset } from "@/nucleo/rutas";
 import type { DatosReporte } from "@/nucleo/tipos";
 
-import { Firma } from "@/components/docs/Encabezado";
+import { Firma, LogoFormato } from "@/components/docs/Encabezado";
 import { Renglones } from "@/components/docs/Renglones";
 import { EquiposEnFormato } from "@/modulos/equipos/EquiposEnFormato";
 import type { EquipoAtendido } from "@/modulos/equipos/tipos";
@@ -52,7 +50,8 @@ export function EncabezadoSevin() {
       <tbody>
         <tr>
           <td className="w-[28%] border border-black p-1.5 text-center">
-            <img src={asset("/variantes/sevin-logo.png")} alt="SEVIN" className="mx-auto h-12 w-auto object-contain" />
+            {/* En la demo, la marca de la app en vez del logo de Sevin (LogoFormato) */}
+            <LogoFormato className="mx-auto h-12 w-auto object-contain" anchoDemo="max-w-[160px]" alt="SEVIN" />
           </td>
           <td className="border border-black p-2 text-center text-[14px] font-bold">INFORME DE SERVICIOS</td>
           <td className="w-[25%] border border-black px-2 py-1 text-[11.5px] font-bold leading-snug">

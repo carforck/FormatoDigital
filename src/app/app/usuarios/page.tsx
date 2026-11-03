@@ -14,6 +14,7 @@ import { Avatar, PageHeader } from "@/components/ui/corporativo";
 import { Input } from "@/components/ui/input";
 import { ETIQUETA_ROL } from "@/nucleo/catalogos";
 import { ACCIONES, DESCRIPCION_ACCION, puede } from "@/nucleo/permisos";
+import { Paginacion, usePaginacion } from "@/components/ui/Paginacion";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { PanelUsuariosEmpresa } from "@/components/usuarios/PanelUsuariosEmpresa";
 import type { Rol } from "@/nucleo/tipos";
@@ -29,6 +30,7 @@ export default function Usuarios() {
   const [nuevo, setNuevo] = useState({ nombre: "", email: "", cargo: "", rol: "tecnico" as Rol, clienteId: "" });
   const primerCliente = demo.clientes[0]?.id;
   const sinClientes = demo.clientes.length === 0;
+  const pag = usePaginacion(demo.usuarios, 20, "", "pag");
 
   return (
     <div className="space-y-6">
@@ -48,7 +50,7 @@ export default function Usuarios() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {demo.usuarios.map((u) => (
+                {pag.visibles.map((u) => (
                   <tr key={u.id}>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-3">
@@ -107,7 +109,8 @@ export default function Usuarios() {
               </tbody>
             </table>
           </div>
-  
+          <Paginacion p={pag} nombre="usuarios" />
+
           <form
             className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
             onSubmit={(e) => {

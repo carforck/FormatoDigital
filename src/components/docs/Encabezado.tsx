@@ -18,13 +18,14 @@ import { useVarianteActual } from "./VarianteFormato";
  * (SOTEC); en la demo va la marca ControlOne con «by SOTEC» debajo en pequeño
  * (public/controlone-logo.png, generado por scripts/generar-logo-formato.py).
  * `className` da el tamaño del logo de la empresa; `anchoDemo`, el ancho máximo de la marca.
- * Dentro de otra variante de formato (`ConVariante`, p. ej. FORTOX) va el logo de esa
- * variante o, mientras no lo haya, su marca como logo de texto (en la demo y en la empresa).
+ * En la empresa, dentro de otra variante de formato (`ConVariante`, p. ej. FORTOX) va el logo
+ * de esa variante o, mientras no lo haya, su marca como logo de texto. En la demo todo documento
+ * (también los de FORTOX o SEVIN) lleva la marca de la app: nunca el logo de una empresa real.
  */
 export function LogoFormato({ className, anchoDemo = "max-w-[190px]", alt = "SOTEC" }: { className?: string; anchoDemo?: string; alt?: string }) {
   const { modo } = useDemo();
   const v = useVarianteActual();
-  if (v.clave !== VARIANTE_BASE) {
+  if (modo === "empresa" && v.clave !== VARIANTE_BASE) {
     if (v.logo) return <img src={asset(v.logo)} alt={v.marca} className={className} />;
     return (
       <span className="inline-flex flex-col items-center" data-logo-texto={v.clave}>

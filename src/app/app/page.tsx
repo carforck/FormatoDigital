@@ -471,8 +471,10 @@ export default function Tablero() {
             <p className="px-4 py-6 text-sm text-slate-500">No hay documentos con estos filtros en el período.</p>
           ) : (
             <ul className="max-h-[360px] divide-y divide-slate-100 overflow-y-auto">
+              {/* Los 20 más recientes del período: el listado completo (paginado) está en Documentos */}
               {[...lista]
                 .sort((a, b) => b.actualizado.localeCompare(a.actualizado))
+                .slice(0, 20)
                 .map((d) => (
                   <li key={d.id}>
                     <Link href={rutaDoc(d.id, "&desde=tablero")} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
@@ -491,6 +493,14 @@ export default function Tablero() {
                     </Link>
                   </li>
                 ))}
+              {lista.length > 20 && (
+                <li className="px-4 py-2.5 text-center text-xs text-slate-500">
+                  20 de {lista.length} ·{" "}
+                  <Link href="/app/documentos" className="font-medium text-sotec-greenDeep hover:underline">
+                    ver todos en Documentos
+                  </Link>
+                </li>
+              )}
             </ul>
           )}
         </section>

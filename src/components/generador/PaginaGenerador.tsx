@@ -6,7 +6,7 @@
  * decide entre crear un documento nuevo, continuar uno editable o bloquear.
  */
 import Link from "next/link";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Lock } from "lucide-react";
 
@@ -18,8 +18,9 @@ import type { TipoDoc } from "@/nucleo/tipos";
 
 /**
  * Página del generador (nuevo o continuar). Con `?id=` solo abre documentos que
- * el usuario puede editar: los suyos en borrador o rechazados. Cualquier otro
- * caso (ajeno, enviado, cerrado o inexistente) se bloquea aunque se escriba la URL.
+ * el usuario puede editar: los suyos en borrador, rechazados o en revisión mientras nadie
+ * los haya revisado. Cualquier otro caso (ajeno, aprobado, cerrado o inexistente) se bloquea
+ * aunque se escriba la URL.
  */
 function Contenido({ tipo }: { tipo: TipoDoc }) {
   const params = useSearchParams();
@@ -31,7 +32,19 @@ function Contenido({ tipo }: { tipo: TipoDoc }) {
   const cliente = params.get("cliente") ?? undefined;
   // Desde la ficha de un equipo: ?equipo=<id> lo deja marcado como atendido
   const equipo = params.get("equipo") ?? undefined;
-  if (!id) return <Generador key={`nuevo-${proyecto ?? ""}-${cliente ?? ""}-${equipo ?? ""}`} tipo={tipo} proyectoInicial={proyecto} clienteInicial={cliente} equipoInicial={equipo} />;
+  // «Empezar uno nuevo» sobre un borrador recuperado: se vuelve a montar el generador en limpio
+  const [vuelta, setVuelta] = useState(0);
+  if (!id)
+    return (
+      <Generador
+        key={`nuevo-${proyecto ?? ""}-${cliente ?? ""}-${equipo ?? ""}-${vuelta}`}
+        tipo={tipo}
+        proyectoInicial={proyecto}
+        clienteInicial={cliente}
+        equipoInicial={equipo}
+        onEmpezarNuevo={() => setVuelta((v) => v + 1)}
+      />
+    );
 
   const doc = demo.documentos.find((d) => d.id === id && d.tipo === tipo);
   if (!doc || !puedeEditarDoc(u, doc)) {
@@ -42,7 +55,7 @@ function Contenido({ tipo }: { tipo: TipoDoc }) {
           <Lock className="h-5 w-5" />
         </span>
         <p className="mt-4 text-lg font-semibold">Este documento no se puede editar</p>
-        <p className="mt-1 text-sm text-slate-600">Solo su autor lo edita, y solo mientras está en borrador o fue devuelto con observaciones. Lo enviado, aprobado o cerrado queda bloqueado para la trazabilidad.</p>
+        <p className="mt-1 text-sm text-slate-600">Solo su autor lo edita, y solo mientras está en borrador, fue devuelto con observaciones o sigue en revisión sin que nadie lo haya revisado. Lo aprobado o cerrado queda bloqueado para la trazabilidad.</p>
         <Link href={visible ? rutaDoc(doc!.id) : "/app/documentos"} className="mt-5 inline-flex rounded-lg bg-sotec px-4 py-2 text-sm font-medium text-white hover:bg-black">
           {visible ? "Ver el documento" : "Ir a documentos"}
         </Link>

@@ -61,7 +61,7 @@ export default function MatrizRoles() {
       </div>
       <ul className="grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
         <li className="rounded-lg border border-slate-200 bg-white p-3">
-          <strong className="text-slate-800">Separación de funciones:</strong> solo el autor edita y envía su documento (en borrador o rechazado) y nadie aprueba lo propio.
+          <strong className="text-slate-800">Separación de funciones:</strong> solo el autor edita y envía su documento (en borrador o rechazado; en revisión lo corrige mientras nadie lo haya revisado) y nadie aprueba lo propio.
         </li>
         <li className="rounded-lg border border-slate-200 bg-white p-3">
           <strong className="text-slate-800">Cliente:</strong> ve solo los documentos aprobados o cerrados de su empresa, nunca los formatos internos (gastos), y sus cuentas ya emitidas.

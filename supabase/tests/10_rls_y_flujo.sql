@@ -93,9 +93,23 @@ do $$ begin
   raise exception 'FALLO: el técnico se aprobó su propio reporte';
 exception when insufficient_privilege then null; end $$;
 update public.documentos set estado = 'en_revision' where id = (select v::uuid from ctx where k = 'rt1');
+-- En revisión y sin revisar, el autor lo corrige sin retirarlo (0014): sigue en revisión
+update public.documentos set datos = '{"asunto":"Fibra corregida"}' where id = (select v::uuid from ctx where k = 'rt1');
 do $$ begin
-  update public.documentos set datos = '{"asunto":"cambiado"}' where id = (select v::uuid from ctx where k = 'rt1');
-  raise exception 'FALLO: modificó un documento ya enviado';
+  assert (select estado = 'en_revision' and datos ->> 'asunto' = 'Fibra corregida' from public.documentos where id = (select v::uuid from ctx where k = 'rt1')), 'el autor corrige en revisión y sigue en revisión';
+  assert exists (select 1 from public.documento_eventos where documento_id = (select v::uuid from ctx where k = 'rt1') and accion = 'Corrigió mientras estaba en revisión'), 'evento «Corrigió mientras estaba en revisión»';
+end $$;
+reset role;
+-- Otro técnico no corrige lo ajeno en revisión (ni lo ve)
+select pg_temp.como('00000000-0000-0000-0000-0000000000a4');
+update public.documentos set datos = '{"asunto":"ajeno"}' where id = (select v::uuid from ctx where k = 'rt1');
+reset role;
+do $$ begin assert (select datos ->> 'asunto' from public.documentos where id = (select v::uuid from ctx where k = 'rt1')) = 'Fibra corregida', 'otro técnico no corrige lo ajeno'; end $$;
+-- La coordinadora no edita contenido ajeno en revisión: lo aprueba o lo rechaza
+select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
+do $$ begin
+  update public.documentos set datos = '{"asunto":"por la revisora"}' where id = (select v::uuid from ctx where k = 'rt1');
+  raise exception 'FALLO: la revisora editó un documento ajeno en revisión';
 exception when insufficient_privilege then null; end $$;
 reset role;
 
@@ -107,8 +121,15 @@ exception when check_violation then null; end $$;
 update public.documentos set estado = 'aprobado' where id = (select v::uuid from ctx where k = 'rt1');
 do $$ begin
   assert (select aprobado_por from public.documentos where id = (select v::uuid from ctx where k = 'rt1')) = '00000000-0000-0000-0000-0000000000a2', 'registra quién aprobó';
-  assert (select count(*) from public.documento_eventos where documento_id = (select v::uuid from ctx where k = 'rt1')) = 3, 'creó, envió y aprobó';
+  assert (select count(*) from public.documento_eventos where documento_id = (select v::uuid from ctx where k = 'rt1')) = 4, 'creó, envió, corrigió y aprobó';
 end $$;
+reset role;
+-- Ya revisado (aprobado), el autor no lo modifica
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+do $$ begin
+  update public.documentos set datos = '{"asunto":"cambiado"}' where id = (select v::uuid from ctx where k = 'rt1');
+  raise exception 'FALLO: modificó un documento ya aprobado';
+exception when insufficient_privilege then null; end $$;
 reset role;
 
 select pg_temp.como('00000000-0000-0000-0000-0000000000a5');
@@ -555,11 +576,10 @@ do $$ begin
   raise exception 'FALLO: marcó un equipo de otro cliente';
 exception when insufficient_privilege then null; end $$;
 update public.documentos set estado = 'en_revision' where id = (select v::uuid from ctx where k = 'rtE');
--- Enviado: los equipos atendidos quedan fijos
-do $$ begin
-  delete from public.documento_equipos where documento_id = (select v::uuid from ctx where k = 'rtE');
-  raise exception 'FALLO: cambió los equipos de un reporte enviado';
-exception when insufficient_privilege then null; end $$;
+-- En revisión sin revisar, el autor aún corrige los equipos atendidos (0014)
+delete from public.documento_equipos where documento_id = (select v::uuid from ctx where k = 'rtE') and equipo_id = (select v::uuid from ctx where k = 'e2');
+insert into public.documento_equipos (organizacion_id, documento_id, equipo_id)
+values ('10000000-0000-0000-0000-000000000001', (select v::uuid from ctx where k = 'rtE'), (select v::uuid from ctx where k = 'e2'));
 -- El técnico edita y retira, pero no borra ni cambia el cliente
 update public.equipos set marca = 'Dahua', estado = 'con_falla' where id = (select v::uuid from ctx where k = 'e2');
 delete from public.equipos where id = (select v::uuid from ctx where k = 'e3');
@@ -598,6 +618,13 @@ exception when insufficient_privilege then null; end $$;
 reset role;
 select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
 update public.documentos set estado = 'aprobado' where id = (select v::uuid from ctx where k = 'rtE');
+reset role;
+-- Aprobado: los equipos atendidos quedan fijos
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+do $$ begin
+  delete from public.documento_equipos where documento_id = (select v::uuid from ctx where k = 'rtE');
+  raise exception 'FALLO: cambió los equipos de un reporte aprobado';
+exception when insufficient_privilege then null; end $$;
 reset role;
 select pg_temp.como('00000000-0000-0000-0000-0000000000a5');
 do $$ begin
@@ -909,6 +936,34 @@ select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
 update public.clientes set activo = false where nombre = 'Peña Hermanos';
 do $$ begin
   assert (select public.completar_cliente((select id from public.clientes where nombre = 'Peña Hermanos'), '{"contacto":"Alguien"}')).contacto = '', 'un cliente desactivado no se completa';
+end $$;
+reset role;
+
+-- ------------------------------------------------- 14. corregir en revisión (0014)
+-- Con la firma del cliente en sitio: corregir la anula; la firma no se cambia en el mismo paso
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+insert into ctx select 'cr1', (public.crear_documento('10000000-0000-0000-0000-000000000001', 'reporte', '{"asunto":"Revisión 1"}', null, 'c0000000-0000-0000-0000-000000000001')).id;
+update public.documentos set estado = 'en_revision' where id = (select v::uuid from ctx where k = 'cr1');
+update public.documentos set datos = datos || '{"firmaCliente":"data:image/png;base64,AAAA","nombreRecibe":"Ing. Ficticio","cargoRecibe":"Sistemas"}' where id = (select v::uuid from ctx where k = 'cr1');
+do $$ begin
+  update public.documentos set datos = datos || '{"asunto":"otro","firmaCliente":"data:image/png;base64,BBBB"}' where id = (select v::uuid from ctx where k = 'cr1');
+  raise exception 'FALLO: corrigió y cambió la firma del cliente en un solo paso';
+exception when insufficient_privilege then null; end $$;
+update public.documentos set datos = datos || '{"asunto":"Revisión 1 corregida"}' where id = (select v::uuid from ctx where k = 'cr1');
+do $$ begin
+  assert (select estado = 'en_revision' and datos ->> 'firmaCliente' = '' and datos ->> 'nombreRecibe' = '' and datos ->> 'asunto' = 'Revisión 1 corregida' from public.documentos where id = (select v::uuid from ctx where k = 'cr1')), 'corregir en revisión anula la firma en sitio y conserva lo corregido';
+  assert not exists (select 1 from public.firmas where documento_id = (select v::uuid from ctx where k = 'cr1') and campo = 'firmaCliente'), 'corregir borra la fila en_sitio de firmas';
+  assert exists (select 1 from public.documento_eventos where documento_id = (select v::uuid from ctx where k = 'cr1') and accion = 'Se anuló la firma del cliente (el contenido cambió)'), 'evento de firma anulada al corregir';
+end $$;
+reset role;
+-- Rechazado por la coordinadora: el autor lo edita como siempre (rechazado), no como «en revisión»
+select pg_temp.como('00000000-0000-0000-0000-0000000000a2');
+update public.documentos set estado = 'rechazado', motivo_rechazo = 'Faltan fotos' where id = (select v::uuid from ctx where k = 'cr1');
+reset role;
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+update public.documentos set datos = datos || '{"asunto":"Revisión 1 con fotos"}' where id = (select v::uuid from ctx where k = 'cr1');
+do $$ begin
+  assert (select estado = 'rechazado' and datos ->> 'asunto' = 'Revisión 1 con fotos' from public.documentos where id = (select v::uuid from ctx where k = 'cr1')), 'rechazado sigue editable por el autor';
 end $$;
 reset role;
 

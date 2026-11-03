@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { EstadoBadge } from "@/components/ui/badges";
 import { Input } from "@/components/ui/input";
 import { tomarAvisoCliente } from "@/nucleo/clientes";
-import { puede, puedeCrearTipo, puedeEditarDoc, puedeFirmaClienteEnSitio, puedeRetirarDoc, puedeRevisarDoc, puedeVerDoc } from "@/nucleo/permisos";
+import { CORRIGIO_EN_REVISION, puede, puedeCrearTipo, puedeEditarDoc, puedeFirmaClienteEnSitio, puedeRetirarDoc, puedeRevisarDoc, puedeVerDoc } from "@/nucleo/permisos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { abrirImpresion, tituloArchivo } from "@/nucleo/impresion";
 import { rutaCuenta, rutaEquipo, rutaProyecto, urlPublica } from "@/nucleo/rutas";
@@ -36,7 +36,8 @@ import { VARIANTE_BASE, formatoEnVariante, varianteParaTipo } from "@/nucleo/var
 import { clienteDoc, empresaDe, infoDoc, rutaNuevo } from "@/modulos/registro";
 
 /**
- * Contenido del detalle. Reglas clave: solo el autor edita (borrador o rechazado); nadie
+ * Contenido del detalle. Reglas clave: solo el autor edita (borrador, rechazado o en revisión
+ * mientras nadie lo haya revisado; ahí sigue en revisión al guardar); nadie
  * revisa lo propio; el cierre depende del formato (formulario, firma del cliente o revisor).
  */
 function Detalle() {
@@ -86,6 +87,8 @@ function Detalle() {
   const { flujo, Plantilla } = info;
   const f = info.formato;
   const editable = puedeEditarDoc(u, doc);
+  // En revisión sin revisar: el autor lo corrige con «Editar» y sigue en revisión (no se reenvía)
+  const corrigeEnRevision = editable && doc.estado === "en_revision";
   const pend = faltantes(doc);
   // Nadie aprueba ni rechaza su propio documento (separación de funciones)
   const revisa = puedeRevisarDoc(u, doc);
@@ -97,6 +100,9 @@ function Detalle() {
   const tomaFirmaEnSitio = puedeFirmaClienteEnSitio(u, doc) && !firmaCliente;
   const conFirmaEnSitio = flujo.cierre === "cliente" && Boolean(flujo.campoFirmaCliente) && String((doc.datos as unknown as Record<string, unknown>)[flujo.campoFirmaCliente ?? ""] ?? "").startsWith("data:image/");
   const ultimo = doc.historial[doc.historial.length - 1];
+  // El autor lo corrigió después de enviarlo (sigue en revisión): el revisor lo sabe
+  const accionesHist = doc.historial.map((e) => e.accion);
+  const corregidoEnRevision = doc.estado === "en_revision" && accionesHist.lastIndexOf(CORRIGIO_EN_REVISION) > accionesHist.lastIndexOf("Envió a revisión");
   const cierraRevisor = flujo.cierre === "revisor" && doc.estado === "aprobado" && puede(u.rol, "revisar");
   const proyecto = demo.proyectos.find((p) => p.id === doc.proyectoId);
   const datosLibres = doc.datos as unknown as Record<string, string | undefined>;
@@ -123,7 +129,9 @@ function Detalle() {
             ? flujo.aprobarAlEnviar
               ? "Aprobada y enviada: el cliente ya la ve en su portal para aceptarla con su firma."
               : "Enviado a revisión. El Coordinador SST recibió una notificación (cambia a ese perfil para aprobarlo)."
-            : "Borrador guardado."}
+            : ok === "corregido"
+              ? "Cambios guardados: sigue en revisión con lo corregido y el revisor recibió un aviso."
+              : "Borrador guardado."}
         </p>
       )}
 
@@ -177,7 +185,7 @@ function Detalle() {
               <PenLine className="h-4 w-4" /> Editar
             </Button>
           )}
-          {editable && (
+          {editable && !corrigeEnRevision && (
             <Button disabled={pend.length > 0} title={pend.length ? "Completa los pendientes" : ""} onClick={() => demo.enviar(doc.id)}>
               <SendHorizonal className="h-4 w-4" /> {flujo.aprobarAlEnviar ?? "Enviar a revisión"}
             </Button>
@@ -299,7 +307,7 @@ function Detalle() {
           <strong>Motivo del rechazo:</strong> {doc.motivoRechazo}
         </p>
       )}
-      {editable && pend.length > 0 && (
+      {editable && !corrigeEnRevision && pend.length > 0 && (
         <div className="print:hidden rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           <strong>Pendiente para enviar ({pend.length}):</strong> {pend.join(" · ")}
         </div>
@@ -312,6 +320,17 @@ function Detalle() {
       {doc.estado === "borrador" && !editable && ultimo?.accion === "Retiró el envío para corregir" && (
         <p className="print:hidden flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
           <Info className="h-4 w-4 shrink-0" /> {nombre(ultimo.usuarioId)} retiró el envío para corregirlo. Volverá a la bandeja de revisión cuando lo reenvíe.
+        </p>
+      )}
+      {corrigeEnRevision && (
+        <p className="print:hidden flex items-center gap-2 text-xs text-slate-500">
+          <PenLine className="h-3.5 w-3.5 shrink-0" />
+          En revisión. Puedes corregirlo mientras nadie lo haya revisado: con «Editar» sigue en revisión con lo corregido.
+        </p>
+      )}
+      {revisa && corregidoEnRevision && (
+        <p className="print:hidden flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+          <Info className="h-4 w-4 shrink-0" /> {nombre(doc.autorId)} lo corrigió mientras estaba en revisión: lo que ves es la versión corregida.
         </p>
       )}
       {!editable && u.rol !== "cliente" && (doc.estado === "en_revision" || doc.estado === "aprobado" || doc.estado === "cerrado") && (

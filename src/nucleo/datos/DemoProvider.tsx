@@ -39,7 +39,7 @@ import { infoDoc, prefijoDe } from "@/modulos/registro";
 import { planCliente } from "@/nucleo/clientes";
 import { prefijoVariante, serieConsecutivo, type TipoProyecto } from "@/nucleo/variantes";
 import { buscarOpcion, comparable, limpiarOpcion } from "@/nucleo/opciones";
-import { puede, puedeCrearTipo, puedeFirmaClienteEnSitio, puedeRetirarDoc, puedeUsarTipo, puedeVerCuenta, puedeVerDoc, puedeVerProyecto } from "@/nucleo/permisos";
+import { CORRIGIO_EN_REVISION, puede, puedeCrearTipo, puedeEditarDoc, puedeFirmaClienteEnSitio, puedeRetirarDoc, puedeUsarTipo, puedeVerCuenta, puedeVerDoc, puedeVerProyecto } from "@/nucleo/permisos";
 import {
   CLIENTES_SEED,
   CONFIG_SEED,
@@ -236,7 +236,7 @@ interface Api extends Estado, ApiEquipos {
   salir: () => void;
   // Documentos y su flujo: borrador → en revisión → aprobado → cerrado (o rechazado)
   /**
-   * Crea (con el consecutivo definitivo) o actualiza el contenido de un documento propio en borrador o rechazado.
+   * Crea (con el consecutivo definitivo) o actualiza el contenido de un documento propio en borrador, rechazado o en revisión sin revisar (sigue en revisión y queda «Corrigió mientras estaba en revisión»).
    * Con `registrar_clientes`, el cliente escrito que no está en el directorio se crea y se enlaza; si ya está,
    * se enlaza y se llenan solo sus campos vacíos (`planCliente`, @/nucleo/clientes).
    */
@@ -840,12 +840,33 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
         setS((prev) => {
           const existente = prev.documentos.find((d) => d.id === doc.id);
           if (existente) {
-            // Solo el autor edita, y solo en borrador o rechazado; se conserva lo que no es contenido
-            const editable = existente.autorId === prev.usuarioId && usaTipo(prev, existente.tipo) && (existente.estado === "borrador" || existente.estado === "rechazado");
-            if (!editable) return prev;
+            // Solo el autor edita: en borrador, rechazado o en revisión sin revisar (puedeEditarDoc); se conserva lo que no es contenido
+            const autor = prev.usuarios.find((x) => x.id === prev.usuarioId);
+            if (!autor || !puedeEditarDoc(autor, existente)) return prev;
             // La variante de formato se recalcula mientras es borrador (el generador la resuelve por proyecto o cliente)
             const dir = conDirectorio(prev, { ...existente, datos: doc.datos, clienteId: doc.clienteId, proyectoId: doc.proyectoId || undefined, variante: doc.variante ?? existente.variante, actualizado: ahora() } as Documento);
             const merged = { ...dir.doc, equiposIds: equiposDelCliente(prev, dir.doc) } as Documento;
+            if (existente.estado === "en_revision") {
+              // Corrige sin retirarlo: sigue en revisión, queda en el historial y el revisor recibe un aviso
+              const igual = (a: Documento) => JSON.stringify([a.datos, a.clienteId, a.proyectoId ?? "", a.equiposIds ?? []]);
+              if (igual(merged) === igual(existente)) return prev; // sin cambios: nada que registrar
+              // La firma del cliente en sitio respaldaba el contenido anterior: con cualquier cambio se anula
+              // (igual que al retirar; 0014). Se vuelve a tomar después con «Tomar firma del cliente en sitio».
+              const campo = infoDoc(existente.tipo).flujo.campoFirmaCliente;
+              const firmaPrevia = campo ? String((existente.datos as unknown as Record<string, unknown>)[campo] ?? "") : "";
+              const anula = firmaPrevia.startsWith("data:image/")
+                ? sinFirmaCliente({ ...prev, auditoria: dir.auditoria }, { ...merged, datos: { ...merged.datos, [campo!]: firmaPrevia } } as Documento)
+                : { datos: merged.datos, eventos: [], auditoria: dir.auditoria };
+              const corregido = { ...merged, datos: anula.datos, historial: [...existente.historial, evento(prev, CORRIGIO_EN_REVISION), ...anula.eventos] } as Documento;
+              const texto = `${nombre(prev.usuarioId)} corrigió ${existente.codigo} mientras estaba en revisión`;
+              return {
+                ...prev,
+                clientes: dir.clientes,
+                documentos: prev.documentos.map((d) => (d.id === doc.id ? corregido : d)),
+                notificaciones: [...revisoresDe(existente.tipo).map((r) => ({ id: uid("n"), para: r, texto, docId: existente.id, fecha: ahora(), leida: false })), ...prev.notificaciones],
+                auditoria: registrar({ ...prev, auditoria: anula.auditoria }, CORRIGIO_EN_REVISION, existente.codigo),
+              };
+            }
             return { ...prev, clientes: dir.clientes, auditoria: dir.auditoria, documentos: prev.documentos.map((d) => (d.id === doc.id ? merged : d)) };
           }
           // Documento nuevo: solo de un módulo que el perfil puede diligenciar (lo comercial, la administración)

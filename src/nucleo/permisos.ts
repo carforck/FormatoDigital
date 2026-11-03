@@ -95,14 +95,29 @@ export function puedeVerDoc(u: Usuario, d: Documento): boolean {
   return d.autorId === u.id;
 }
 
+/** Acción del historial al corregir un documento mientras sigue en revisión. */
+export const CORRIGIO_EN_REVISION = "Corrigió mientras estaba en revisión";
+
 /**
- * Solo el autor edita su documento, y solo mientras está en borrador o rechazado.
- * Los revisores no editan contenido ajeno: lo aprueban o lo devuelven con motivo
- * (separación de funciones del SGC; la base de datos aplica la misma regla).
+ * En revisión y sin que nadie lo haya revisado todavía: desde el último «Envió a revisión»
+ * solo hay movimientos del autor (corregirlo, la firma del cliente en sitio). Si el revisor
+ * ya actuó (aprobó, rechazó o dejó cualquier otro evento), deja de serlo.
+ */
+export function revisionSinTocar(d: Documento): boolean {
+  if (d.estado !== "en_revision" || infoDoc(d.tipo).flujo.aprobarAlEnviar) return false;
+  const i = d.historial.map((e) => e.accion).lastIndexOf("Envió a revisión");
+  return d.historial.slice(i + 1).every((e) => e.usuarioId === d.autorId);
+}
+
+/**
+ * Solo el autor edita su documento: en borrador o rechazado y, en revisión, mientras nadie
+ * lo haya revisado (pedido de Magno: corrige sin retirarlo y sigue en revisión). Aprobado o
+ * cerrado ya no se modifica. Los revisores no editan contenido ajeno: lo aprueban o lo
+ * devuelven con motivo (separación de funciones del SGC; la base de datos aplica la misma regla).
  */
 export function puedeEditarDoc(u: Usuario, d: Documento): boolean {
-  if (u.rol === "cliente" || !puedeUsarTipo(u.rol, d.tipo)) return false;
-  return d.autorId === u.id && (d.estado === "borrador" || d.estado === "rechazado");
+  if (u.rol === "cliente" || !puedeUsarTipo(u.rol, d.tipo) || d.autorId !== u.id) return false;
+  return d.estado === "borrador" || d.estado === "rechazado" || revisionSinTocar(d);
 }
 
 /**

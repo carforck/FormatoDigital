@@ -15,7 +15,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Cctv, CheckCircle2, Eye, FolderKanban, MessageSquare, Printer, Save, SendHorizonal } from "lucide-react";
+import { AlertTriangle, Cctv, CheckCircle2, Eye, FilePlus2, FolderKanban, MessageSquare, Printer, Save, SendHorizonal } from "lucide-react";
 
 import { ChatAsistente, type ValorPaso } from "@/components/chat/ChatAsistente";
 import { FirmaPad } from "@/components/docs/FirmaPad";
@@ -35,14 +35,16 @@ import { rutaDoc } from "@/nucleo/rutas";
 import type { Cliente, Documento, Proyecto, TipoDoc } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 import { avance, faltantes } from "@/nucleo/validar";
-import { puede } from "@/nucleo/permisos";
+import { puede, puedeEditarDoc } from "@/nucleo/permisos";
 import { VARIANTE_BASE, formatoEnVariante, prefijoVariante, formatosPara, resolverVariante, varianteDe } from "@/nucleo/variantes";
 import { avisoPlan, buscarCliente, claveNombre, dejarAvisoCliente, mismoNombre, planCliente, preguntaParecido, separarCliente } from "@/nucleo/clientes";
 import { unirOpciones } from "@/nucleo/opciones";
 
 interface Props {
   tipo: TipoDoc;
-  /** Documento existente a continuar (borrador o rechazado). */
+  /** Descarta el borrador sin terminar recuperado del navegador y arranca uno nuevo. */
+  onEmpezarNuevo?: () => void;
+  /** Documento existente a continuar (borrador, rechazado o en revisión sin revisar). */
   existente?: Documento;
   /** Proyecto preseleccionado (`?proyecto=`): fija también el cliente. */
   proyectoInicial?: string;
@@ -61,7 +63,7 @@ const etiquetaProyecto = (p: Proyecto) => `${p.codigo} · ${p.nombre}`;
  * en src/modulos/<clave>/. El generador intercala dos pasos comunes: el
  * proyecto (justo después del cliente) y, si el formato los registra, los equipos.
  */
-export function Generador({ tipo, existente, proyectoInicial, clienteInicial, equipoInicial }: Props) {
+export function Generador({ tipo, existente, proyectoInicial, clienteInicial, equipoInicial, onEmpezarNuevo }: Props) {
   const demo = useDemo();
   const router = useRouter();
   const usuario = demo.usuario!;
@@ -444,13 +446,34 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     }
   }
 
+  // En revisión sin revisar (pedido de Magno): se corrige y sigue en revisión («Guardar cambios», sin reenviar)
+  const enRevision = existente?.estado === "en_revision";
+
   /** Guarda (y con `enviar`, envía a revisión o aprueba según el flujo del formato) y abre el detalle. */
   function guardar(enviar: boolean) {
     if (guardando) return; // un solo envío aunque se haga doble clic
-    if (enviar && pendientes.length) {
-      setAviso(`Faltan ${pendientes.length} punto(s) por completar antes de enviar.`);
+    // Lo que está en revisión debe seguir completo
+    if ((enviar || enRevision) && pendientes.length) {
+      setAviso(`Faltan ${pendientes.length} punto(s) por completar antes de ${enRevision ? "guardar los cambios" : "enviar"}.`);
       setVista("doc");
       return;
+    }
+    if (existente) {
+      // Mientras se editaba, el revisor pudo aprobarlo o rechazarlo (otra pestaña, otro equipo)
+      const actual = demo.documentos.find((d) => d.id === existente.id);
+      if (!actual || !puedeEditarDoc(usuario, actual)) {
+        setAvisoCliente(`${existente.codigo} ya no se puede modificar: el revisor ya lo revisó. Tus cambios no se guardaron.`);
+        return;
+      }
+      const campoFirma = info.flujo.campoFirmaCliente;
+      const firmado = enRevision && campoFirma && String((existente.datos as unknown as Record<string, unknown>)[campoFirma] ?? "").startsWith("data:image/");
+      // Sin cambios no hay nada que corregir: vuelve al detalle sin registrar nada
+      const huella = (d: Documento) => JSON.stringify([d.datos, d.clienteId || "", d.proyectoId || "", d.equiposIds ?? []]);
+      if (enRevision && huella(docV) === huella(existente)) {
+        salirAlDetalle(router, rutaDoc(existente.id, `${origen.query ? `&${origen.query}` : ""}`));
+        return;
+      }
+      if (firmado && sucio && !confirm("La firma del cliente tomada en sitio respalda el contenido anterior: al guardar los cambios se anula y habrá que tomarla de nuevo.\n\n¿Guardar los cambios?")) return;
     }
     let clienteId = doc.clienteId;
     // Directorio: un cliente desactivado no se vuelve a crear; se ofrece usarlo
@@ -483,7 +506,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     // replace: «atrás» desde el detalle vuelve a donde se abrió el generador, no a un formulario vacío.
     // Abierto con «Editar» desde el detalle: se regresa a esa entrada (sin duplicarla en el historial)
     const destino = rutaDoc(g.id, `${origen.query ? `&${origen.query}` : ""}`);
-    if (existente) salirAlDetalle(router, destino, enviar ? "enviado" : "guardado");
+    if (existente) salirAlDetalle(router, destino, enviar ? "enviado" : enRevision ? "corregido" : "guardado");
     else router.replace(rutaDoc(g.id, `&ok=${enviar ? "enviado" : "guardado"}${origen.query ? `&${origen.query}` : ""}`));
   }
 
@@ -511,7 +534,13 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   const Plantilla = info.Plantilla;
   const clienteSel = demo.clientes.find((c) => c.id === doc.clienteId);
   const sel = "h-10 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800";
-  const acciones = (
+  const acciones = enRevision ? (
+    <div className="grid grid-cols-1 gap-2">
+      <Button disabled={guardando} onClick={() => guardar(false)}>
+        <Save className="h-4 w-4" /> Guardar cambios
+      </Button>
+    </div>
+  ) : (
     <div className="grid grid-cols-2 gap-2">
       <Button variant="outline" disabled={guardando} onClick={() => guardar(false)}>
         <Save className="h-4 w-4" /> Guardar borrador
@@ -553,6 +582,30 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
         </div>
       </div>
 
+      {recuperado.current && !existente && (
+        <div role="status" className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 print:hidden">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <p className="min-w-0 flex-1">
+            Se abrió {f.el} {f.corto.toLowerCase()} que dejaste sin terminar{clienteDoc(doc) ? ` (${clienteDoc(doc)})` : ""}. ¿Lo sigues o empiezas uno nuevo?
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              if (!confirm(`¿Descartar ${f.el} ${f.corto.toLowerCase()} sin terminar y empezar uno nuevo? Lo que tenía se borra.`)) return;
+              try {
+                localStorage.removeItem(claveCache);
+              } catch {
+                /* sin almacenamiento */
+              }
+              onEmpezarNuevo?.();
+            }}
+          >
+            <FilePlus2 className="h-4 w-4" /> Empezar uno nuevo
+          </Button>
+        </div>
+      )}
+
       <div className="flex rounded-lg bg-slate-100 p-1 lg:hidden print:hidden">
         {(["chat", "doc"] as const).map((v) => (
           <button key={v} onClick={() => setVista(v)} className={cn("flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-sm font-medium", vista === v && "bg-white shadow-sm")}>
@@ -576,7 +629,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
             retomando={Boolean(existente) || recuperado.current}
             bienvenida={
               existente
-                ? `Retomamos ${doc.codigo}. Edita lo que necesites directamente en el formato.${doc.motivoRechazo ? `\n\nMotivo del rechazo: ${doc.motivoRechazo}` : ""}`
+                ? `Retomamos ${doc.codigo}. Edita lo que necesites directamente en el formato.${enRevision ? "\n\nEstá en revisión: al guardar los cambios sigue en revisión con lo corregido." : ""}${doc.motivoRechazo ? `\n\nMotivo del rechazo: ${doc.motivoRechazo}` : ""}`
                 : recuperado.current
                   ? `Recuperé lo que estabas diligenciando en ${f.el} ${f.corto.toLowerCase()}. Revisa el formato y continúa donde quedaste.`
                   : `Hola, ${usuario.nombre.split(" ")[0]}. Te guío para diligenciar ${f.el} ${f.corto.toLowerCase()}${formatos.length ? "" : ` (${f.codigo})`}. Lo que respondas aparece al instante en el formato.${proyecto ? `\n\nQueda en el proyecto ${etiquetaProyecto(proyecto)}${clienteSel ? ` de ${clienteSel.nombre}` : ""}.` : ""}`
@@ -602,7 +655,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
           )}
           {aviso && pendientes.length === 0 && (
             <p className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 print:hidden">
-              <CheckCircle2 className="h-4 w-4" /> Todo completo: ya puedes {info.flujo.aprobarAlEnviar ? "aprobarlo y enviarlo al cliente" : "enviarlo a revisión"}.
+              <CheckCircle2 className="h-4 w-4" /> Todo completo: ya puedes {enRevision ? "guardar los cambios" : info.flujo.aprobarAlEnviar ? "aprobarlo y enviarlo al cliente" : "enviarlo a revisión"}.
             </p>
           )}
           {avisoCliente && (

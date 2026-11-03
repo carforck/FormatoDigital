@@ -9,7 +9,7 @@
  * galería (`ElegirImagen`); un paso de firma puede preguntar quién firma (`firmante`).
  */
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Bot, Check, CheckCircle2, PenLine, Plus, Send, Sparkles, Trash2, User } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Bot, Check, CheckCircle2, CornerDownRight, PenLine, Plus, Send, Sparkles, Trash2, User } from "lucide-react";
 
 import { ElegirImagen, avisoSobrantes, mensajeImagenIlegible } from "@/components/docs/ElegirImagen";
 
@@ -103,14 +103,19 @@ interface Msg {
 // Id incremental de módulo para las `key` de los mensajes
 let seq = 0;
 const m = (rol: Msg["rol"], texto: string): Msg => ({ id: ++seq, rol, texto });
+const FIN = "¡Listo! Revisa el formato: puedes editar cualquier campo con un clic. Cuando quieras, guárdalo o envíalo a revisión.";
 
 /**
  * Chat paso a paso con barra de avance. Con `retomando` arranca ya completo
  * (documento existente o recuperado) y solo muestra las acciones y el atajo
- * «Volver a una pregunta». Las respuestas largas se recortan en el eco (140).
+ * «Volver a una pregunta». En cualquier paso se puede volver atrás o cambiar una
+ * respuesta; al corregirla se regresa a donde se iba (o directo a la firma), sin
+ * repetir las siguientes. Las respuestas largas se recortan en el eco (140).
  */
 export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFirmar, firmado, ejecutoresIniciales = [], bienvenida, retomando, acciones, onAgregarOpcion, onAgregarServicio }: Props) {
   const [i, setI] = useState(retomando ? pasos.length : 0);
+  // Hasta dónde llegó: al corregir una respuesta anterior se vuelve aquí sin repetir las siguientes
+  const [tope, setTope] = useState(retomando ? pasos.length : 0);
   const [hist, setHist] = useState<Msg[]>(() =>
     retomando ? [m("bot", bienvenida)] : [m("bot", bienvenida), m("bot", pasos[0].pregunta)],
   );
@@ -174,14 +179,17 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
       }
     }
     const extra = aplicar(paso.id, v);
-    const sig = pasos[i + 1];
+    const corrigiendo = i + 1 < tope;
+    const destino = corrigiendo ? tope : i + 1;
+    const sig = pasos[destino];
     setHist((h) => [
       ...h,
       m("user", eco.length > 140 ? `${eco.slice(0, 140)}…` : eco || "(omitido)"),
       ...(extra ? [m("bot", extra)] : []),
-      m("bot", sig ? sig.pregunta : "¡Listo! Revisa el formato: puedes editar cualquier campo con un clic. Cuando quieras, guárdalo o envíalo a revisión."),
+      m("bot", `${corrigiendo ? "Corregido. " : ""}${sig ? `${corrigiendo ? "Seguimos donde ibas: " : ""}${sig.pregunta}` : FIN}`),
     ]);
-    setI(i + 1);
+    setI(destino);
+    setTope(Math.max(tope, destino));
     setValor("");
   }
 
@@ -252,8 +260,25 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
 
   function irA(idx: number) {
     setI(idx);
-    setHist((h) => [...h, m("bot", `Volvamos a: ${pasos[idx].pregunta}`)]);
+    setTope(Math.max(tope, i));
+    setHist((h) => [...h, m("bot", idx >= pasos.length ? FIN : `Volvamos a: ${pasos[idx].pregunta}`)]);
   }
+  // Atajos: la primera firma ya alcanzada y el punto al que se vuelve tras corregir
+  const iFirma = pasos.findIndex((p) => p.tipo === "firma");
+  const alcance = Math.max(tope, i);
+  const verFirma = iFirma >= 0 && iFirma <= alcance && i !== iFirma;
+  const listaPasos = (
+    <details className="text-xs text-slate-500">
+      <summary className="cursor-pointer">{completo ? "Volver a una pregunta" : "Cambiar una respuesta"}</summary>
+      <div className="mt-2 flex flex-wrap gap-1">
+        {pasos.slice(0, alcance).map((p, k) => (
+          <button key={p.id} type="button" onClick={() => irA(k)} className={cn("rounded border border-slate-200 px-2 py-0.5 hover:bg-slate-50", k === i && "border-sotec-greenDeep text-sotec-greenDeep")}>
+            {k + 1}. {p.resaltar ?? p.id}
+          </button>
+        ))}
+      </div>
+    </details>
+  );
 
   return (
     <div className="flex h-full min-h-[520px] flex-col rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -285,6 +310,28 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
       </div>
 
       <div className="space-y-3 border-t border-slate-200 px-4 py-3">
+        {paso && (i > 0 || verFirma) && (
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {i > 0 && (
+                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => irA(i - 1)}>
+                  <ArrowLeft className="h-3.5 w-3.5" /> Anterior
+                </Button>
+              )}
+              {i < tope && (
+                <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => irA(tope)}>
+                  <CornerDownRight className="h-3.5 w-3.5" /> {tope >= pasos.length ? "Dejarlo así e ir al final" : `Dejarlo así y seguir en el paso ${tope + 1}`}
+                </Button>
+              )}
+              {verFirma && i < tope && (
+                <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => irA(iFirma)}>
+                  <PenLine className="h-3.5 w-3.5" /> Ir a la firma
+                </Button>
+              )}
+            </div>
+            {i > 0 && listaPasos}
+          </div>
+        )}
         {paso && (
           <>
             {paso.ayuda && <p className="whitespace-pre-line text-xs text-slate-500">{paso.ayuda}</p>}
@@ -606,16 +653,12 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
         {completo && (
           <div className="space-y-2">
             {acciones}
-            <details className="text-xs text-slate-500">
-              <summary className="cursor-pointer">Volver a una pregunta</summary>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {pasos.map((p, k) => (
-                  <button key={p.id} type="button" onClick={() => irA(k)} className="rounded border border-slate-200 px-2 py-0.5 hover:bg-slate-50">
-                    {k + 1}. {p.resaltar ?? p.id}
-                  </button>
-                ))}
-              </div>
-            </details>
+            {verFirma && (
+              <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => irA(iFirma)}>
+                <PenLine className="h-4 w-4" /> Ir a la firma
+              </Button>
+            )}
+            {listaPasos}
           </div>
         )}
       </div>

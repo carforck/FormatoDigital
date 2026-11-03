@@ -9,7 +9,8 @@
  * restringido, coordinador aprueba, cliente firma; pedidos de Magno (fotos,
  * firma por enlace, envío, cuenta de cobro); trabajo de campo (firma del cliente
  * en sitio, retirar para corregir —anula la firma del cliente—, cámara o galería,
- * clientes nuevos al directorio y los que solo se parecen se preguntan); que ninguna pantalla se desborde en 8 anchos y los controles del shell.
+ * clientes nuevos al directorio y los que solo se parecen se preguntan); corregir en revisión
+ * mientras nadie lo haya revisado (sigue en revisión; ya aprobado no se modifica); que ninguna pantalla se desborde en 8 anchos y los controles del shell.
  */
 const fs = require("fs");
 const os = require("os");
@@ -17,7 +18,7 @@ const path = require("path");
 const puppeteer = require("puppeteer-core");
 
 const BASE = (process.env.BASE || "http://localhost:3100").replace(/\/$/, "");
-const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion" | "campo" | "variantes" | "listas" | "epp" | "paginacion" | "logos"
+const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion" | "campo" | "revision" | "variantes" | "listas" | "epp" | "paginacion" | "logos" | "asistente"
 const CLAVE = "sotec-demo-v9";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -2456,6 +2457,88 @@ async function listas(b, errores) {
 }
 
 /**
+ * Asistente (pedidos de Magno): volver a la pregunta anterior o a cualquiera ya respondida;
+ * al corregir se regresa a donde se iba (o directo a la firma) sin repetir lo demás; y un
+ * borrador sin terminar que se recupera se puede descartar para empezar uno nuevo.
+ */
+async function asistente(b, errores) {
+  console.log("\n— Asistente: anterior, corregir sin repetir, ir a la firma y empezar uno nuevo");
+  const p = await nuevaPagina(b, errores);
+  await p.setViewport({ width: 1440, height: 900 });
+  await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "networkidle0" });
+  await clic(p, "Técnico de campo");
+  await p.waitForFunction(() => location.pathname.includes("/app/nuevo/reporte"));
+  await sleep(800);
+  const paso = () => p.evaluate(() => (document.body.innerText.match(/Paso (\d+) \/ \d+/) ?? [])[1] ?? (document.body.innerText.includes("Completo") ? "fin" : ""));
+  const ultimoBot = () => p.evaluate(() => [...document.querySelectorAll(".rounded-2xl.whitespace-pre-line")].map((e) => e.innerText).pop() ?? "");
+  const aPaso = (n) =>
+    p.evaluate((n) => {
+      const d = [...document.querySelectorAll("details")].find((x) => /Cambiar una respuesta|Volver a una pregunta/.test(x.innerText));
+      d.open = true;
+      const b = [...d.querySelectorAll("button")].find((x) => x.textContent.trim().startsWith(`${n}.`));
+      b?.click();
+      return Boolean(b);
+    }, n);
+
+  await responder(p, "Ladrillera Arcillas del Caribe");
+  await sinProyecto(p);
+  await clic(p, "Correctivo");
+  const iFecha = Number(await paso());
+  ok(await p.evaluate(() => [...document.querySelectorAll("main button")].some((b) => b.textContent.trim() === "Anterior")), "desde el segundo paso hay botón «Anterior»");
+  await clic(p, String(new Date().getFullYear()));
+  await clic(p, "08:00");
+  const iFin = Number(await paso());
+  await clic(p, "Anterior");
+  ok(Number(await paso()) === iFin - 1 && (await ultimoBot()).startsWith("Volvamos a"), "«Anterior» vuelve a la pregunta de antes");
+  await clic(p, "Dejarlo así");
+  ok(Number(await paso()) === iFin, "«Dejarlo así» regresa a donde iba");
+  ok(await aPaso(iFecha - 1), "«Cambiar una respuesta» lista las preguntas ya respondidas");
+  await sleep(350);
+  ok(Number(await paso()) === iFecha - 1, "se abre la pregunta del tipo de mantenimiento");
+  await clic(p, "Preventivo");
+  ok(Number(await paso()) === iFin && (await ultimoBot()).includes("Seguimos donde ibas"), "al corregir vuelve a donde iba, sin repetir las preguntas siguientes");
+  ok((await p.evaluate(() => document.querySelector(".doc-print").innerText)).includes("Preventivo"), "la corrección queda en el formato");
+
+  // Hasta el final y luego corregir algo: «Ir a la firma» lleva directo a firmar
+  await clic(p, "10:00");
+  await responder(p, "Ing. Daniel Ortega");
+  await clic(p, "Reparación fibra óptica");
+  await clic(p, "Continuar sin equipos");
+  await clic(p, "Redactar borrador");
+  await clic(p, "Enviar", "form button");
+  await clic(p, "Programar mantenimiento");
+  await clic(p, "Continuar sin fotos");
+  await clic(p, "Andrés Camacho Ruiz");
+  await clic(p, "Firmar ahora");
+  await firmar(p);
+  await clic(p, "Continuar");
+  await clic(p, "El cliente firma después");
+  ok((await paso()) === "fin", "el reporte queda completo");
+  await aPaso(iFecha - 1);
+  await sleep(350);
+  await clic(p, "Ir a la firma");
+  ok(await p.evaluate(() => [...document.querySelectorAll("main button")].some((b) => /Volver a firmar|Firmar ahora/.test(b.textContent))), "«Ir a la firma» abre el paso de la firma sin pasar por los demás");
+  await clic(p, "Continuar");
+  ok((await paso()) !== "", "después de la firma sigue con lo que faltaba");
+
+  // Borrador sin terminar: al volver se ofrece empezar uno nuevo
+  await p.goto(`${BASE}/app/nuevo/reporte`, { waitUntil: "networkidle0" });
+  await sleep(800);
+  const t = await p.evaluate(() => document.body.innerText);
+  ok(t.includes("que dejaste sin terminar") && t.includes("Ladrillera Arcillas del Caribe"), "al abrir un reporte nuevo avisa del que quedó sin terminar");
+  await clic(p, "Empezar uno nuevo");
+  await sleep(500);
+  const t2 = await p.evaluate(() => document.body.innerText);
+  ok(!t2.includes("que dejaste sin terminar") && (await paso()) === "1" && !(await p.evaluate(() => document.querySelector(".doc-print").innerText)).includes("Ladrillera Arcillas"), "«Empezar uno nuevo» descarta lo viejo y arranca en el paso 1 con el formato vacío");
+  await p.reload({ waitUntil: "networkidle0" });
+  await sleep(800);
+  ok(!(await p.evaluate(() => document.body.innerText)).includes("que dejaste sin terminar"), "lo descartado no vuelve al recargar");
+  await p.close();
+}
+
+/**
  * Paginación y listas que escalan: con volumen ficticio inyectado en la demo (60 documentos
  * en revisión, 30 por cerrar, 35 clientes y 40 eventos de auditoría, todos inventados), la
  * revisión sale en filas en escritorio y en tarjetas en el celular, cada lista pagina,
@@ -2568,6 +2651,130 @@ async function paginacion(b, errores) {
   await p.close();
 }
 
+/**
+ * Pedido de Magno: el técnico corrige un reporte ya enviado mientras está en revisión y nadie lo ha
+ * revisado (sigue en revisión, «Guardar cambios»); ya revisado (aprobado) no se modifica.
+ */
+async function revision(b, errores) {
+  console.log("\n— Corregir en revisión: el autor edita lo enviado mientras nadie lo haya revisado");
+  const p = await nuevaPagina(b, errores);
+  await p.setViewport({ width: 1440, height: 900 });
+  await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "networkidle0" });
+  await clic(p, "Técnico de campo");
+  await p.waitForFunction(() => location.pathname.includes("/app/nuevo/reporte"));
+  await sleep(800);
+  const texto = () => p.evaluate(() => document.body.innerText.replace(/\s+/g, " "));
+  const h1 = () => p.evaluate(() => document.querySelector("h1").innerText);
+  const estado = () => p.evaluate((k) => JSON.parse(localStorage.getItem(k)), CLAVE);
+  const ir = async (ruta, ms = 700) => {
+    await p.goto(BASE + ruta, { waitUntil: "networkidle0" });
+    await sleep(ms);
+  };
+  const botones = () => p.evaluate(() => [...document.querySelectorAll("main button")].map((x) => x.textContent.trim()));
+  const CORRIGIO = "Corrigió mientras estaba en revisión";
+
+  // Reporte del técnico en revisión (de la semilla), sin revisar todavía
+  let s = await estado();
+  const d0 = s.documentos.find((d) => d.tipo === "reporte" && d.estado === "en_revision" && d.autorId === "u-tec1");
+  ok(Boolean(d0), `hay un reporte del técnico en revisión (${d0 && d0.codigo})`);
+  const urlDoc = `/app/documentos/ver?id=${d0.id}`;
+  await ir(urlDoc);
+  let t = await texto();
+  let bs = await botones();
+  ok(bs.some((x) => x === "Editar") && t.includes("Puedes corregirlo mientras nadie lo haya revisado"), "en revisión sin revisar, el autor ve «Editar» y la nota «Puedes corregirlo mientras nadie lo haya revisado»");
+  ok(!bs.some((x) => x.includes("Enviar a revisión")) && bs.some((x) => x.includes("Retirar para corregir")), "no ofrece «Enviar a revisión» otra vez; «Retirar para corregir» sigue disponible");
+
+  // Con la firma del cliente tomada en sitio: corregir la anula (respaldaba lo anterior)
+  await clic(p, "Tomar firma del cliente en sitio");
+  await clic(p, "Firmar", "[role=dialog] button");
+  await firmar(p);
+  s = await estado();
+  ok(String(s.documentos.find((d) => d.id === d0.id).datos.firmaCliente || "").startsWith("data:image/") && (await botones()).some((x) => x === "Editar"), "la firma en sitio del autor no le quita «Editar»");
+
+  // Editar: el generador ofrece «Guardar cambios» (no «Guardar borrador» ni «Enviar a revisión»)
+  const antes = s.documentos.find((d) => d.id === d0.id).actualizado;
+  await clic(p, "Editar");
+  await p.waitForFunction(() => location.pathname.includes("/app/nuevo/reporte"), { timeout: 15000 });
+  await sleep(900);
+  bs = await botones();
+  ok(bs.some((x) => x === "Guardar cambios") && !bs.some((x) => x.includes("Enviar a revisión") || x.includes("Guardar borrador")), `el generador muestra solo «Guardar cambios» (${bs.filter((x) => /Guardar|Enviar/.test(x)).join(", ")})`);
+  await editarCampo(p, "asunto", "Mantenimiento CCTV hornos corregido en revisión");
+  await clic(p, "Guardar cambios");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
+  await sleep(700);
+  s = await estado();
+  let d = s.documentos.find((x) => x.id === d0.id);
+  t = await texto();
+  ok((await h1()).includes("En revisión") && d.estado === "en_revision" && d.datos.asunto === "Mantenimiento CCTV hornos corregido en revisión", "al guardar sigue en revisión con lo corregido");
+  ok(t.includes("Cambios guardados: sigue en revisión") && d.actualizado !== antes, "avisa «Cambios guardados: sigue en revisión» y actualiza la fecha de modificación");
+  ok(d.historial.filter((h) => h.accion === CORRIGIO).length === 1 && t.includes(CORRIGIO), "historial: «Corrigió mientras estaba en revisión»");
+  ok(!String(d.datos.firmaCliente || "") && d.historial.some((h) => h.accion.startsWith("Se anuló la firma del cliente")), "corregir anula la firma del cliente tomada en sitio");
+  ok(s.notificaciones.some((n) => n.para === "supervisor" && n.docId === d0.id && n.texto.includes("corrigió")), "el revisor recibe el aviso «… corrigió … mientras estaba en revisión»");
+
+  // Guardar sin cambios no registra nada
+  await clic(p, "Editar");
+  await p.waitForFunction(() => location.pathname.includes("/app/nuevo/reporte"), { timeout: 15000 });
+  await sleep(900);
+  await clic(p, "Guardar cambios");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
+  await sleep(600);
+  s = await estado();
+  ok(s.documentos.find((x) => x.id === d0.id).historial.filter((h) => h.accion === CORRIGIO).length === 1, "«Guardar cambios» sin cambios no agrega otro evento");
+
+  // El revisor ve la versión corregida y la nota; aprueba
+  await comoUsuario(p, "u-sup");
+  await ir(urlDoc);
+  t = await texto();
+  const hoja = await p.evaluate(() => document.querySelector(".doc-print").innerText);
+  ok(hoja.includes("Mantenimiento CCTV hornos corregido en revisión") && t.includes("lo corrigió mientras estaba en revisión"), "el revisor ve el contenido corregido y la nota de la corrección");
+  ok(!(await botones()).some((x) => x === "Editar"), "el revisor no tiene «Editar» sobre lo ajeno");
+  await clic(p, "Aprobar");
+  ok((await h1()).includes("Aprobado"), "el revisor lo aprueba");
+
+  // Ya revisado: el técnico no lo modifica (ni por la URL del generador)
+  await comoUsuario(p, "u-tec1");
+  await ir(urlDoc);
+  t = await texto();
+  ok(!(await botones()).some((x) => x === "Editar") && !t.includes("Puedes corregirlo mientras nadie lo haya revisado"), "aprobado: sin «Editar» ni la nota");
+  await ir(`/app/nuevo/reporte?id=${d0.id}`);
+  ok((await texto()).includes("Este documento no se puede editar"), "aprobado: el generador por URL queda bloqueado");
+
+  // Rechazado: se edita como siempre (Guardar borrador / Enviar a revisión)
+  await ir("/app/nuevo/reporte", 800);
+  s = await estado();
+  const dR = s.documentos.find((x) => x.tipo === "reporte" && x.estado === "rechazado" && x.autorId === "u-tec1");
+  if (dR) {
+    await ir(`/app/nuevo/reporte?id=${dR.id}`, 900);
+    bs = await botones();
+    ok(bs.some((x) => x.includes("Guardar borrador")) && bs.some((x) => x.includes("Enviar a revisión")) && !bs.some((x) => x === "Guardar cambios"), "rechazado: el generador mantiene «Guardar borrador» y «Enviar a revisión»");
+  }
+
+  // Mientras edita, el revisor lo aprueba desde otro equipo: el formulario se bloquea y no se guarda nada
+  s = await estado();
+  const d2 = s.documentos.find((x) => x.estado === "en_revision" && x.autorId === "u-tec1" && x.id !== d0.id);
+  if (d2) {
+    await ir(`/app/nuevo/${d2.tipo}?id=${d2.id}`, 900);
+    ok((await botones()).some((x) => x === "Guardar cambios"), `${d2.codigo} (${d2.tipo}) en revisión abre el generador con «Guardar cambios»`);
+    const p2 = await nuevaPagina(b, errores);
+    await p2.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+    await p2.evaluate(
+      (k, id) => {
+        const st = JSON.parse(localStorage.getItem(k));
+        st.documentos = st.documentos.map((x) => (x.id === id ? { ...x, estado: "aprobado", historial: [...x.historial, { fecha: "2026-11-03T10:00:00", usuarioId: "u-sup", accion: "Aprobó" }] } : x));
+        localStorage.setItem(k, JSON.stringify(st));
+      },
+      CLAVE,
+      d2.id,
+    );
+    await sleep(900);
+    ok((await texto()).includes("Este documento no se puede editar"), "si el revisor lo aprueba mientras se edita, el formulario se bloquea");
+    await p2.close();
+  }
+  await p.close();
+}
+
 (async () => {
   const b = await puppeteer.launch({ executablePath: chrome(), headless: true, args: ["--no-sandbox"] });
   const errores = [];
@@ -2583,11 +2790,13 @@ async function paginacion(b, errores) {
     if (!SOLO || SOLO === "comercial") await comercial(b, errores);
     if (!SOLO || SOLO === "impresion") await impresion(b, errores);
     if (!SOLO || SOLO === "campo") await campo(b, errores);
+    if (!SOLO || SOLO === "revision") await revision(b, errores);
     if (!SOLO || SOLO === "variantes") await variantes(b, errores);
     if (!SOLO || SOLO === "listas") await listas(b, errores);
     if (!SOLO || SOLO === "epp") await epp(b, errores);
     if (!SOLO || SOLO === "paginacion") await paginacion(b, errores);
     if (!SOLO || SOLO === "logos") await logos(b, errores);
+    if (!SOLO || SOLO === "asistente") await asistente(b, errores);
   } catch (e) {
     ok(false, `error: ${e.message}`);
   } finally {

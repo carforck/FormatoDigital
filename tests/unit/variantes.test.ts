@@ -10,6 +10,7 @@ import {
   prefijoVariante,
   resolverVariante,
   sinProyectoPorTipo,
+  varianteDeNombreCliente,
   serieConsecutivo,
   tiposProyectoDe,
   varianteDe,
@@ -29,6 +30,7 @@ function igual<T>(nombre: string, r: T, esperado: T) {
 }
 
 const config = {}; // sin tipos propios: los de fábrica
+const base0 = (): InfoFormato => ({ codigo: "FO-GSST-22", nombre: "Formato de reporte técnico", version: "01", fecha: "01/03/2020", corto: "Reporte técnico", el: "el", nuevo: "Nuevo", plural: "reportes" });
 const fortox = { tipo: "Servicios Fortox" };
 const sotec = { tipo: "Servicios SOTEC" };
 
@@ -42,7 +44,7 @@ igual("FORTOX con su logo", varianteDe("fortox").logo, "/variantes/fortox-logo.p
 igual("FORTOX con hoja propia", varianteDe("fortox").hoja, "fortox");
 
 // Tipos de proyecto
-igual("tipos de fábrica", tiposProyectoDe(config).map((t) => t.nombre), ["Servicios SOTEC", "Servicios Fortox"]);
+igual("tipos de fábrica", tiposProyectoDe(config).map((t) => t.nombre), ["Servicios SOTEC", "Servicios Fortox", "Servicios Sevin"]);
 igual("tipos propios de Configuración", tiposProyectoDe({ tiposProyecto: [{ nombre: "Servicios Otra", variante: "fortox" }] }).map((t) => t.nombre), ["Servicios Otra"]);
 igual("lista propia vacía → la de fábrica", tiposProyectoDe({ tiposProyecto: [] }), TIPOS_PROYECTO_BASE);
 igual("tipo sin importar mayúsculas", varianteDeTipoProyecto(config, "  servicios fortox "), "fortox");
@@ -71,7 +73,19 @@ igual("elegida Fortox en un gasto → sotec", resolverVariante({ tipo: "gasto", 
 igual("opciones sin proyecto del reporte", sinProyectoPorTipo("reporte", config), [
   { etiqueta: "Sin proyecto · Servicios SOTEC", variante: "sotec" },
   { etiqueta: "Sin proyecto · Servicios Fortox", variante: "fortox" },
+  { etiqueta: "Sin proyecto · Servicios Sevin", variante: "sevin" },
 ]);
+// Por el nombre del cliente (sin formato por defecto ni proyecto)
+igual("cliente «Sevin Ltda.» → sevin", resolverVariante({ tipo: "reporte", cliente: { nombre: "Sevin Ltda." }, config }), "sevin");
+igual("cliente «SEVÍN SEGURIDAD» (mayúsculas y tilde) → sevin", varianteDeNombreCliente("SEVÍN SEGURIDAD"), "sevin");
+igual("cliente «Oficina Fortox» → fortox", resolverVariante({ tipo: "reporte", cliente: { nombre: "Oficina Fortox" }, config }), "fortox");
+igual("otro cliente → sotec", resolverVariante({ tipo: "reporte", cliente: { nombre: "Centro Comercial Mirador" }, config }), "sotec");
+igual("no confunde una palabra que contiene «sevin»", varianteDeNombreCliente("Sevinia Logística"), undefined);
+igual("el formato por defecto del cliente manda sobre el nombre", resolverVariante({ tipo: "reporte", cliente: { nombre: "Sevin Ltda.", variante: "sotec" }, config }), "sotec");
+igual("lo elegido sin proyecto manda sobre el nombre", resolverVariante({ tipo: "reporte", cliente: { nombre: "Sevin Ltda." }, config, elegida: "sotec" }), "sotec");
+igual("proyecto de SOTEC con cliente Sevin → sotec", resolverVariante({ tipo: "reporte", proyecto: sotec, cliente: { nombre: "Sevin Ltda." }, config }), "sotec");
+igual("SEVIN: GSE-FO-03 v03", [formatoEnVariante(base0(), "reporte", "sevin").codigo, formatoEnVariante(base0(), "reporte", "sevin").version], ["GSE-FO-03", "03"]);
+igual("SEVIN no cubre los gastos", varianteParaTipo("gasto", "sevin").clave, "sotec");
 igual("el gasto no ofrece elegir formato", sinProyectoPorTipo("gasto", config), []);
 
 // Control documental y etiquetas

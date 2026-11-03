@@ -7,7 +7,7 @@
  * hoja(s) anexa(s) con el mismo encabezado; las fotos se toman con la cámara o se
  * eligen de la galería (`ElegirImagen`). Sale con la variante de formato de quien lo
  * muestra (`ConVariante`: logo, control documental, colores, pie y etiquetas). Una variante
- * con hoja propia (FORTOX) sale en su formato (`HojaFortox`), con los mismos datos.
+ * con hoja propia sale en su formato (`HojaFortox`, `HojaSevin`), con los mismos datos.
  */
 
 import { Trash2 } from "lucide-react";
@@ -21,6 +21,7 @@ import { ElegirImagen, avisoSobrantes, mensajeImagenIlegible } from "@/component
 import { Encabezado, Firma } from "@/components/docs/Encabezado";
 import { PieFormato, useEtiquetas, useVariante } from "@/components/docs/VarianteFormato";
 import { EncabezadoFortox, HojaFortox, PieFortox } from "@/modulos/reportes/HojaFortox";
+import { EncabezadoSevin, HojaSevin } from "@/modulos/reportes/HojaSevin";
 import { EquiposEnFormato } from "@/modulos/equipos/EquiposEnFormato";
 import type { EquipoAtendido } from "@/modulos/equipos/tipos";
 
@@ -45,7 +46,7 @@ export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, e
   const fotos = datos.fotos ?? [];
   // Etiquetas de los campos según la variante de formato (FORTOX puede nombrarlos distinto)
   const et = useEtiquetas("reporte");
-  const fortox = useVariante("reporte").hoja === "fortox";
+  const hoja = useVariante("reporte").hoja;
   const campo = (k: CampoTexto, opts: { multiline?: boolean; type?: "text" | "date" | "time" | "email" | "tel"; placeholder?: string } = {}) => (
     <span className={cn("rounded transition-colors", resaltar === k && "bg-sotec-green/40 ring-2 ring-sotec-green")}>
       <EditableText
@@ -68,12 +69,13 @@ export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, e
     </div>
   );
 
-  const anexo = (fotos.length > 0 || editar) && <AnexoFotos fotos={fotos} codigoDoc={codigoDoc} editar={editar} resaltar={resaltar === "fotos"} fortox={fortox} />;
+  const anexo = (fotos.length > 0 || editar) && <AnexoFotos fotos={fotos} codigoDoc={codigoDoc} editar={editar} resaltar={resaltar === "fotos"} hojaPropia={hoja} />;
 
-  if (fortox) {
+  if (hoja) {
+    const Hoja = hoja === "fortox" ? HojaFortox : HojaSevin;
     return (
       <div className="doc-zona space-y-4">
-        <HojaFortox datos={datos} codigoDoc={codigoDoc} campo={campo} editar={editar} firmar={firmar} resaltar={resaltar} equipos={equipos} />
+        <Hoja datos={datos} codigoDoc={codigoDoc} campo={campo} editar={editar} firmar={firmar} resaltar={resaltar} equipos={equipos} />
         {anexo}
       </div>
     );
@@ -176,7 +178,7 @@ const FOTOS_POR_HOJA = 6;
  * Hoja(s) anexa(s) «Registro fotográfico»: cada grupo de 6 fotos es una hoja propia
  * con su encabezado, así ninguna foto queda partida entre páginas al imprimir.
  */
-function AnexoFotos({ fotos, codigoDoc, editar, resaltar, fortox }: { fotos: FotoReporte[]; codigoDoc?: string; editar?: Props["editar"]; resaltar: boolean; fortox: boolean }) {
+function AnexoFotos({ fotos, codigoDoc, editar, resaltar, hojaPropia }: { fotos: FotoReporte[]; codigoDoc?: string; editar?: Props["editar"]; resaltar: boolean; hojaPropia?: "fortox" | "sevin" }) {
   const hojas: FotoReporte[][] = [];
   for (let i = 0; i < fotos.length; i += FOTOS_POR_HOJA) hojas.push(fotos.slice(i, i + FOTOS_POR_HOJA));
   if (hojas.length === 0) hojas.push([]);
@@ -194,7 +196,7 @@ function AnexoFotos({ fotos, codigoDoc, editar, resaltar, fortox }: { fotos: Fot
           editar={editar}
           resaltar={resaltar && h === 0}
           ultima={h === hojas.length - 1}
-          fortox={fortox}
+          hojaPropia={hojaPropia}
         />
       ))}
     </>
@@ -212,7 +214,7 @@ function HojaFotos({
   editar,
   resaltar,
   ultima,
-  fortox,
+  hojaPropia,
 }: {
   fotos: FotoReporte[];
   grupo: FotoReporte[];
@@ -223,7 +225,8 @@ function HojaFotos({
   editar?: Props["editar"];
   resaltar: boolean;
   ultima: boolean;
-  fortox: boolean;
+  /** Variante con hoja propia (FORTOX, SEVIN): encabezado y pie de su formato. */
+  hojaPropia?: "fortox" | "sevin";
 }) {
   const cambiar = (id: string, patch: Partial<FotoReporte>) => editar?.({ fotos: fotos.map((f) => (f.id === id ? { ...f, ...patch } : f)) });
   /** Agrega hasta 12 fotos comprimidas; devuelve el aviso si alguna no se pudo leer (HEIC fuera de Safari). */
@@ -237,7 +240,7 @@ function HojaFotos({
   };
   return (
     <article className={cn("doc-print mx-auto w-full max-w-[816px] bg-white p-6 text-[12px] leading-snug shadow-sm ring-1 ring-slate-200 sm:p-10", resaltar && "ring-2 ring-sotec-green")}>
-      {fortox ? <EncabezadoFortox codigoDoc={codigoDoc} /> : <Encabezado tipo="reporte" codigoDoc={codigoDoc} />}
+      {hojaPropia === "fortox" ? <EncabezadoFortox codigoDoc={codigoDoc} /> : hojaPropia === "sevin" ? <EncabezadoSevin /> : <Encabezado tipo="reporte" codigoDoc={codigoDoc} />}
       <div className="hdr mt-6 border border-black py-0.5 print:mt-3">
         REGISTRO FOTOGRÁFICO · ANEXO{codigoDoc ? ` DEL REPORTE ${codigoDoc}` : ""}
         {totalHojas > 1 ? ` · HOJA ${hoja} DE ${totalHojas}` : ""}
@@ -281,9 +284,9 @@ function HojaFotos({
         </div>
       )}
       {editar && ultima && <ElegirImagen multiple className="mt-3" que="fotos del registro fotográfico" textoCamara="Tomar foto" textoGaleria="Galería / archivos" onElegir={subir} />}
-      {fortox ? (
+      {hojaPropia === "fortox" ? (
         <PieFortox />
-      ) : (
+      ) : hojaPropia === "sevin" ? null : (
         <PieFormato tipo="reporte" anexo className="mt-6 text-center text-[9.5px] font-bold print:mt-3">
           Documento emitido por el Servicio de Calidad de la Compañía. El documento es propiedad de SOTEC.
         </PieFormato>

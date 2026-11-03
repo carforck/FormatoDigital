@@ -44,6 +44,13 @@ export interface DatosReporte {
   an8?: string;
   valorServicio?: string;
   factura?: string;
+  /** Campos propios del formato de SEVIN (variante «sevin»). */
+  lugarServicio?: "campo" | "laboratorio" | "";
+  ubicacion?: string;
+  fechaSolicitud?: string;
+  diagnostico?: string;
+  empresaTecnico?: string;
+  cargoTecnico?: string;
   /** Registro fotográfico: sale en una hoja anexa con el mismo encabezado. */
   fotos?: FotoReporte[];
 }

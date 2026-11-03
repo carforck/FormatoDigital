@@ -35,6 +35,7 @@ import {
   Network,
   Search,
   Settings,
+  ShieldCheck,
   Sun,
   Users,
   Wallet,
@@ -80,6 +81,8 @@ const GRUPOS: { titulo: string; items: Item[] }[] = [
     items: [
       { href: "/app/proyectos", label: "Proyectos", icon: FolderKanban },
       { href: "/app/equipos", label: "Equipos", icon: Cctv },
+      // Pedido de Magno: la entrega de EPP en Gestión (técnico, coordinador y administración; el cliente no)
+      { href: "/app/nuevo/epp", label: "Entrega de EPP", icon: ShieldCheck, tipo: "epp" },
       { href: "/app/revision", label: "Revisión y aprobación", icon: ClipboardCheck, req: "revisar", contador: "revision" },
       { href: "/app/cobros", label: "Cuentas de cobro", icon: Receipt, req: "ver_cobros" },
       { href: "/app/clientes", label: "Clientes", icon: Building2, req: "clientes" },
@@ -677,6 +680,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 { tipo: "permiso", t: "Permiso de trabajo", d: "F-GSST-13 · peligros, EPP y grupo ejecutor", icon: HardHat },
                 { tipo: "gasto", t: "Legalización de gastos", d: "FO-GSST-25 · gastos con foto de la factura", icon: Wallet },
                 { tipo: "cotizacion", t: "Cotización", d: "Propuesta económica al cliente, con aceptación firmada", icon: FileSignature },
+                { tipo: "epp", t: "Entrega de EPP", d: "Elementos de protección entregados, con la firma del trabajador", icon: ShieldCheck },
               ] as { tipo: TipoDoc; t: string; d: string; icon: typeof FileText }[]
             )
               .filter((o) => puedeCrearTipo(usuario.rol, o.tipo))

@@ -4,6 +4,7 @@
  * configuración y enlaces de firma. Las fechas son texto ISO local
  * («AAAA-MM-DDTHH:mm:ss», ver `ahora()` en el proveedor de datos).
  */
+import type { DatosEpp } from "@/modulos/epp/tipos";
 import type { DatosGasto } from "@/modulos/gastos/tipos";
 import type { DatosPermiso } from "@/modulos/permisos/tipos";
 import type { DatosReporte } from "@/modulos/reportes/tipos";
@@ -16,6 +17,7 @@ import type { TipoProyecto } from "@/nucleo/variantes";
 export type { DatosReporte, FotoReporte } from "@/modulos/reportes/tipos";
 export type { DatosPermiso, Ejecutor, SiNoNa } from "@/modulos/permisos/tipos";
 export type { DatosGasto, ItemGasto } from "@/modulos/gastos/tipos";
+export type { DatosEpp, ItemEpp } from "@/modulos/epp/tipos";
 export type { DatosCotizacion, ItemCotizacion } from "@/modulos/cotizaciones/tipos";
 export type { Equipo, EstadoEquipo, SistemaEquipo } from "@/modulos/equipos/tipos";
 
@@ -26,7 +28,7 @@ export type Rol = "tecnico" | "supervisor" | "admin" | "cliente";
 export type Estado = "borrador" | "en_revision" | "aprobado" | "rechazado" | "cerrado";
 
 /** Tipos de documento; cada uno es un módulo en src/modulos/registro.ts. */
-export type TipoDoc = "reporte" | "permiso" | "gasto" | "cotizacion";
+export type TipoDoc = "reporte" | "permiso" | "gasto" | "cotizacion" | "epp";
 
 export interface Usuario {
   id: string;
@@ -142,8 +144,13 @@ export interface DocCotizacion extends DocBase {
   datos: DatosCotizacion;
 }
 
+export interface DocEpp extends DocBase {
+  tipo: "epp";
+  datos: DatosEpp;
+}
+
 /** Documento de cualquier formato; `tipo` determina la forma de `datos`. */
-export type Documento = DocReporte | DocPermiso | DocGasto | DocCotizacion;
+export type Documento = DocReporte | DocPermiso | DocGasto | DocCotizacion | DocEpp;
 /** Contenido del formato según el tipo de documento. */
 export type DatosDe<T extends TipoDoc> = Extract<Documento, { tipo: T }>["datos"];
 

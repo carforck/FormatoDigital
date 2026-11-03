@@ -10,6 +10,7 @@ import { createElement, type ComponentType } from "react";
 
 import type { EmpresaPlantilla, FlujoDocumento, InfoFormato, ModuloDocumento, PropsPlantilla } from "./contrato";
 import { moduloCotizaciones } from "./cotizaciones";
+import { moduloEpp } from "./epp";
 import { moduloGastos } from "./gastos";
 import { moduloPermisos } from "./permisos";
 import { moduloReportes } from "./reportes";
@@ -42,6 +43,7 @@ export const MODULOS: InfoModulo[] = [
   { clave: "permisos", nombre: "Permisos de trabajo", descripcion: "Peligros, medidas, EPP, verificación y grupo ejecutor con firmas.", estado: "activo", formato: "F-GSST-13", relaciona: ["proyectos", "ordenes"] },
   { clave: "reportes", nombre: "Reportes técnicos", descripcion: "Diagnóstico, acción y resultado; registro fotográfico como hoja anexa; firma del técnico y del cliente en sitio o por enlace.", estado: "activo", formato: "FO-GSST-22", relaciona: ["proyectos", "ordenes", "cobros"] },
   { clave: "gastos", nombre: "Legalización de gastos", descripcion: "Transporte, alimentación, hospedaje y materiales con la foto de cada factura, Vo.Bo. de administración y reembolso.", estado: "activo", formato: "FO-GSST-25", relaciona: ["proyectos", "ordenes", "cobros"] },
+  { clave: "epp", nombre: "Entrega de EPP", descripcion: "Registro de entrega de elementos de protección personal a cada trabajador: elementos, cantidad, talla y motivo, con la firma de recibido del trabajador y la de quien entrega. Interno.", estado: "activo", formato: "por confirmar", relaciona: ["proyectos", "permisos"] },
   { clave: "cotizaciones", nombre: "Cotizaciones", descripcion: "Propuesta económica al cliente por proyecto: la administración la aprueba y la envía al portal, y el cliente la acepta con su firma. Solo la administración (comercial).", estado: "activo", relaciona: ["proyectos", "cobros"], requiere: "cotizar" },
   { clave: "cobros", nombre: "Cuentas de cobro", descripcion: "SOTEC le cobra a su cliente por el servicio, con ítems tomados de los reportes técnicos, IVA y valor en letras. Solo la administración (comercial).", estado: "activo", relaciona: ["proyectos", "ordenes", "reportes"], requiere: "cobros" },
   { clave: "requerimientos", nombre: "Requerimiento de materiales", descripcion: "Solicitud de materiales para un proyecto, con aprobación y entrega; interno, el cliente no lo ve.", estado: "planeado", relaciona: ["proyectos", "gastos"] },
@@ -60,10 +62,11 @@ export const DOCUMENTOS: { [T in TipoDoc]: ModuloDocumento<DatosDe<T>> } = {
   permiso: moduloPermisos,
   gasto: moduloGastos,
   cotizacion: moduloCotizaciones,
+  epp: moduloEpp,
 };
 
 /** Orden en el menú, el tablero, los filtros y los proyectos. */
-export const TIPOS_DOC: TipoDoc[] = ["reporte", "permiso", "gasto", "cotizacion"];
+export const TIPOS_DOC: TipoDoc[] = ["reporte", "permiso", "gasto", "cotizacion", "epp"];
 
 // Paleta de series (globals.css), en el orden de TIPOS_DOC
 const PALETA = ["var(--serie-a)", "var(--serie-b)", "var(--serie-c)", "var(--serie-d)", "var(--serie-e)"];

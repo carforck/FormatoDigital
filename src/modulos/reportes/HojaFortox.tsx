@@ -16,6 +16,7 @@ import { asset } from "@/nucleo/rutas";
 import type { DatosReporte } from "@/nucleo/tipos";
 
 import { Firma } from "@/components/docs/Encabezado";
+import { Renglones } from "@/components/docs/Renglones";
 import { EquiposEnFormato } from "@/modulos/equipos/EquiposEnFormato";
 import type { EquipoAtendido } from "@/modulos/equipos/tipos";
 
@@ -183,10 +184,7 @@ export function HojaFortox({ datos, codigoDoc, campo, editar, firmar, resaltar, 
             {linea("Hora de Llegada", "horaLlegada")}
             {linea("Hora de Salida", "horaSalida")}
           </div>
-          <div
-            className="mt-3 min-h-[190px] text-justify text-[12.5px] leading-[24px] print:min-h-[170px]"
-            style={{ backgroundImage: "repeating-linear-gradient(to bottom, transparent 0 23px, #000 23px 24px)" }}
-          >
+          <Renglones minimo={8} texto={`${datos.descripcion ?? ""}\n${datos.recomendaciones ?? ""}`} className="mt-3 text-justify text-[12.5px]">
             {campo("descripcion", { multiline: true, placeholder: editar ? "Actividad realizada (toca para escribir)" : " " })}
             {(datos.recomendaciones || editar) && (
               <div className={cn(resaltar === "recomendaciones" && "rounded bg-sotec-green/40 ring-2 ring-sotec-green")}>
@@ -194,7 +192,7 @@ export function HojaFortox({ datos, codigoDoc, campo, editar, firmar, resaltar, 
                 {campo("recomendaciones", { multiline: true })}
               </div>
             )}
-          </div>
+          </Renglones>
         </div>
         <div className="grid grid-cols-1 gap-x-8 gap-y-1.5 border-t border-black p-2 font-bold sm:grid-cols-2 print:grid-cols-2">
           {linea("Valor Servicio (antes de IVA) $", "valorServicio")}

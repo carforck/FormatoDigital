@@ -17,7 +17,7 @@ const path = require("path");
 const puppeteer = require("puppeteer-core");
 
 const BASE = (process.env.BASE || "http://localhost:3100").replace(/\/$/, "");
-const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion" | "campo" | "variantes" | "listas"
+const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion" | "campo" | "variantes" | "listas" | "epp"
 const CLAVE = "sotec-demo-v9";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -1852,6 +1852,7 @@ async function variantes(b, errores) {
   ok((await p.title()).startsWith(`${guardado.codigo} · Reporte técnico`), `el PDF se llama con el consecutivo (${await p.title()})`);
   ok((await vista()).logo && h.includes("REPORTE DE MANTENIMIENTO DE SEGURIDAD ELECTRÓNICA") && h.includes("FORMA: 7PA/F1-15"), "/imprimir sale con el formato de FORTOX");
   await foto("imprimir-fortox");
+  ok(await p.evaluate(() => ![...document.querySelectorAll(".doc-print, .doc-print *")].some((e) => getComputedStyle(e).backgroundImage.includes("gradient"))), "la hoja de FORTOX no usa degradados (el «cuadro negro» al imprimir)");
   if (capturas) {
     await p.emulateMediaType("print");
     await p.pdf({ path: path.join(capturas, "imprimir-fortox.pdf"), format: "letter", printBackground: true });
@@ -1957,6 +1958,37 @@ async function variantes(b, errores) {
   await p.goto(`${BASE}/app/documentos/ver?id=${idSin}`, { waitUntil: "networkidle0" });
   await sleep(400);
 
+  // 7c. Cliente «Sevin»: con solo escogerlo (o escribirlo) el reporte sale en el «Informe de servicios» GSE-FO-03
+  await p.evaluate(() => localStorage.removeItem("fd-generador-reporte-u-tec1"));
+  await p.goto(`${BASE}/app/nuevo/reporte`, { waitUntil: "networkidle0" });
+  await sleep(800);
+  await responder(p, "Sevin Ltda.");
+  await sleep(300);
+  const sevin = () => p.evaluate(() => Boolean(document.querySelector(".doc-print[data-hoja=sevin] img[alt=SEVIN]")));
+  h = await hoja();
+  ok((await chip()).startsWith("Formato: Servicios Sevin") && (await sevin()), "al escribir el cliente «Sevin Ltda.» el reporte cambia al formato de SEVIN");
+  ok(h.includes("INFORME DE SERVICIOS") && h.includes("Código: GSE-FO-03") && h.includes("Versión: 03") && h.includes("Actividades realizadas") && h.includes("Sugerencias o acciones correctivas"), "la hoja de SEVIN trae su encabezado y secciones (GSE-FO-03 v03)");
+  await p.evaluate(() => [...document.querySelectorAll(".doc-print[data-hoja=sevin] button")].find((b) => b.textContent.trim() === "Mantenimiento preventivo").click());
+  await sleep(200);
+  ok(await p.evaluate(() => [...document.querySelectorAll(".doc-print[data-hoja=sevin] button[aria-pressed=true]")].map((b) => b.textContent.trim()).join() === "Mantenimiento preventivoX"), "la casilla «Mantenimiento preventivo» queda marcada con X");
+  ok(await p.evaluate(() => (document.body.innerText.match(/Sin proyecto · Servicios Sevin/g) || []).length > 0), "el asistente ofrece «Sin proyecto · Servicios Sevin»");
+  await clic(p, "Guardar borrador");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"));
+  await sleep(600);
+  const idSevin = new URL(p.url()).searchParams.get("id");
+  const docSevin = await p.evaluate((k, id) => JSON.parse(localStorage.getItem(k)).documentos.find((d) => d.id === id), CLAVE, idSevin);
+  ok(docSevin && docSevin.variante === "sevin" && docSevin.datos.tipoReporte === "Mantenimiento preventivo", "el reporte se guarda con el formato SEVIN");
+  await p.goto(`${BASE}/imprimir?doc=${idSevin}&volver=/app/documentos`, { waitUntil: "networkidle0" });
+  await p.waitForSelector("[data-impresion-lista]", { timeout: 20000 });
+  ok(await sevin(), "/imprimir sale con el formato de SEVIN");
+  // Sin degradados repetidos en las hojas: al imprimir desde el celular salen como un cuadro negro
+  ok(await p.evaluate(() => ![...document.querySelectorAll(".doc-print, .doc-print *")].some((e) => getComputedStyle(e).backgroundImage.includes("gradient"))), "ninguna hoja usa degradados (el «cuadro negro» al imprimir)");
+  if (capturas) {
+    await p.emulateMediaType("print");
+    await p.pdf({ path: path.join(capturas, "imprimir-sevin.pdf"), format: "letter", printBackground: true });
+    await p.emulateMediaType(null);
+  }
+
   // 8. Celular (390): el chip y el encabezado de FORTOX en la pestaña «Formato»
   await p.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
   await p.goto(`${BASE}/app/nuevo/reporte?proyecto=p-12`, { waitUntil: "networkidle0" });
@@ -1981,6 +2013,117 @@ async function variantes(b, errores) {
  * campos del celular (iPhone no acerca la pantalla) y nombres de cliente pegados con su NIT.
  * CAPTURAS_LISTAS=/ruta guarda capturas (390 px y escritorio).
  */
+/**
+ * Entrega de EPP (pedido de Magno): ítem en «Gestión» para el técnico, el Coordinador SST y la
+ * administración (no el cliente); el técnico la diligencia en el asistente, la envía, el
+ * coordinador la aprueba firmando como quien entrega y /imprimir sale en una hoja carta.
+ */
+async function epp(b, errores) {
+  console.log("\n— Entrega de EPP");
+  const p = await nuevaPagina(b, errores);
+  await p.evaluateOnNewDocument(() => {
+    window.__impresiones = 0;
+    window.print = () => window.__impresiones++;
+  });
+  await p.setViewport({ width: 1440, height: 900 });
+  await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "networkidle0" });
+  const menu = () => p.evaluate(() => [...document.querySelectorAll("aside a")].map((a) => [a.getAttribute("href"), a.textContent.trim(), a.closest("div")?.parentElement?.textContent.includes("Gestión")]));
+  const enGestion = async () => (await menu()).some(([h, t, g]) => h === "/app/nuevo/epp" && t.includes("Entrega de EPP") && g);
+  const hoja = () => p.evaluate(() => [...document.querySelectorAll(".doc-print")].map((h) => h.innerText.replace(/\s+/g, " ")).join(" | "));
+
+  // 1. Técnico: el ítem está en Gestión y lleva al formato
+  await clic(p, "Técnico de campo");
+  await p.waitForFunction(() => location.pathname.startsWith("/app"));
+  await sleep(800);
+  ok(await enGestion(), "técnico: «Entrega de EPP» en el menú, grupo Gestión");
+  await p.evaluate(() => [...document.querySelectorAll("aside a")].find((a) => a.getAttribute("href") === "/app/nuevo/epp").click());
+  await p.waitForFunction(() => location.pathname.includes("/app/nuevo/epp"));
+  await sleep(900);
+  let h = await hoja();
+  ok(h.includes("REGISTRO DE ENTREGA DE ELEMENTOS DE PROTECCIÓN PERSONAL") && h.includes("COMPROMISO DEL TRABAJADOR"), "el formato de entrega de EPP se ve en la vista previa");
+  ok(h.includes("Andrés Camacho Ruiz"), "el trabajador se prellena con el usuario");
+
+  // 2. Asistente completo
+  await clic(p, "Sede SOTEC");
+  await clic(p, "Sin proyecto");
+  await clic(p, "Andrés Camacho Ruiz");
+  await responder(p, "1000000009");
+  await clic(p, "Ingeniero de campo");
+  await clic(p, String(new Date().getFullYear()));
+  await clic(p, "Casco de seguridad");
+  await clic(p, "Guantes dieléctricos");
+  await clic(p, "Botas dieléctricas");
+  await clic(p, "Continuar con 3");
+  await clic(p, "Ingreso");
+  await clic(p, "Omitir");
+  await clic(p, "Firmar ahora");
+  await firmar(p);
+  await clic(p, "Continuar");
+  await clic(p, "Firma al aprobar");
+  await sleep(300);
+  h = await hoja();
+  ok(h.includes("Casco de seguridad") && h.includes("Guantes dieléctricos") && h.includes("Botas dieléctricas") && h.includes("Total de unidades entregadas: 3"), "la tabla trae los 3 elementos marcados");
+  ok((h.match(/Ingreso/g) || []).length >= 3, "el motivo «Ingreso» queda en cada elemento");
+  ok(h.includes("Sede SOTEC") && h.includes("1000000009"), "área y cédula en el formato");
+
+  // 3. Enviar a revisión
+  await clic(p, "Enviar a revisión");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
+  await sleep(600);
+  const id = new URL(p.url()).searchParams.get("id");
+  const guardado = await p.evaluate((k, i) => JSON.parse(localStorage.getItem(k)).documentos.find((d) => d.id === i), CLAVE, id);
+  ok(guardado && guardado.tipo === "epp" && guardado.estado === "en_revision" && /^EPP-\d{3}-\d{2}$/.test(guardado.codigo) && guardado.datos.items.length === 3 && guardado.datos.firmaRecibe, `se envía a revisión con consecutivo EPP (${guardado && guardado.codigo})`);
+
+  // 4. Coordinador SST: lo ve en Gestión, lo aprueba firmando como quien entrega
+  await comoUsuario(p, "u-sup");
+  await p.goto(`${BASE}/app`, { waitUntil: "networkidle0" });
+  await sleep(700);
+  ok(await enGestion(), "coordinador: «Entrega de EPP» en Gestión");
+  await p.goto(`${BASE}/app/documentos/ver?id=${id}`, { waitUntil: "networkidle0" });
+  await sleep(700);
+  await clic(p, "Aprobar y firmar la entrega");
+  await firmar(p);
+  await sleep(500);
+  const aprobado = await p.evaluate((k, i) => JSON.parse(localStorage.getItem(k)).documentos.find((d) => d.id === i), CLAVE, id);
+  ok(aprobado.estado === "aprobado" && aprobado.datos.firmaEntrega && aprobado.datos.entregaNombre === "Andrea Ríos Martínez", "el coordinador aprueba y queda como quien entrega, con su firma");
+
+  // 5. /imprimir: una sola hoja carta
+  await p.goto(`${BASE}/imprimir?doc=${id}&volver=/app/documentos`, { waitUntil: "networkidle0" });
+  await p.waitForSelector("[data-impresion-lista]", { timeout: 20000 });
+  await sleep(300);
+  ok((await p.title()).startsWith(aprobado.codigo), `el PDF se llama con el consecutivo (${await p.title()})`);
+  // Carta a 96 ppp: 816 × 1056 px (@page sin margen); la hoja impresa debe caber en una
+  await p.setViewport({ width: 816, height: 1056 });
+  await p.emulateMediaType("print");
+  const hojas = await p.evaluate(() => [...document.querySelectorAll(".doc-print")].map((h) => Math.round(h.getBoundingClientRect().height)));
+  if (process.env.EPP_CAPTURAS) await p.pdf({ path: path.join(process.env.EPP_CAPTURAS, "epp.pdf"), format: "letter", printBackground: true });
+  await p.emulateMediaType(null);
+  await p.setViewport({ width: 1440, height: 900 });
+  ok(hojas.length === 1 && hojas[0] <= 1056, `/imprimir sale en una hoja carta (${hojas.join(", ")} px de 1056)`);
+
+  // 6. Administración: lo ve en Gestión y en Documentos
+  await comoUsuario(p, "u-adm");
+  await p.goto(`${BASE}/app/documentos`, { waitUntil: "networkidle0" });
+  await sleep(700);
+  ok(await enGestion(), "administración: «Entrega de EPP» en Gestión");
+  ok((await p.evaluate(() => document.querySelector("main").innerText)).includes(aprobado.codigo), "administración ve la entrega en Documentos");
+
+  // 7. Cliente: ni en el menú, ni por URL, ni el documento
+  await comoUsuario(p, "u-cli");
+  await p.goto(`${BASE}/app`, { waitUntil: "networkidle0" });
+  await sleep(700);
+  ok(!(await menu()).some(([h]) => h === "/app/nuevo/epp"), "cliente: sin «Entrega de EPP» en el menú");
+  await p.goto(`${BASE}/app/nuevo/epp`, { waitUntil: "networkidle0" });
+  await sleep(600);
+  ok((await p.evaluate(() => document.body.innerText)).includes("Acceso restringido"), "cliente: /app/nuevo/epp bloqueado");
+  await p.goto(`${BASE}/app/documentos/ver?id=${id}`, { waitUntil: "networkidle0" });
+  await sleep(600);
+  ok(!(await p.evaluate(() => document.body.innerText)).includes("COMPROMISO DEL TRABAJADOR"), "cliente: no ve la entrega de EPP");
+  await p.close();
+}
+
 async function listas(b, errores) {
   console.log("\n— Listas: «＋ Agregar otro» en los formularios, 16 px en el celular y cliente pegado con su NIT");
   const p = await nuevaPagina(b, errores);
@@ -2218,6 +2361,7 @@ async function listas(b, errores) {
     if (!SOLO || SOLO === "campo") await campo(b, errores);
     if (!SOLO || SOLO === "variantes") await variantes(b, errores);
     if (!SOLO || SOLO === "listas") await listas(b, errores);
+    if (!SOLO || SOLO === "epp") await epp(b, errores);
   } catch (e) {
     ok(false, `error: ${e.message}`);
   } finally {

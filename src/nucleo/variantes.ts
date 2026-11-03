@@ -12,7 +12,8 @@
  *   2. Sin proyecto: el tipo de servicio que elige quien diligencia («Sin proyecto · Servicios
  *      Fortox»: el técnico no crea proyectos), guardado en el documento.
  *   3. Si no eligió (o proyecto antiguo sin tipo): el «Formato por defecto» del cliente.
- *   4. Si no: SOTEC.
+ *   4. Si no, el nombre del cliente: «Sevin Ltda.» → Sevin, «Oficina Fortox» → Fortox (`clientes`).
+ *   5. Si no: SOTEC.
  * El documento guarda la variante con la que se creó (`Documento.variante`): cambiar
  * después el tipo del proyecto o del cliente no cambia los documentos ya guardados.
  * Un documento antiguo sin `variante` sale como SOTEC.
@@ -22,6 +23,10 @@
  * tomado del PDF que envió Fortox (insumos/formato-reporte-tecnico-fortox.pdf, fuera del
  * repo). Su hoja es distinta a la de SOTEC, así que el reporte la dibuja aparte
  * (`hoja: "fortox"`, ver src/modulos/reportes/HojaFortox.tsx); logo en public/variantes.
+ *
+ * ══ SEVIN ═══════════════════════════════════════════════════════════════════════
+ * «Informe de servicios» GSE-FO-03, versión 03, octubre 2023 (insumos/GSE-FO-03-informe-de-
+ * servicio-sevin-v3.pdf). Hoja propia: src/modulos/reportes/HojaSevin.tsx.
  * ════════════════════════════════════════════════════════════════════════════════
  */
 import type { InfoFormato } from "@/modulos/contrato";
@@ -60,7 +65,9 @@ export interface VarianteFormato {
   /** Datos de marca aún por confirmar: se avisa en el aplicativo (no en el papel). */
   provisional?: boolean;
   /** Hoja propia de la variante cuando su formato no es el de SOTEC con otra marca (p. ej. "fortox"). */
-  hoja?: "fortox";
+  hoja?: "fortox" | "sevin";
+  /** Palabras del nombre del cliente que, sin otra indicación, eligen esta variante («sevin»). */
+  clientes?: string[];
 }
 
 /** Clave de la variante por defecto. */
@@ -78,14 +85,40 @@ const VARIANTE_FORTOX: VarianteFormato = {
   colorEncabezado: "#FABF8F", // franjas salmón del formato de Fortox
   colorMarca: "#0B2D5B",
   hoja: "fortox",
+  clientes: ["fortox"],
   formatos: {
     // Fortox no maneja versión ni fecha del formato: solo la FORMA
     reporte: { nombre: "Reporte de mantenimiento de seguridad electrónica", codigo: "7PA/F1-15", version: "—", fecha: "—" },
   },
 };
 
+/** SEVIN: su «Informe de servicios» GSE-FO-03 (versión 03, octubre 2023), con hoja propia. */
+const VARIANTE_SEVIN: VarianteFormato = {
+  clave: "sevin",
+  marca: "SEVIN",
+  etiqueta: "Servicios Sevin",
+  logo: "/variantes/sevin-logo.png",
+  colorEncabezado: "#002060", // azul oscuro de las franjas del formato de Sevin
+  colorMarca: "#002060",
+  hoja: "sevin",
+  clientes: ["sevin"],
+  formatos: {
+    reporte: { nombre: "Informe de servicios", codigo: "GSE-FO-03", version: "03", fecha: "Octubre 2023" },
+  },
+};
+
 /** Variantes disponibles, en el orden de los selectores. */
-export const VARIANTES: VarianteFormato[] = [VARIANTE_SOTEC, VARIANTE_FORTOX];
+export const VARIANTES: VarianteFormato[] = [VARIANTE_SOTEC, VARIANTE_FORTOX, VARIANTE_SEVIN];
+
+/** Texto en minúsculas, sin tildes ni signos, para comparar nombres. */
+const plano = (t: string) => ` ${t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9ñ]+/g, " ")} `;
+
+/** Variante que corresponde al nombre de un cliente («Sevin Ltda.» → sevin); undefined si ninguna. */
+export function varianteDeNombreCliente(nombre?: string): string | undefined {
+  if (!nombre?.trim()) return undefined;
+  const n = plano(nombre);
+  return VARIANTES.find((v) => v.clientes?.some((c) => n.includes(plano(c))))?.clave;
+}
 
 /** Variante por su clave; una clave desconocida o vacía es SOTEC (documentos antiguos). */
 export function varianteDe(clave?: string | null): VarianteFormato {
@@ -136,6 +169,7 @@ export const TIPO_PROYECTO_BASE = "Servicios SOTEC";
 export const TIPOS_PROYECTO_BASE: TipoProyecto[] = [
   { nombre: TIPO_PROYECTO_BASE, variante: VARIANTE_BASE },
   { nombre: "Servicios Fortox", variante: "fortox" },
+  { nombre: "Servicios Sevin", variante: "sevin" },
 ];
 
 /** Tipos de proyecto de la organización (los de Configuración o, si no hay, los de fábrica). */
@@ -160,13 +194,13 @@ export function varianteDeTipoProyecto(config: Pick<Config, "tiposProyecto">, ti
 export function resolverVariante(a: {
   tipo: TipoDoc;
   proyecto?: Pick<Proyecto, "tipo"> | null;
-  cliente?: Pick<Cliente, "variante"> | null;
+  cliente?: (Pick<Cliente, "variante"> & Partial<Pick<Cliente, "nombre">>) | null;
   config: Pick<Config, "tiposProyecto">;
   /** Variante elegida en el documento cuando no tiene proyecto. */
   elegida?: string;
 }): string {
   const delProyecto = varianteDeTipoProyecto(a.config, a.proyecto?.tipo);
-  const clave = delProyecto ?? (a.proyecto ? undefined : a.elegida) ?? a.cliente?.variante ?? VARIANTE_BASE;
+  const clave = delProyecto ?? (a.proyecto ? undefined : a.elegida) ?? a.cliente?.variante ?? varianteDeNombreCliente(a.cliente?.nombre) ?? VARIANTE_BASE;
   return varianteParaTipo(a.tipo, clave).clave;
 }
 

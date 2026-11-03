@@ -237,7 +237,14 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   // Variante de formato: la del tipo del proyecto; sin proyecto, la elegida («Sin proyecto · Servicios
   // Fortox», guardada en doc.variante) o la del cliente; si no, SOTEC
   const varianteDel = (p: Proyecto | undefined, clienteId: string, elegida?: string) =>
-    resolverVariante({ tipo, proyecto: p, cliente: demo.clientes.find((c) => c.id === clienteId), config: demo.config, elegida });
+    resolverVariante({
+      tipo,
+      proyecto: p,
+      // Cliente escrito a mano (aún no en el directorio): cuenta su nombre («Sevin Ltda.» → formato Sevin)
+      cliente: demo.clientes.find((c) => c.id === clienteId) ?? { nombre: String((doc.datos as unknown as Record<string, unknown>)[info.campoCliente] ?? "") },
+      config: demo.config,
+      elegida,
+    });
   const variante = varianteDel(proyecto, doc.clienteId, doc.variante);
   /** «Sin proyecto · Servicios SOTEC / Servicios Fortox»: el técnico elige el formato sin crear proyecto. */
   const sinProyecto = sinProyectoPorTipo(tipo, demo.config);

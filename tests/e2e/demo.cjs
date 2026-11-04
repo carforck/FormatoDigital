@@ -2211,6 +2211,27 @@ async function variantes(b, errores) {
  * administración (no el cliente); el técnico la diligencia en el asistente, la envía, el
  * coordinador la aprueba firmando como quien entrega y /imprimir sale en una hoja carta.
  */
+/**
+ * Copia de fixtures/foto.jpg con un EXIF mínimo (DateTimeOriginal = `fecha`, «aaaa:mm:dd hh:mm:ss»)
+ * o sin EXIF (`fecha` vacía, archivo recién escrito: su fecha es «ahora»). Devuelve la ruta.
+ */
+function fotoConExif(fecha, nombre) {
+  const base = fs.readFileSync(path.join(__dirname, "fixtures/foto.jpg"));
+  const destino = path.join(os.tmpdir(), nombre);
+  if (!fecha) {
+    fs.writeFileSync(destino, base);
+    return destino;
+  }
+  const u16 = (n) => [n >> 8, n & 255];
+  const u32 = (n) => [n >>> 24, (n >> 16) & 255, (n >> 8) & 255, n & 255];
+  const texto = [...fecha].map((c) => c.charCodeAt(0)).concat(0);
+  // TIFF big-endian: cabecera (8) + IFD0 con el puntero al IFD EXIF (18) + IFD EXIF con DateTimeOriginal (18) + texto
+  const tiff = [0x4d, 0x4d, ...u16(42), ...u32(8), ...u16(1), ...u16(0x8769), ...u16(4), ...u32(1), ...u32(26), ...u32(0), ...u16(1), ...u16(0x9003), ...u16(2), ...u32(texto.length), ...u32(44), ...u32(0), ...texto];
+  const app1 = [0x45, 0x78, 0x69, 0x66, 0, 0, ...tiff];
+  fs.writeFileSync(destino, Buffer.concat([base.subarray(0, 2), Buffer.from([0xff, 0xe1, ...u16(app1.length + 2), ...app1]), base.subarray(2)]));
+  return destino;
+}
+
 async function epp(b, errores) {
   console.log("\n— Entrega de EPP");
   const p = await nuevaPagina(b, errores);
@@ -2254,6 +2275,27 @@ async function epp(b, errores) {
   await clic(p, "Firmar ahora");
   await firmar(p);
   await clic(p, "Continuar");
+  // 2a. Foto del trabajador recibiendo el EPP: desde la galería, con la fecha EXIF de la foto (no se escribe)
+  ok((await p.evaluate(() => document.body.innerText)).includes("Foto del trabajador recibiendo el EPP"), "después de la firma el asistente pide la foto del trabajador recibiendo el EPP");
+  ok(await p.evaluate(() => [...document.querySelectorAll("main button")].some((x) => !x.closest(".doc-print") && x.textContent.trim() === "Omitir")), "la foto se puede omitir");
+  const galeria = await p.$('main input[type=file]:not([capture])[aria-label*="trabajador recibiendo el EPP"]:not(.doc-print *)');
+  await galeria.uploadFile(fotoConExif("2026:10:15 08:30:00", "epp-galeria.jpg"));
+  await p.waitForFunction(() => document.body.innerText.includes("Firma de quien entrega (si está presente)"), { timeout: 10000 }).catch(() => {});
+  const leyenda = () => p.evaluate(() => [...document.querySelectorAll(".doc-print [data-foto-recibe]")].map((f) => (f.querySelector("img") ? "img|" : "") + (f.querySelector("[data-foto-leyenda]")?.textContent.trim() ?? "")).join(" / "));
+  let ley = await leyenda();
+  ok(ley.startsWith("img|Foto de galería · tomada el 15/10/2026 08:30"), `la foto sale en la vista previa con la fecha EXIF y dice que es de galería (${ley})`);
+  // La fecha también queda estampada en la imagen: franja oscura al pie (esquina inferior derecha)
+  const franja = await p.evaluate(async () => {
+    const img = document.querySelector(".doc-print [data-foto-recibe] img");
+    const c = document.createElement("canvas");
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    const ctx = c.getContext("2d");
+    ctx.drawImage(img, 0, 0);
+    const [r, g, b] = ctx.getImageData(c.width - 3, c.height - 3, 1, 1).data;
+    return Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+  });
+  ok(franja <= 110, `la fecha queda estampada en la imagen (franja oscura al pie, luminancia ${franja})`);
   await clic(p, "Firma al aprobar");
   await sleep(300);
   h = await hoja();
@@ -2266,6 +2308,77 @@ async function epp(b, errores) {
   await sleep(300);
   h = await hoja();
   ok((await p.evaluate(() => Boolean(document.querySelector(".doc-print[data-hoja=laclay]")))) && h.includes("Matriz Entrega de EPP's") && /CASCO DE SEGURIDAD/i.test(h) && h.includes("1000000009"), "el selector «Formato» cambia la entrega a la matriz de La Clay con los mismos datos");
+  ley = await leyenda();
+  ok(ley.startsWith("img|Foto de galería · tomada el 15/10/2026 08:30"), `la matriz de La Clay también muestra la foto con su fecha (${ley})`);
+  // Cámara de la app con marco guía (Chrome con cámara falsa): Esc cierra y apaga la cámara
+  await p.evaluate(() => {
+    window.__flujos = [];
+    const gum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = async (c) => {
+      const f = await gum(c);
+      window.__flujos.push(f);
+      return f;
+    };
+  });
+  const QUE_R = "Tomar foto: foto del trabajador recibiendo el EPP (reemplazar)";
+  const camaraLista = () => p.waitForFunction(() => document.querySelector("[data-camara-guia] video")?.videoWidth > 0 && !document.querySelector('[data-camara-guia] button[aria-label="Capturar"]').disabled, { timeout: 10000 }).catch(() => {});
+  const abrirCamara = async () => {
+    await p.evaluate((l) => document.querySelector(`.doc-print button[aria-label="${l}"]`).click(), QUE_R);
+    await camaraLista();
+  };
+  const apagadas = () => p.evaluate(() => window.__flujos.length > 0 && window.__flujos.every((f) => f.getTracks().every((t) => t.readyState === "ended")));
+  await abrirCamara();
+  const dlg = await p.evaluate(() => {
+    const d = document.querySelector("[data-camara-guia]");
+    const v = d && d.querySelector("video");
+    return d && { rol: d.getAttribute("role"), modal: d.getAttribute("aria-modal"), aviso: d.innerText.includes("Ubica la cara del trabajador dentro del marco"), marco: Boolean(d.querySelector("svg ellipse")), foco: document.activeElement?.getAttribute("aria-label"), video: v.videoWidth, inline: v.playsInline, muted: v.muted };
+  });
+  ok(dlg && dlg.rol === "dialog" && dlg.modal === "true" && dlg.marco && dlg.aviso && dlg.video > 0 && dlg.inline && dlg.muted && dlg.foco === "Capturar", `«Tomar foto» abre la cámara de la app con el marco para la cara y el foco en «Capturar» (${JSON.stringify(dlg)})`);
+  await p.keyboard.press("Escape");
+  await sleep(300);
+  ok(!(await p.$("[data-camara-guia]")) && (await apagadas()), "Esc cierra la cámara y la apaga (pistas detenidas)");
+  await abrirCamara();
+  const idCam = () => p.evaluate(() => window.__flujos[window.__flujos.length - 1]?.getVideoTracks()[0]?.getSettings().deviceId ?? "");
+  await sleep(400);
+  const cam1 = await idCam();
+  await clic(p, "Voltear", "[data-camara-guia] button");
+  await camaraLista();
+  await sleep(400);
+  const cam2 = await idCam();
+  const aperturas = await p.evaluate(() => window.__flujos.length);
+  ok(aperturas >= 3 && cam1 && cam2 && cam1 !== cam2, `«Voltear» cambia de verdad a la otra cámara del equipo (${aperturas} aperturas)`);
+  await clic(p, "Voltear", "[data-camara-guia] button");
+  await camaraLista();
+  await sleep(400);
+  ok((await idCam()) === cam1 && !(await p.evaluate(() => document.querySelector("[data-camara-guia] [role=status]"))), "volver a voltear regresa a la primera cámara, sin avisos de error");
+  await p.evaluate(() => document.querySelector('[data-camara-guia] button[aria-label="Capturar"]').click());
+  await p.waitForFunction(() => document.querySelector(".doc-print [data-foto-leyenda]")?.textContent.includes("Tomada en sitio"), { timeout: 10000 }).catch(() => {});
+  ley = await leyenda();
+  const hhmm = (d) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const cercaDeAhora = (t) => {
+    const sello = /(\d{2}\/\d{2}\/\d{4} \d{2}:\d{2})/.exec(t)?.[1] ?? "";
+    const [dd, mm, aa, hh, mi] = sello.split(/[/ :]/).map(Number);
+    return sello ? Math.abs(new Date(aa, mm - 1, dd, hh, mi).getTime() - Date.now()) < 3 * 60000 : false;
+  };
+  ok(ley.startsWith("img|Tomada en sitio el ") && cercaDeAhora(ley) && !(await p.$("[data-camara-guia]")) && (await apagadas()), `«Capturar» deja la foto «Tomada en sitio» con la hora de la captura, cierra y apaga la cámara (${ley}; ahora ${hhmm(new Date())})`);
+  const kbCam = await p.evaluate(() => {
+    const i = document.querySelector(".doc-print [data-foto-recibe] img");
+    return [Math.round(((i.src.length - i.src.indexOf(",") - 1) * 3) / 4 / 1024), i.naturalWidth, i.naturalHeight];
+  });
+  ok(kbCam[0] <= 150 && Math.max(kbCam[1], kbCam[2]) <= 1024, `la foto de la cámara queda comprimida (${kbCam[0]} KB, ${kbCam[1]}×${kbCam[2]} px)`);
+  // Sin permiso para la cámara: aviso claro y queda la cámara del sistema (input con capture) y la galería
+  await p.evaluate(() => {
+    navigator.mediaDevices.getUserMedia = () => Promise.reject(Object.assign(new Error("denegado"), { name: "NotAllowedError" }));
+  });
+  await p.evaluate((l) => document.querySelector(`.doc-print button[aria-label="${l}"]`).click(), QUE_R);
+  await p.waitForSelector(".doc-print [data-aviso-camara]", { timeout: 5000 }).catch(() => {});
+  const aviso = await p.evaluate(() => document.querySelector(".doc-print [data-aviso-camara]")?.textContent ?? "");
+  const camara = await p.$('.doc-print input[type=file][capture][aria-label*="reemplazar"]');
+  ok(aviso.includes("No se dio permiso para usar la cámara") && Boolean(camara) && !(await p.$("[data-camara-guia]")), `sin permiso: aviso y la cámara del sistema como respaldo (${aviso.slice(0, 60)}…)`);
+  await camara.uploadFile(fotoConExif("", "epp-camara.jpg"));
+  await p.waitForFunction(() => document.querySelector(".doc-print [data-foto-leyenda]")?.textContent.includes("Tomada en sitio"), { timeout: 10000 }).catch(() => {});
+  ley = await leyenda();
+  ok(ley.startsWith("img|Tomada en sitio el ") && cercaDeAhora(ley), `con la cámara del sistema la foto también dice «Tomada en sitio» con la hora de la captura (${ley})`);
   await p.select('select[aria-label="Formato del documento"]', "sotec");
   await sleep(300);
   ok(!(await p.evaluate(() => Boolean(document.querySelector(".doc-print[data-hoja=laclay]")))) && (await hoja()).includes("COMPROMISO DEL TRABAJADOR"), "y vuelve al formato de SOTEC");
@@ -2277,6 +2390,8 @@ async function epp(b, errores) {
   const id = new URL(p.url()).searchParams.get("id");
   const guardado = await p.evaluate((k, i) => JSON.parse(localStorage.getItem(k)).documentos.find((d) => d.id === i), CLAVE, id);
   ok(guardado && guardado.tipo === "epp" && guardado.estado === "en_revision" && /^EPP-\d{3}-\d{2}$/.test(guardado.codigo) && guardado.datos.items.length === 3 && guardado.datos.firmaRecibe, `se envía a revisión con consecutivo EPP (${guardado && guardado.codigo})`);
+  const fr = guardado && guardado.datos.fotoRecibe;
+  ok(fr && fr.src.startsWith("data:image/jpeg") && fr.origen === "camara" && !Number.isNaN(Date.parse(fr.tomada)) && fr.src.length < 400000, `la foto se guarda comprimida con su fecha (ISO) y origen (${fr && `${fr.origen}, ${fr.tomada}, ${Math.round(fr.src.length / 1024)} KB`})`);
 
   // 4. Coordinador SST: lo ve en Gestión, lo aprueba firmando como quien entrega
   await comoUsuario(p, "u-sup");
@@ -2304,6 +2419,36 @@ async function epp(b, errores) {
   await p.emulateMediaType(null);
   await p.setViewport({ width: 1440, height: 900 });
   ok(hojas.length === 1 && hojas[0] <= 1056, `/imprimir sale en una hoja carta (${hojas.join(", ")} px de 1056)`);
+  const leyImp = await leyenda();
+  ok(leyImp.startsWith("img|Tomada en sitio el ") && /\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}/.test(leyImp) && !(await p.evaluate(() => document.querySelector(".doc-print [data-foto-recibe] button, .doc-print [data-foto-recibe] input"))), `/imprimir lleva la foto con la fecha y hora, sin botones (${leyImp})`);
+  ok(await p.evaluate(() => ![...document.querySelectorAll(".doc-print, .doc-print *")].some((e) => getComputedStyle(e).backgroundImage.includes("gradient"))), "la hoja con la foto no usa degradados");
+  // La misma entrega en la matriz de La Clay (copia en la demo): la foto va junto al pie de firma, en una hoja
+  await p.evaluate(
+    (k, i) => {
+      const s = JSON.parse(localStorage.getItem(k));
+      s.documentos.push({ ...s.documentos.find((d) => d.id === i), id: "d-epp-foto-laclay", variante: "laclay" });
+      localStorage.setItem(k, JSON.stringify(s));
+    },
+    CLAVE,
+    id,
+  );
+  await p.goto(`${BASE}/imprimir?doc=d-epp-foto-laclay&volver=/app/documentos`, { waitUntil: "networkidle0" });
+  await p.waitForSelector("[data-impresion-lista]", { timeout: 20000 });
+  await sleep(300);
+  const leyLC = await leyenda();
+  ok((await p.evaluate(() => Boolean(document.querySelector(".doc-print[data-hoja=laclay]")))) && leyLC.startsWith("img|Tomada en sitio el ") && /\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}/.test(leyLC), `/imprimir de LA CLAY lleva la foto con la fecha y hora (${leyLC})`);
+  await p.setViewport({ width: 816, height: 1056 });
+  await p.emulateMediaType("print");
+  const hojasLC = await p.evaluate(() => [...document.querySelectorAll(".doc-print")].map((x) => Math.round(x.getBoundingClientRect().height)));
+  if (process.env.EPP_CAPTURAS) await p.pdf({ path: path.join(process.env.EPP_CAPTURAS, "epp-laclay-foto.pdf"), format: "letter", printBackground: true });
+  await p.emulateMediaType(null);
+  await p.setViewport({ width: 1440, height: 900 });
+  ok(hojasLC.length === 1 && hojasLC[0] <= 1056, `la matriz de LA CLAY con la foto sale en una hoja carta (${hojasLC.join(", ")} px de 1056)`);
+  await p.evaluate((k) => {
+    const s = JSON.parse(localStorage.getItem(k));
+    s.documentos = s.documentos.filter((d) => d.id !== "d-epp-foto-laclay");
+    localStorage.setItem(k, JSON.stringify(s));
+  }, CLAVE);
 
   // 6. Administración: lo ve en Gestión y en Documentos
   await comoUsuario(p, "u-adm");
@@ -2995,7 +3140,7 @@ async function requerimiento(b, errores) {
 }
 
 (async () => {
-  const b = await puppeteer.launch({ executablePath: chrome(), headless: true, args: ["--no-sandbox"] });
+  const b = await puppeteer.launch({ executablePath: chrome(), headless: true, args: ["--no-sandbox", "--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream=device-count=2"] });
   const errores = [];
   try {
     if (!SOLO || SOLO === "flujo") await flujo(b, errores);

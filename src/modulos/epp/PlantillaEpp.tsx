@@ -17,6 +17,7 @@ import { useVariante } from "@/components/docs/VarianteFormato";
 import { SelectConOtro } from "@/components/ui/SelectConOtro";
 import { cn } from "@/lib/utils";
 
+import { FotoEntrega } from "./FotoEntrega";
 import { COMPROMISO_EPP, EPP_CATALOGO, MOTIVOS_EPP, itemEpp } from "./catalogo";
 import { HojaLaClay } from "./HojaLaClay";
 import { totalUnidades, type DatosEpp, type ItemEpp } from "./tipos";
@@ -32,7 +33,7 @@ interface Props {
   resaltar?: string;
 }
 
-type CampoTexto = Exclude<keyof DatosEpp, "items">;
+type CampoTexto = Exclude<keyof DatosEpp, "items" | "fotoRecibe">;
 
 /** Filas mínimas de la tabla impresa (como un formato en papel). */
 const FILAS_MINIMAS = 8;
@@ -188,7 +189,14 @@ export function PlantillaEpp({ datos, codigoDoc, editar, firmar, resaltar }: Pro
           <div className="min-h-[54px] p-2 text-justify print:min-h-[40px]">{campo("observaciones", { multiline: true, placeholder: editar ? "Observaciones (opcional)" : " " })}</div>
         </section>
 
-        <div className="mt-6 grid grid-cols-2 gap-10 print:mt-4">
+        {/* Firmas y, a la derecha, la foto de quien recibe (si la hay; al diligenciar, el botón para tomarla) */}
+        <div
+          className={cn(
+            "mt-6 grid grid-cols-2 gap-10 print:mt-4",
+            (datos.fotoRecibe || editar) && "gap-6 sm:grid-cols-[1fr_1fr_150px] sm:gap-8",
+            datos.fotoRecibe ? "print:grid-cols-[1fr_1fr_150px] print:gap-8" : "print:grid-cols-2 print:gap-10",
+          )}
+        >
           <div className={cn(resaltar === "firmaRecibe" && "rounded ring-2 ring-sotec-green")}>
             <Firma src={datos.firmaRecibe} etiqueta="trabajador que recibe" texto="✍ Firma de quien recibe" onFirmar={firmar ? () => firmar("firmaRecibe") : undefined} />
             <div className="border-t border-black pt-0.5 font-bold">Recibe (trabajador)</div>
@@ -205,6 +213,7 @@ export function PlantillaEpp({ datos, codigoDoc, editar, firmar, resaltar }: Pro
               {(datos.entregaCargo || editar) && <> · {campo("entregaCargo", { placeholder: editar ? "Cargo" : " " })}</>}
             </div>
           </div>
+          <FotoEntrega className="col-span-2 mx-auto w-[150px] sm:col-span-1 sm:w-auto print:col-span-1 print:w-auto" foto={datos.fotoRecibe} resaltado={resaltar === "fotoRecibe"} onCambiar={editar ? (fotoRecibe) => editar({ fotoRecibe }) : undefined} />
         </div>
 
         <p className="mt-6 text-center text-[9.5px] font-bold print:mt-3">

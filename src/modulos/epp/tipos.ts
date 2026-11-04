@@ -6,6 +6,10 @@
  * firma el recibido de lo que se le entrega.
  */
 
+import type { FotoRecibeEpp } from "./foto";
+
+export type { FotoRecibeEpp } from "./foto";
+
 /** Motivo de la entrega de un elemento. */
 export type MotivoEpp = "Ingreso" | "Reposición" | "Dotación" | "Pérdida o daño" | (string & {});
 
@@ -43,6 +47,11 @@ export interface DatosEpp {
   observaciones: string;
   /** Firma del trabajador que recibe. */
   firmaRecibe: string;
+  /**
+   * Foto del trabajador recibiendo el EPP (evidencia opcional): con la fecha y hora de la
+   * captura (EXIF o del archivo, nunca escritas a mano) estampadas en la imagen y bajo ella.
+   */
+  fotoRecibe?: FotoRecibeEpp;
   /** Quien entrega (almacén, Coordinador SST): nombre, cargo y firma; al aprobar se completan con el revisor. */
   entregaNombre: string;
   entregaCargo: string;

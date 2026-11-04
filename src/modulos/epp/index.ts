@@ -8,9 +8,12 @@
  * proceso y omite lo que esa matriz no lleva (observaciones y firma de quien entrega).
  */
 
+import { createElement } from "react";
+
 import type { Paso } from "@/components/chat/ChatAsistente";
 import type { ModuloDocumento } from "@/modulos/contrato";
 import { EPP_CATALOGO, MOTIVOS_EPP, eppVacio, itemEpp, itemsMarcados } from "./catalogo";
+import { PasoFotoEpp, fotoDeValor } from "./FotoEntrega";
 import { PlantillaEpp } from "./PlantillaEpp";
 import { totalUnidades, type DatosEpp } from "./tipos";
 import { faltantesEpp } from "./validar";
@@ -47,7 +50,7 @@ export const moduloEpp: ModuloDocumento<DatosEpp> = {
     cerrar: "Archivar la entrega",
     eventoCierre: "Archivó la entrega de EPP",
   },
-  duplicar: (d, hoy) => ({ ...d, fecha: hoy, items: d.items.map((i, k) => ({ ...itemEpp(i.elemento, hoy, i.motivo, k), cantidad: i.cantidad, talla: i.talla, ...(i.codigo ? { codigo: i.codigo } : {}), ...(i.unidad ? { unidad: i.unidad } : {}) })), firmaRecibe: "", entregaNombre: "", entregaCargo: "", firmaEntrega: "" }),
+  duplicar: (d, hoy) => ({ ...d, fecha: hoy, items: d.items.map((i, k) => ({ ...itemEpp(i.elemento, hoy, i.motivo, k), cantidad: i.cantidad, talla: i.talla, ...(i.codigo ? { codigo: i.codigo } : {}), ...(i.unidad ? { unidad: i.unidad } : {}) })), firmaRecibe: "", fotoRecibe: undefined, entregaNombre: "", entregaCargo: "", firmaEntrega: "" }),
   alElegirProyecto: (p, c) => ({
     cambio: { obra: c ? `${c.nombre} · ${p.nombre}` : p.nombre },
     mensaje: `La entrega queda en el proyecto ${p.codigo} · ${p.nombre}.`,
@@ -81,6 +84,16 @@ export const moduloEpp: ModuloDocumento<DatosEpp> = {
     { id: "motivo", tipo: "select", resaltar: "items", pregunta: "¿Motivo de la entrega?", opciones: [...MOTIVOS_EPP], agregar: false },
     { id: "observaciones", tipo: "textarea", resaltar: "observaciones", opcional: true, pregunta: "¿Observaciones?", sugerencias: ["Se entrega dotación completa por ingreso.", "Reposición por desgaste del elemento anterior."] },
     { id: "firmaRecibe", tipo: "firma", resaltar: "firmaRecibe", pregunta: "Firma del trabajador que recibe." },
+    {
+      // Evidencia opcional: la fecha y la hora salen de la foto (no se escriben) y quedan estampadas en ella
+      id: "fotoRecibe",
+      tipo: "componente",
+      resaltar: "fotoRecibe",
+      opcional: true,
+      pregunta: "Foto del trabajador recibiendo el EPP (opcional).",
+      ayuda: "Queda como evidencia junto a la firma, con la fecha y la hora de la foto.",
+      render: (avanzar) => createElement(PasoFotoEpp, { actual: datos.fotoRecibe, avanzar }),
+    },
     {
       id: "firmaEntrega",
       tipo: "firma",
@@ -117,6 +130,12 @@ export const moduloEpp: ModuloDocumento<DatosEpp> = {
       // Firmó en sitio: el asistente entrega [nombre, cargo] de quien entrega
       if (Array.isArray(v)) return { cambio: { entregaNombre: String(v[0] ?? ""), entregaCargo: String(v[1] ?? "") } };
       return { cambio: {} };
+    }
+    if (id === "fotoRecibe") {
+      // [src, tomada, origen, fuente] = foto nueva; "-" = sin foto; "" = se deja la que había
+      if (v === "-") return { cambio: { fotoRecibe: undefined } };
+      const foto = fotoDeValor(v);
+      return { cambio: foto ? { fotoRecibe: foto } : {} };
     }
     if (id === "fecha") return { cambio: { fecha: v as string, items: datos.items.map((i) => (i.fecha === datos.fecha ? { ...i, fecha: v as string } : i)) } };
     return { cambio: { [id]: v } as Partial<DatosEpp> };

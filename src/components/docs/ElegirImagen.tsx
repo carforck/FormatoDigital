@@ -16,8 +16,11 @@ import { AlertTriangle, Camera, ImagePlus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
-  /** Recibe los archivos elegidos; puede devolver un aviso (p. ej. «1 imagen no se pudo leer»). */
-  onElegir: (archivos: File[]) => Promise<string | void> | string | void;
+  /**
+   * Recibe los archivos elegidos y de qué botón vinieron (`camara` o `galeria`); puede devolver
+   * un aviso (p. ej. «1 imagen no se pudo leer»).
+   */
+  onElegir: (archivos: File[], origen: "camara" | "galeria") => Promise<string | void> | string | void;
   /** Varias imágenes a la vez (solo desde la galería; la cámara toma una). */
   multiple?: boolean;
   /** Qué se agrega, para las etiquetas accesibles («fotos del reporte», «factura del gasto 2»). */
@@ -27,18 +30,23 @@ interface Props {
   /** Textos de los botones del bloque. */
   textoCamara?: string;
   textoGaleria?: string;
+  /**
+   * «Tomar foto» con la cámara de la app (p. ej. con un marco guía) en vez del input con `capture`:
+   * el botón de la cámara llama a esta función. Sin ella, la cámara del sistema.
+   */
+  onCamara?: () => void;
   /** Deshabilita los botones (p. ej. mientras otro proceso usa las fotos). */
   ocupado?: boolean;
   className?: string;
 }
 
 /** Dos botones: cámara y galería/archivos. Los inputs son `sr-only` dentro de cada `<label>`. */
-export function ElegirImagen({ onElegir, multiple, que, variante = "bloque", textoCamara = "Tomar foto", textoGaleria = "Galería / archivos", ocupado, className }: Props) {
+export function ElegirImagen({ onElegir, multiple, que, variante = "bloque", textoCamara = "Tomar foto", textoGaleria = "Galería / archivos", onCamara, ocupado, className }: Props) {
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const deshabilitado = ocupado || procesando;
 
-  async function elegir(e: React.ChangeEvent<HTMLInputElement>) {
+  async function elegir(e: React.ChangeEvent<HTMLInputElement>, origen: "camara" | "galeria") {
     // Se copia la lista y se limpia el input: elegir de nuevo el mismo archivo vuelve a disparar «change»
     const lista = e.target.files ? Array.from(e.target.files) : [];
     e.target.value = "";
@@ -46,7 +54,7 @@ export function ElegirImagen({ onElegir, multiple, que, variante = "bloque", tex
     setError(null);
     setProcesando(true);
     try {
-      const aviso = await onElegir(lista);
+      const aviso = await onElegir(lista, origen);
       if (aviso) setError(aviso);
     } catch {
       setError(mensajeImagenIlegible(lista.length));
@@ -64,7 +72,7 @@ export function ElegirImagen({ onElegir, multiple, que, variante = "bloque", tex
       disabled={deshabilitado}
       className="sr-only"
       aria-label={camara ? `Tomar foto: ${que}` : `Elegir de la galería o archivos: ${que}`}
-      onChange={elegir}
+      onChange={(e) => elegir(e, camara ? "camara" : "galeria")}
     />
   );
 
@@ -72,10 +80,16 @@ export function ElegirImagen({ onElegir, multiple, que, variante = "bloque", tex
     const icono = "print:hidden inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded text-[#2E7D32] hover:bg-[#F1F8E9] focus-within:ring-2 focus-within:ring-sotec-green has-[:disabled]:opacity-50";
     return (
       <span className={cn("print:hidden inline-flex flex-wrap items-center justify-center", className)}>
-        <label className={icono} title={`Tomar foto: ${que}`}>
-          {procesando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
-          {input(true)}
-        </label>
+        {onCamara ? (
+          <button type="button" className={icono} title={`Tomar foto: ${que}`} aria-label={`Tomar foto: ${que}`} disabled={deshabilitado} onClick={onCamara}>
+            {procesando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+          </button>
+        ) : (
+          <label className={icono} title={`Tomar foto: ${que}`}>
+            {procesando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+            {input(true)}
+          </label>
+        )}
         <label className={icono} title={`Galería o archivos: ${que}`}>
           <ImagePlus className="h-3.5 w-3.5" />
           {input(false)}
@@ -95,10 +109,16 @@ export function ElegirImagen({ onElegir, multiple, que, variante = "bloque", tex
   return (
     <div className={cn("print:hidden space-y-1.5", className)}>
       <div className="flex gap-2">
-        <label className={boton}>
-          {procesando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />} {procesando ? "Procesando…" : textoCamara}
-          {input(true)}
-        </label>
+        {onCamara ? (
+          <button type="button" className={boton} aria-label={`Tomar foto: ${que}`} disabled={deshabilitado} onClick={onCamara}>
+            {procesando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />} {procesando ? "Procesando…" : textoCamara}
+          </button>
+        ) : (
+          <label className={boton}>
+            {procesando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />} {procesando ? "Procesando…" : textoCamara}
+            {input(true)}
+          </label>
+        )}
         <label className={boton}>
           <ImagePlus className="h-4 w-4" /> {textoGaleria}
           {input(false)}

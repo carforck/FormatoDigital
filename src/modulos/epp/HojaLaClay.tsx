@@ -20,6 +20,7 @@ import { useVariante } from "@/components/docs/VarianteFormato";
 import { SelectConOtro } from "@/components/ui/SelectConOtro";
 import { cn } from "@/lib/utils";
 
+import { FotoEntrega } from "./FotoEntrega";
 import { EPP_CATALOGO, MOTIVOS_EPP, itemEpp } from "./catalogo";
 import { fechaLaClay, unidadEpp, type DatosEpp, type ItemEpp } from "./tipos";
 
@@ -224,26 +225,29 @@ export function HojaLaClay({ datos, codigoDoc, editar, firmar, resaltar }: Props
         </button>
       )}
 
-      {/* Pie: el trabajador firma una sola vez por todas las filas */}
-      <div className="mt-4 w-full max-w-[380px] space-y-1.5 text-[10.5px] font-semibold print:mt-3">
-        <div className="flex items-end gap-2">
-          <span className="w-28 shrink-0 leading-tight">NOMBRE COMPLETO:</span>
-          <span className="min-w-0 flex-1 border-b border-black font-normal uppercase">{campo("trabajador")}</span>
+      {/* Pie: el trabajador firma una sola vez por todas las filas; a la derecha, la foto de quien recibe (evidencia) */}
+      <div className="mt-4 flex flex-wrap items-start justify-between gap-4 sm:flex-nowrap print:mt-3 print:flex-nowrap">
+        <div className="w-full max-w-[380px] space-y-1.5 text-[10.5px] font-semibold">
+          <div className="flex items-end gap-2">
+            <span className="w-28 shrink-0 leading-tight">NOMBRE COMPLETO:</span>
+            <span className="min-w-0 flex-1 border-b border-black font-normal uppercase">{campo("trabajador")}</span>
+          </div>
+          <div className={cn("flex items-end gap-2", res("firmaRecibe"))}>
+            <span className="w-28 shrink-0">FIRMA:</span>
+            <span className="min-w-0 flex-1 border-b border-black font-normal">
+              <Firma src={datos.firmaRecibe} etiqueta="trabajador que recibe" texto="✍ Firma de quien recibe" onFirmar={firmar ? () => firmar("firmaRecibe") : undefined} />
+            </span>
+          </div>
+          <div className="flex items-end gap-2">
+            <span className="w-28 shrink-0 leading-tight">NUMERO DE IDENTIFICACIÓN:</span>
+            <span className="min-w-0 flex-1 border-b border-black font-normal">{campo("cedula")}</span>
+          </div>
+          <div className="flex items-end gap-2">
+            <span className="w-28 shrink-0">FECHA:</span>
+            <span className="min-w-0 flex-1 border-b border-black font-normal">{campo("fecha", { type: "date" })}</span>
+          </div>
         </div>
-        <div className={cn("flex items-end gap-2", res("firmaRecibe"))}>
-          <span className="w-28 shrink-0">FIRMA:</span>
-          <span className="min-w-0 flex-1 border-b border-black font-normal">
-            <Firma src={datos.firmaRecibe} etiqueta="trabajador que recibe" texto="✍ Firma de quien recibe" onFirmar={firmar ? () => firmar("firmaRecibe") : undefined} />
-          </span>
-        </div>
-        <div className="flex items-end gap-2">
-          <span className="w-28 shrink-0 leading-tight">NUMERO DE IDENTIFICACIÓN:</span>
-          <span className="min-w-0 flex-1 border-b border-black font-normal">{campo("cedula")}</span>
-        </div>
-        <div className="flex items-end gap-2">
-          <span className="w-28 shrink-0">FECHA:</span>
-          <span className="min-w-0 flex-1 border-b border-black font-normal">{campo("fecha", { type: "date" })}</span>
-        </div>
+        <FotoEntrega className="w-[150px] shrink-0" altoFoto="h-[100px]" foto={datos.fotoRecibe} resaltado={resaltar === "fotoRecibe"} onCambiar={editar ? (fotoRecibe) => editar({ fotoRecibe }) : undefined} />
       </div>
     </article>
   );

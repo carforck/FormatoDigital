@@ -18,8 +18,14 @@ export interface ItemEpp {
   /** Talla, referencia o marca. */
   talla: string;
   motivo: MotivoEpp;
-  /** Fecha de entrega del elemento (por defecto, la del formato). */
+  /** Fecha de entrega del elemento (por defecto, la del formato). En la matriz de La Clay, «EMISIÓN». */
   fecha: string;
+  /** Código del elemento en el almacén del cliente (matriz de La Clay, columna «CÓDIGO»). Opcional. */
+  codigo?: string;
+  /** Unidad («UNIDAD», «PAR»); sin ella se deduce del elemento (`unidadEpp`). Opcional. */
+  unidad?: string;
+  /** Fecha en que se solicitó el elemento (matriz de La Clay, «SOLICITADO»). Opcional. */
+  solicitado?: string;
 }
 
 /** Contenido del formato de entrega de EPP. */
@@ -29,6 +35,8 @@ export interface DatosEpp {
   trabajador: string;
   cedula: string;
   cargo: string;
+  /** Proceso o área del trabajador en la obra (matriz de La Clay, «PROCESO»). Opcional. */
+  proceso?: string;
   /** Área, proyecto u obra (o el cliente donde trabaja). */
   obra: string;
   items: ItemEpp[];
@@ -43,3 +51,19 @@ export interface DatosEpp {
 
 /** Unidades entregadas en total. */
 export const totalUnidades = (d: Pick<DatosEpp, "items">) => d.items.reduce((a, i) => a + (i.cantidad > 0 ? i.cantidad : 0), 0);
+
+/** Elementos que se entregan por par (guantes, botas, tapones auditivos…). */
+const POR_PAR = /\b(guante|bota|zapato|calzado|polaina|manga|tapon)/;
+
+/** Unidad de un elemento: la anotada o, si no, «PAR» o «UNIDAD» según el elemento. */
+export function unidadEpp(i: Pick<ItemEpp, "elemento" | "unidad">): string {
+  if (i.unidad?.trim()) return i.unidad.trim().toUpperCase();
+  const e = i.elemento.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return POR_PAR.test(e) ? "PAR" : "UNIDAD";
+}
+
+/** Fecha como la escribe la matriz de La Clay: «2026-05-05» → «5/05/2026»; otro texto queda igual. */
+export function fechaLaClay(f?: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(f ?? "");
+  return m ? `${Number(m[3])}/${m[2]}/${m[1]}` : (f ?? "");
+}

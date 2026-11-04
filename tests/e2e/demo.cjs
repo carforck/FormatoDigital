@@ -1173,7 +1173,7 @@ async function logos(b, errores) {
   const revisar = () =>
     p.evaluate(() => {
       const srcs = [...document.querySelectorAll(".doc-print img")].map((i) => i.getAttribute("src") || "");
-      return { hojas: document.querySelectorAll(".doc-print").length, app: srcs.some((x) => x.includes("controlone-logo")), empresa: srcs.filter((x) => /sotec-logo|fortox-logo|sevin-logo/.test(x)) };
+      return { hojas: document.querySelectorAll(".doc-print").length, app: srcs.some((x) => x.includes("controlone-logo")), empresa: srcs.filter((x) => /sotec-logo|fortox-logo|sevin-logo|laclay-logo/.test(x)) };
     });
   const esperar = () => p.waitForSelector("[data-impresion-lista]", { timeout: 20000 });
   // Copias de un reporte con variante FORTOX y SEVIN
@@ -1181,11 +1181,13 @@ async function logos(b, errores) {
     const s = JSON.parse(localStorage.getItem(k));
     const r = s.documentos.find((d) => d.tipo === "reporte");
     for (const v of ["fortox", "sevin"]) s.documentos.push({ ...r, id: `d-logo-${v}`, variante: v });
+    const e = s.documentos.find((d) => d.tipo === "epp");
+    if (e) s.documentos.push({ ...e, id: "d-logo-laclay", variante: "laclay" });
     localStorage.setItem(k, JSON.stringify(s));
     const de = (t) => s.documentos.find((d) => d.tipo === t)?.id;
     return { reporte: r.id, permiso: de("permiso"), gasto: de("gasto"), cotizacion: de("cotizacion"), epp: de("epp"), requerimiento: de("requerimiento"), cuenta: s.cuentas[0]?.id };
   }, CLAVE);
-  for (const [nombre, id] of Object.entries({ reporte: ids.reporte, "reporte FORTOX": "d-logo-fortox", "reporte SEVIN": "d-logo-sevin", permiso: ids.permiso, gasto: ids.gasto, cotización: ids.cotizacion, "entrega de EPP": ids.epp, requerimiento: ids.requerimiento })) {
+  for (const [nombre, id] of Object.entries({ reporte: ids.reporte, "reporte FORTOX": "d-logo-fortox", "reporte SEVIN": "d-logo-sevin", "entrega de EPP LA CLAY": ids.epp && "d-logo-laclay", permiso: ids.permiso, gasto: ids.gasto, cotización: ids.cotizacion, "entrega de EPP": ids.epp, requerimiento: ids.requerimiento })) {
     if (!id) {
       console.log(`  (sin ${nombre} en la semilla: se revisa en el generador)`);
       continue;
@@ -2105,6 +2107,81 @@ async function variantes(b, errores) {
     await p.emulateMediaType(null);
   }
 
+  // 7d. Entrega de EPP de Ladrillera La Clay: con solo escribir el cliente sale en su «Matriz Entrega de EPP's»
+  // (nombre del cliente; trabajador y cédula de prueba, ficticios)
+  await p.evaluate(() => localStorage.removeItem("fd-generador-epp-u-tec1"));
+  await p.goto(`${BASE}/app/nuevo/epp`, { waitUntil: "networkidle0" });
+  await sleep(800);
+  const laclay = () => p.evaluate(() => Boolean(document.querySelector(".doc-print[data-hoja=laclay]")));
+  const logosHoja = () => p.evaluate(() => [...document.querySelectorAll(".doc-print img")].map((i) => i.getAttribute("src") || ""));
+  ok(!(await laclay()) && (await chip()) === "Formato: Servicios SOTEC", "la entrega de EPP arranca en el formato de SOTEC");
+  await responder(p, "Ladrillera La Clay S.A.S.");
+  await sleep(300);
+  h = await hoja();
+  ok((await chip()).startsWith("Formato: Ladrillera La Clay") && (await laclay()), "al escribir el cliente «Ladrillera La Clay S.A.S.» la entrega cambia a la matriz de LA CLAY");
+  ok(
+    h.includes("Matriz Entrega de EPP's") && h.includes("Sistema Integrado de Gestión") && h.includes("Fecha de Edición") && h.includes("5/05/2026") && /CÓDIGO.*DESCRIPCIÓN.*UND\..*NOMBRE.*CARGO.*PROCESO.*EMISIÓN.*SOLICITADO/i.test(h) && h.includes("NOMBRE COMPLETO:") && h.includes("NUMERO DE IDENTIFICACIÓN:") && !h.includes("COMPROMISO DEL TRABAJADOR"),
+    "la matriz de LA CLAY trae su encabezado, columnas y pie de firma",
+  );
+  let logosLC = await logosHoja();
+  ok(logosLC.some((x) => x.includes("controlone-logo")) && !logosLC.some((x) => x.includes("laclay-logo")), "en la demo, la matriz de LA CLAY lleva la marca de la app (no el logo de La Clay)");
+  await clic(p, "Sin proyecto");
+  await sleep(300);
+  const opcionesEpp = await p.evaluate(() => [...document.querySelectorAll("main button")].filter((b) => !b.closest(".doc-print")).map((b) => b.textContent.trim()).filter((t) => t === "Ladrillera La Clay" || t === "Servicios SOTEC"));
+  ok(JSON.stringify(opcionesEpp) === JSON.stringify(["Ladrillera La Clay", "Servicios SOTEC"]) && (await p.evaluate(() => document.body.innerText)).includes("¿Con qué formato sale la entrega de epp?"), `el asistente pregunta el formato de la entrega, La Clay primero (${opcionesEpp})`);
+  await clic(p, "Ladrillera La Clay");
+  await clic(p, "Andrés Camacho Ruiz");
+  await responder(p, "1000000009");
+  await clic(p, "Ingeniero de campo");
+  await clic(p, String(new Date().getFullYear()));
+  await clic(p, "Casco de seguridad");
+  await clic(p, "Guantes de vaqueta");
+  await clic(p, "Continuar con 2");
+  await clic(p, "Dotación");
+  ok((await p.evaluate(() => document.body.innerText)).includes("¿Proceso o área del trabajador?"), "con LA CLAY el asistente pregunta el proceso (columna PROCESO)");
+  await clic(p, "Producción");
+  await clic(p, "Firmar ahora");
+  await firmar(p);
+  await sleep(300);
+  h = await hoja();
+  ok(!(await p.evaluate(() => document.body.innerText)).includes("Firma de quien entrega (si está presente)"), "la matriz no pide la firma de quien entrega (firma quien aprueba)");
+  await clic(p, "Guardar borrador");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"));
+  await sleep(600);
+  const idLC = new URL(p.url()).searchParams.get("id");
+  const docLC = await p.evaluate((k, id) => JSON.parse(localStorage.getItem(k)).documentos.find((d) => d.id === id), CLAVE, idLC);
+  ok(docLC && docLC.tipo === "epp" && docLC.variante === "laclay" && docLC.datos.proceso === "Producción" && /^EPP-\d{3}-\d{2}$/.test(docLC.codigo), `la entrega se guarda con el formato LA CLAY y la serie EPP (${docLC && docLC.codigo})`);
+  ok((await laclay()) && (await chip()).startsWith("Formato: Ladrillera La Clay"), "el detalle muestra la matriz de LA CLAY y su chip");
+  await p.goto(`${BASE}/imprimir?doc=${idLC}&volver=/app/documentos`, { waitUntil: "networkidle0" });
+  await p.waitForSelector("[data-impresion-lista]", { timeout: 20000 });
+  await sleep(300);
+  ok(await laclay(), "/imprimir sale con la matriz de LA CLAY");
+  const filasLC = await p.evaluate(() => [...document.querySelectorAll(".doc-print[data-hoja=laclay] tbody tr")].map((tr) => [...tr.cells].map((c) => c.innerText.trim()).join("|")));
+  ok(
+    filasLC.some((f) => /^\|CASCO DE SEGURIDAD\|UNIDAD\|ANDRÉS CAMACHO RUIZ\|INGENIERO DE CAMPO\|PRODUCCIÓN\|\d{1,2}\/\d{2}\/\d{4}\|$/i.test(f)) && filasLC.some((f) => /^\|GUANTES DE VAQUETA\|PAR\|/i.test(f)),
+    `cada elemento es una fila de la matriz: código, descripción, unidad, nombre, cargo, proceso, emisión y solicitado (${filasLC.filter((f) => f.replace(/\|/g, "")).slice(-2).join(" / ")})`,
+  );
+  ok(filasLC.length >= 30, `la matriz trae renglones vacíos hasta llenar la hoja (${filasLC.length} filas)`);
+  logosLC = await logosHoja();
+  ok(logosLC.some((x) => x.includes("controlone-logo")) && !logosLC.some((x) => x.includes("laclay-logo")), "/imprimir de LA CLAY en la demo: marca de la app");
+  ok(await p.evaluate(() => ![...document.querySelectorAll(".doc-print, .doc-print *")].some((e) => getComputedStyle(e).backgroundImage.includes("gradient"))), "la matriz de LA CLAY no usa degradados (el «cuadro negro» al imprimir)");
+  await p.setViewport({ width: 816, height: 1056 });
+  await p.emulateMediaType("print");
+  const altoLC = await p.evaluate(() => [...document.querySelectorAll(".doc-print")].map((x) => Math.round(x.getBoundingClientRect().height)));
+  if (capturas) await p.pdf({ path: path.join(capturas, "imprimir-laclay.pdf"), format: "letter", printBackground: true });
+  await p.emulateMediaType(null);
+  await p.setViewport({ width: 1440, height: 900 });
+  ok(altoLC.length === 1 && altoLC[0] <= 1056, `la matriz de LA CLAY sale en una hoja carta (${altoLC.join(", ")} px de 1056)`);
+  // El reporte técnico del mismo cliente sigue en SOTEC (La Clay solo cambia la entrega de EPP)
+  await p.evaluate(() => localStorage.removeItem("fd-generador-reporte-u-tec1"));
+  await p.goto(`${BASE}/app/nuevo/reporte`, { waitUntil: "networkidle0" });
+  await sleep(800);
+  await responder(p, "Ladrillera La Clay S.A.S.");
+  await sleep(300);
+  ok((await chip()) === "Formato: Servicios SOTEC" && !(await laclay()), "el reporte técnico de La Clay sigue en el formato de SOTEC");
+  await p.evaluate(() => localStorage.removeItem("fd-generador-reporte-u-tec1"));
+  await p.evaluate(() => localStorage.removeItem("fd-generador-epp-u-tec1"));
+
   // 8. Celular (390): el chip y el encabezado de FORTOX en la pestaña «Formato»
   await p.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
   await p.goto(`${BASE}/app/nuevo/reporte?proyecto=p-12`, { waitUntil: "networkidle0" });
@@ -2183,6 +2260,15 @@ async function epp(b, errores) {
   ok(h.includes("Casco de seguridad") && h.includes("Guantes dieléctricos") && h.includes("Botas dieléctricas") && h.includes("Total de unidades entregadas: 3"), "la tabla trae los 3 elementos marcados");
   ok((h.match(/Ingreso/g) || []).length >= 3, "el motivo «Ingreso» queda en cada elemento");
   ok(h.includes("Sede SOTEC") && h.includes("1000000009"), "área y cédula en el formato");
+
+  // 2b. Selector «Formato»: la matriz de La Clay y de vuelta a SOTEC, con los mismos datos
+  await p.select('select[aria-label="Formato del documento"]', "laclay");
+  await sleep(300);
+  h = await hoja();
+  ok((await p.evaluate(() => Boolean(document.querySelector(".doc-print[data-hoja=laclay]")))) && h.includes("Matriz Entrega de EPP's") && /CASCO DE SEGURIDAD/i.test(h) && h.includes("1000000009"), "el selector «Formato» cambia la entrega a la matriz de La Clay con los mismos datos");
+  await p.select('select[aria-label="Formato del documento"]', "sotec");
+  await sleep(300);
+  ok(!(await p.evaluate(() => Boolean(document.querySelector(".doc-print[data-hoja=laclay]")))) && (await hoja()).includes("COMPROMISO DEL TRABAJADOR"), "y vuelve al formato de SOTEC");
 
   // 3. Enviar a revisión
   await clic(p, "Enviar a revisión");

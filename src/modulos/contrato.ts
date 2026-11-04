@@ -20,6 +20,8 @@ export interface ContextoAsistente<D> {
   hoy: string;
   /** Servicios agregados al catálogo de la cotización desde el asistente (Configuración de la empresa). */
   serviciosPropios?: ServicioCatalogo[];
+  /** Variante de formato con la que sale el documento (p. ej. "laclay": la matriz de EPP pregunta el proceso). */
+  variante?: string;
 }
 
 /** Datos de la empresa que necesita `aplicar` además del documento (catálogos agregados por el equipo). */

@@ -46,7 +46,9 @@ export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, e
   const fotos = datos.fotos ?? [];
   // Etiquetas de los campos según la variante de formato (FORTOX puede nombrarlos distinto)
   const et = useEtiquetas("reporte");
-  const hoja = useVariante("reporte").hoja;
+  // Hoja propia del reporte (FORTOX, SEVIN); las de otros tipos (La Clay: la entrega de EPP) no aplican
+  const propia = useVariante("reporte").hoja;
+  const hoja = propia === "fortox" || propia === "sevin" ? propia : undefined;
   const campo = (k: CampoTexto, opts: { multiline?: boolean; type?: "text" | "date" | "time" | "email" | "tel"; placeholder?: string } = {}) => (
     <span className={cn("rounded transition-colors", resaltar === k && "bg-sotec-green/40 ring-2 ring-sotec-green")}>
       <EditableText

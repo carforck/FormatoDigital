@@ -44,7 +44,7 @@ igual("FORTOX con su logo", varianteDe("fortox").logo, "/variantes/fortox-logo.p
 igual("FORTOX con hoja propia", varianteDe("fortox").hoja, "fortox");
 
 // Tipos de proyecto
-igual("tipos de fábrica", tiposProyectoDe(config).map((t) => t.nombre), ["Servicios SOTEC", "Servicios Fortox", "Servicios Sevin"]);
+igual("tipos de fábrica", tiposProyectoDe(config).map((t) => t.nombre), ["Servicios SOTEC", "Servicios Fortox", "Servicios Sevin", "Obra La Clay"]);
 igual("tipos propios de Configuración", tiposProyectoDe({ tiposProyecto: [{ nombre: "Servicios Otra", variante: "fortox" }] }).map((t) => t.nombre), ["Servicios Otra"]);
 igual("lista propia vacía → la de fábrica", tiposProyectoDe({ tiposProyecto: [] }), TIPOS_PROYECTO_BASE);
 igual("tipo sin importar mayúsculas", varianteDeTipoProyecto(config, "  servicios fortox "), "fortox");
@@ -94,6 +94,31 @@ v.formatos.reporte!.prefijo = "RTF";
 igual("con prefijo propio: serie aparte", serieConsecutivo("reporte", "fortox", "2026"), "reporte.fortox-2026");
 igual("con prefijo propio: el prefijo", prefijoVariante("reporte", "fortox"), "RTF");
 v.formatos.reporte!.prefijo = antes;
+
+// LA CLAY: «Matriz Entrega de EPP's» (solo la entrega de EPP; el reporte sigue como estaba)
+const laClay = { tipo: "Obra La Clay" };
+igual("existe LA CLAY con su logo y hoja", [varianteDe("laclay").logo, varianteDe("laclay").hoja], ["/variantes/laclay-logo.png", "laclay"]);
+igual("LA CLAY cubre la entrega de EPP", varianteParaTipo("epp", "laclay").clave, "laclay");
+igual("LA CLAY no cubre el reporte", varianteParaTipo("reporte", "laclay").clave, "sotec");
+igual("formatos de la entrega de EPP", formatosPara("epp").map((v) => v.etiqueta), ["Servicios SOTEC", "Ladrillera La Clay"]);
+igual("el reporte no ofrece La Clay", formatosPara("reporte").some((v) => v.clave === "laclay"), false);
+igual("nombre «Ladrillera La Clay S.A.S.» → laclay", varianteDeNombreCliente("Ladrillera La Clay S.A.S."), "laclay");
+igual("nombre en minúsculas y con obra → laclay", varianteDeNombreCliente("ladrillera la clay · Planta 2"), "laclay");
+igual("«LaClay» junto → laclay", varianteDeNombreCliente("LaClay"), "laclay");
+igual("«Arcillas del Caribe» no es La Clay", varianteDeNombreCliente("Ladrillera Arcillas del Caribe"), undefined);
+igual("«Clayton» no es La Clay", varianteDeNombreCliente("Clayton Ltda."), undefined);
+igual("EPP del cliente La Clay → laclay", resolverVariante({ tipo: "epp", cliente: { nombre: "Ladrillera La Clay S.A.S." }, config }), "laclay");
+igual("reporte del cliente La Clay → sotec", resolverVariante({ tipo: "reporte", cliente: { nombre: "Ladrillera La Clay S.A.S." }, config }), "sotec");
+igual("EPP de un proyecto «Obra La Clay» → laclay", resolverVariante({ tipo: "epp", proyecto: laClay, config }), "laclay");
+igual("reporte de un proyecto «Obra La Clay» → sotec", resolverVariante({ tipo: "reporte", proyecto: laClay, config }), "sotec");
+igual("reporte de un proyecto «Obra La Clay» con cliente Fortox → fortox", resolverVariante({ tipo: "reporte", proyecto: laClay, cliente: { variante: "fortox" }, config }), "fortox");
+igual("EPP de un proyecto Fortox del cliente La Clay → laclay (Fortox no cubre la EPP)", resolverVariante({ tipo: "epp", proyecto: fortox, cliente: { nombre: "Ladrillera La Clay" }, config }), "laclay");
+igual("EPP de un proyecto SOTEC del cliente La Clay → sotec (manda el proyecto)", resolverVariante({ tipo: "epp", proyecto: sotec, cliente: { nombre: "Ladrillera La Clay" }, config }), "sotec");
+igual("EPP con formato elegido SOTEC → sotec", resolverVariante({ tipo: "epp", cliente: { nombre: "Ladrillera La Clay" }, config, elegida: "sotec" }), "sotec");
+igual("cliente con formato por defecto La Clay en un reporte → su nombre o SOTEC", resolverVariante({ tipo: "reporte", cliente: { variante: "laclay", nombre: "Sevin Ltda." }, config }), "sevin");
+const fl = formatoEnVariante({ ...base, codigo: "FO-GSST-?? por confirmar", nombre: "Registro de entrega de elementos de protección personal" }, "epp", "laclay");
+igual("LA CLAY: control documental (código en blanco, versión 0)", [fl.nombre, fl.codigo, fl.version, fl.fecha], ["Matriz Entrega de EPP's", "", "0", "5/05/2026"]);
+igual("LA CLAY sigue la serie EPP", serieConsecutivo("epp", "laclay", "2026"), "epp-2026");
 
 console.log(fallos ? `\n${fallos} de ${casos} casos fallaron` : `✓ variantes: ${casos} casos`);
 process.exit(fallos ? 1 : 0);

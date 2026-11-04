@@ -14,6 +14,9 @@
  *   3. Si no (o proyecto antiguo sin tipo): el «Formato por defecto» del cliente.
  *   4. Si no, el nombre del cliente: «Sevin Ltda.» → Sevin, «Oficina Fortox» → Fortox (`clientes`).
  *   5. Si no: SOTEC.
+ * Cada paso cuenta solo si su variante cubre el tipo de documento: un proyecto «Servicios Fortox»
+ * no cambia la Entrega de EPP, así que para ella sigue mandando el cliente (La Clay); y un
+ * proyecto «Obra La Clay» no cambia sus reportes técnicos.
  * El documento guarda la variante con la que se creó (`Documento.variante`): cambiar
  * después el tipo del proyecto o del cliente no cambia los documentos ya guardados.
  * Un documento antiguo sin `variante` sale como SOTEC.
@@ -27,6 +30,11 @@
  * ══ SEVIN ═══════════════════════════════════════════════════════════════════════
  * «Informe de servicios» GSE-FO-03, versión 03, octubre 2023 (insumos/GSE-FO-03-informe-de-
  * servicio-sevin-v3.pdf). Hoja propia: src/modulos/reportes/HojaSevin.tsx.
+ *
+ * ══ LA CLAY ═════════════════════════════════════════════════════════════════════
+ * «Matriz Entrega de EPP's» de Ladrillera La Clay S.A.S. (Sistema Integrado de Gestión,
+ * versión 0, fecha de edición 5/05/2026; el código viene en blanco en el papel). Solo cambia
+ * la Entrega de EPP (no el reporte): hoja propia src/modulos/epp/HojaLaClay.tsx.
  * ════════════════════════════════════════════════════════════════════════════════
  */
 import type { InfoFormato } from "@/modulos/contrato";
@@ -42,6 +50,9 @@ export interface FormatoVariante extends Partial<Pick<InfoFormato, "codigo" | "n
    */
   prefijo?: string;
 }
+
+/** Hojas propias de las variantes (formatos que no son el de SOTEC con otra marca). */
+export type HojaVariante = "fortox" | "sevin" | "laclay";
 
 /** Marca y plantilla con la que sale un documento. */
 export interface VarianteFormato {
@@ -65,7 +76,7 @@ export interface VarianteFormato {
   /** Datos de marca aún por confirmar: se avisa en el aplicativo (no en el papel). */
   provisional?: boolean;
   /** Hoja propia de la variante cuando su formato no es el de SOTEC con otra marca (p. ej. "fortox"). */
-  hoja?: "fortox" | "sevin";
+  hoja?: HojaVariante;
   /** Palabras del nombre del cliente que, sin otra indicación, eligen esta variante («sevin»). */
   clientes?: string[];
 }
@@ -107,8 +118,24 @@ const VARIANTE_SEVIN: VarianteFormato = {
   },
 };
 
+/** LA CLAY: su «Matriz Entrega de EPP's» (Sistema Integrado de Gestión, versión 0), con hoja propia. */
+const VARIANTE_LACLAY: VarianteFormato = {
+  clave: "laclay",
+  marca: "LA CLAY",
+  etiqueta: "Ladrillera La Clay",
+  logo: "/variantes/laclay-logo.png",
+  colorEncabezado: "#A6A6A6", // franja gris de los títulos de la matriz
+  colorMarca: "#E36C0A",
+  hoja: "laclay",
+  clientes: ["la clay", "laclay"],
+  formatos: {
+    // El papel trae el código en blanco
+    epp: { nombre: "Matriz Entrega de EPP's", codigo: "", version: "0", fecha: "5/05/2026" },
+  },
+};
+
 /** Variantes disponibles, en el orden de los selectores. */
-export const VARIANTES: VarianteFormato[] = [VARIANTE_SOTEC, VARIANTE_FORTOX, VARIANTE_SEVIN];
+export const VARIANTES: VarianteFormato[] = [VARIANTE_SOTEC, VARIANTE_FORTOX, VARIANTE_SEVIN, VARIANTE_LACLAY];
 
 /** Texto en minúsculas, sin tildes ni signos, para comparar nombres. */
 const plano = (t: string) => ` ${t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9ñ]+/g, " ")} `;
@@ -170,6 +197,7 @@ export const TIPOS_PROYECTO_BASE: TipoProyecto[] = [
   { nombre: TIPO_PROYECTO_BASE, variante: VARIANTE_BASE },
   { nombre: "Servicios Fortox", variante: "fortox" },
   { nombre: "Servicios Sevin", variante: "sevin" },
+  { nombre: "Obra La Clay", variante: "laclay" },
 ];
 
 /** Tipos de proyecto de la organización (los de Configuración o, si no hay, los de fábrica). */
@@ -189,7 +217,8 @@ export function varianteDeTipoProyecto(config: Pick<Config, "tiposProyecto">, ti
  * Variante con la que sale un documento nuevo o en borrador: la elegida en el documento;
  * si no, la del tipo del proyecto; si no, la del cliente (formato por defecto o su nombre);
  * si no, SOTEC. Siempre se devuelve una que cubra el tipo de documento (FORTOX no cambia,
- * p. ej., los gastos). Sin `elegida`, es la variante sugerida.
+ * p. ej., los gastos): la que no lo cubre se salta y decide la siguiente. Sin `elegida`, es
+ * la variante sugerida.
  */
 export function resolverVariante(a: {
   tipo: TipoDoc;
@@ -199,9 +228,11 @@ export function resolverVariante(a: {
   /** Variante elegida en el documento (asistente o selector «Formato»). */
   elegida?: string;
 }): string {
-  const delProyecto = varianteDeTipoProyecto(a.config, a.proyecto?.tipo);
-  const clave = a.elegida || (delProyecto ?? a.cliente?.variante ?? varianteDeNombreCliente(a.cliente?.nombre) ?? VARIANTE_BASE);
-  return varianteParaTipo(a.tipo, clave).clave;
+  if (a.elegida) return varianteParaTipo(a.tipo, a.elegida).clave;
+  // En orden: proyecto, formato del cliente, nombre del cliente; vale el primero que cubra el tipo
+  const candidatas = [varianteDeTipoProyecto(a.config, a.proyecto?.tipo), a.cliente?.variante, varianteDeNombreCliente(a.cliente?.nombre)];
+  const clave = candidatas.find((c) => c && VARIANTES.some((v) => v.clave === c && cubre(v, a.tipo)));
+  return clave ?? VARIANTE_BASE;
 }
 
 /**

@@ -89,7 +89,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   const recuperado = useRef(false);
   // Los módulos están tipados por formato; el generador los trata de forma uniforme.
   const mod = modulo as unknown as {
-    pasos: (c: { datos: unknown; clientes: typeof demo.clientes; usuarioNombre: string; hoy: string; serviciosPropios?: ServicioCatalogo[] }) => Paso[];
+    pasos: (c: { datos: unknown; clientes: typeof demo.clientes; usuarioNombre: string; hoy: string; serviciosPropios?: ServicioCatalogo[]; variante?: string }) => Paso[];
     aplicar: (id: string, v: ValorPaso, d: unknown, extras?: { serviciosPropios?: ServicioCatalogo[] }) => { cambio: Record<string, unknown>; mensaje?: string };
     alElegirCliente: (c: Cliente) => { cambio: Record<string, unknown>; mensaje: string };
     vacio: (hoy: string, u: typeof usuario) => Documento["datos"];
@@ -380,7 +380,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   // Las listas suman lo que el equipo agregó con «＋ Agregar otro» (Configuración · opciones por «formato.paso»)
   const propias = demo.config.opcionesPropias ?? {};
   const pasosModulo = mod
-    .pasos({ datos: doc.datos, clientes: demo.clientesActivos, usuarioNombre: usuario.nombre, hoy: hoy(), serviciosPropios: demo.config.serviciosPropios })
+    .pasos({ datos: doc.datos, clientes: demo.clientesActivos, usuarioNombre: usuario.nombre, hoy: hoy(), serviciosPropios: demo.config.serviciosPropios, variante })
     .map((p) => {
       const extra = propias[`${tipo}.${p.id}`];
       if (!extra?.length || !p.opciones || (p.tipo !== "select" && p.tipo !== "multi" && p.tipo !== "gastos")) return p;

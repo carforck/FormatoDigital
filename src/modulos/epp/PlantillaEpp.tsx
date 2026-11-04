@@ -5,17 +5,20 @@
  * una hoja carta con el encabezado común de SOTEC (`Encabezado`), datos del trabajador,
  * tabla de elementos editable (elemento con «＋ Agregar otro», lista «epp.elementos» que
  * comparte con el asistente), compromiso del trabajador, observaciones y las firmas de
- * quien recibe y de quien entrega.
+ * quien recibe y de quien entrega. Con la variante de formato «laclay» (cliente u obra de
+ * Ladrillera La Clay) sale en su «Matriz Entrega de EPP's» (`HojaLaClay`), con los mismos datos.
  */
 
 import { Plus, Trash2 } from "lucide-react";
 
 import { EditableText } from "@/components/docs/EditableText";
 import { Encabezado, Firma } from "@/components/docs/Encabezado";
+import { useVariante } from "@/components/docs/VarianteFormato";
 import { SelectConOtro } from "@/components/ui/SelectConOtro";
 import { cn } from "@/lib/utils";
 
 import { COMPROMISO_EPP, EPP_CATALOGO, MOTIVOS_EPP, itemEpp } from "./catalogo";
+import { HojaLaClay } from "./HojaLaClay";
 import { totalUnidades, type DatosEpp, type ItemEpp } from "./tipos";
 
 /** Campos que se firman en el pad. */
@@ -36,6 +39,13 @@ const FILAS_MINIMAS = 8;
 
 /** Réplica del registro de entrega de EPP (carta). */
 export function PlantillaEpp({ datos, codigoDoc, editar, firmar, resaltar }: Props) {
+  const hoja = useVariante("epp").hoja;
+  if (hoja === "laclay")
+    return (
+      <div className="doc-zona space-y-4">
+        <HojaLaClay datos={datos} codigoDoc={codigoDoc} editar={editar} firmar={firmar} resaltar={resaltar} />
+      </div>
+    );
   const marca = (k: string) => resaltar === k && "rounded bg-sotec-green/40 ring-2 ring-sotec-green";
   const campo = (k: CampoTexto, opts: { multiline?: boolean; type?: "text" | "date"; placeholder?: string } = {}) => (
     <span className={cn("rounded transition-colors", marca(k))}>

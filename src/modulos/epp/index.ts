@@ -3,9 +3,12 @@
  * protección personal al trabajador, con su firma de recibido y la de quien entrega.
  * Interno (el cliente no lo ve); lo diligencian el técnico, el Coordinador SST y la
  * administración; al aprobar, el revisor firma como quien entrega si faltaba.
- * Código del formato por confirmar con SOTEC.
+ * Código del formato por confirmar con SOTEC. Con la variante «laclay» sale en la «Matriz
+ * Entrega de EPP's» de Ladrillera La Clay (`HojaLaClay`): el asistente pregunta además el
+ * proceso y omite lo que esa matriz no lleva (observaciones y firma de quien entrega).
  */
 
+import type { Paso } from "@/components/chat/ChatAsistente";
 import type { ModuloDocumento } from "@/modulos/contrato";
 import { EPP_CATALOGO, MOTIVOS_EPP, eppVacio, itemEpp, itemsMarcados } from "./catalogo";
 import { PlantillaEpp } from "./PlantillaEpp";
@@ -44,14 +47,16 @@ export const moduloEpp: ModuloDocumento<DatosEpp> = {
     cerrar: "Archivar la entrega",
     eventoCierre: "Archivó la entrega de EPP",
   },
-  duplicar: (d, hoy) => ({ ...d, fecha: hoy, items: d.items.map((i, k) => ({ ...itemEpp(i.elemento, hoy, i.motivo, k), cantidad: i.cantidad, talla: i.talla })), firmaRecibe: "", entregaNombre: "", entregaCargo: "", firmaEntrega: "" }),
+  duplicar: (d, hoy) => ({ ...d, fecha: hoy, items: d.items.map((i, k) => ({ ...itemEpp(i.elemento, hoy, i.motivo, k), cantidad: i.cantidad, talla: i.talla, ...(i.codigo ? { codigo: i.codigo } : {}), ...(i.unidad ? { unidad: i.unidad } : {}) })), firmaRecibe: "", entregaNombre: "", entregaCargo: "", firmaEntrega: "" }),
   alElegirProyecto: (p, c) => ({
     cambio: { obra: c ? `${c.nombre} · ${p.nombre}` : p.nombre },
     mensaje: `La entrega queda en el proyecto ${p.codigo} · ${p.nombre}.`,
   }),
   alElegirCliente: (c) => ({ cambio: { obra: c.sitio ? `${c.nombre} · ${c.sitio}` : c.nombre }, mensaje: `Área u obra: ${c.sitio ? `${c.nombre} · ${c.sitio}` : c.nombre}.` }),
 
-  pasos: ({ datos, clientes, usuarioNombre, hoy }) => [
+  pasos: ({ datos, clientes, usuarioNombre, hoy, variante }) => {
+    const laClay = variante === "laclay";
+    const pasos: Paso[] = [
     { id: "cliente", tipo: "texto", resaltar: "obra", pregunta: "¿Para qué área, proyecto u obra es la entrega?", sugerencias: ["Sede SOTEC", ...clientes.map((c) => c.nombre)] },
     { id: "trabajador", tipo: "texto", resaltar: "trabajador", pregunta: "¿Quién recibe los elementos?", sugerencias: [datos.trabajador, usuarioNombre].filter((x, i, a) => x && a.indexOf(x) === i) },
     {
@@ -86,7 +91,21 @@ export const moduloEpp: ModuloDocumento<DatosEpp> = {
       firmar: "Quien entrega firma ahora",
       omitir: "Firma al aprobar",
     },
-  ],
+    ];
+    if (!laClay) return pasos;
+    // La matriz de La Clay no lleva observaciones ni firma de quien entrega (al aprobar firma el revisor),
+    // pero sí el proceso del trabajador: va en el lugar de las observaciones para no correr los pasos
+    // (el asistente los sigue por posición y el formato se puede cambiar a mitad de camino)
+    const proceso: Paso = {
+      id: "proceso",
+      tipo: "texto",
+      resaltar: "proceso",
+      opcional: true,
+      pregunta: "¿Proceso o área del trabajador? (columna «PROCESO» de la matriz)",
+      sugerencias: [datos.proceso, "Producción", "Mantenimiento"].filter((x): x is string => Boolean(x)),
+    };
+    return pasos.filter((p) => p.id !== "firmaEntrega").map((p) => (p.id === "observaciones" ? proceso : p));
+  },
 
   aplicar: (id, v, datos) => {
     if (id === "elementos") {

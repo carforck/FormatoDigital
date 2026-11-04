@@ -1,7 +1,7 @@
 // Pruebas de la entrega de EPP (pedido de Magno): validación antes de enviar y armado de la tabla
 // al marcar elementos en el asistente. Uso: npx tsx tests/unit/epp.test.ts
 import { eppVacio, itemEpp, itemsMarcados } from "../../src/modulos/epp/catalogo";
-import { totalUnidades } from "../../src/modulos/epp/tipos";
+import { fechaLaClay, totalUnidades, unidadEpp } from "../../src/modulos/epp/tipos";
 import { faltantesEpp } from "../../src/modulos/epp/validar";
 
 let fallos = 0;
@@ -41,6 +41,17 @@ igual("lo desmarcado sale", itemsMarcados(conCasco, ["Gafas de seguridad"]).map(
 igual("nada marcado: tabla vacía", itemsMarcados(conCasco, []), []);
 igual("ids distintos para filas nuevas", new Set(itemsMarcados({ fecha: "x", items: [] }, ["A", "B", "C"]).map((i) => i.id)).size, 3);
 igual("total de unidades (ignora negativas)", totalUnidades({ items: [{ ...t[0], cantidad: 2 }, { ...t[1], cantidad: -1 }, { ...t[1], cantidad: 3 }] }), 5);
+
+// Matriz de La Clay: unidad de cada fila, fechas como en el papel y campos opcionales
+igual("guantes → PAR", unidadEpp({ elemento: "Guantes de vaqueta" }), "PAR");
+igual("botas → PAR", unidadEpp({ elemento: "Botas dieléctricas" }), "PAR");
+igual("respirador → UNIDAD", unidadEpp({ elemento: "Respirador material particulado N95" }), "UNIDAD");
+igual("gafas → UNIDAD", unidadEpp({ elemento: "Gafas de seguridad" }), "UNIDAD");
+igual("la unidad anotada manda (en mayúsculas)", unidadEpp({ elemento: "Guantes de vaqueta", unidad: "caja" }), "CAJA");
+igual("fecha ISO → d/mm/aaaa", fechaLaClay("2026-05-05"), "5/05/2026");
+igual("fecha con día de dos cifras", fechaLaClay("2026-05-28"), "28/05/2026");
+igual("fecha vacía", fechaLaClay(""), "");
+igual("código, unidad y solicitado son opcionales al validar", faltantesEpp({ ...lleno, proceso: "Producción", items: [{ ...lleno.items[0], codigo: "EPP-0001", unidad: "UNIDAD", solicitado: "2026-11-01" }] }), []);
 
 console.log(fallos ? `\n${fallos} de ${casos} casos fallaron` : `✓ epp: ${casos} casos`);
 process.exit(fallos ? 1 : 0);

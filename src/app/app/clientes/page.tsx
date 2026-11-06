@@ -11,9 +11,15 @@
  * al pegar o salir del campo se separa (`separarCliente`) y se avisa; los clientes que ya
  * quedaron así se listan en «Nombres por revisar» para corregirlos (se guarda solo con «Guardar»).
  * Con más de 8 clientes aparece la búsqueda; la lista pagina de a 20 (?pag=).
+ *
+ * Tipo de persona (pedido de Magno): cada cliente es persona jurídica (NIT) o natural (cédula;
+ * el mismo campo `nit`, otra etiqueta). La lista sale clasificada (jurídicos y luego naturales,
+ * con su encabezado) y se filtra con «Todos · Jurídicos · Naturales» (con sus cuentas); cada
+ * tarjeta lleva su insignia. Los clientes de antes, sin tipo, cuentan como jurídicos
+ * (@/nucleo/personas). Los datos vacíos no dejan separadores sueltos («· ·»): `unirDatos`.
  */
-import { useState } from "react";
-import { Plus, Power, Search, Trash2, Wand2 } from "lucide-react";
+import { Fragment, useState } from "react";
+import { Building2, Plus, Power, Search, Trash2, UserRound, Wand2 } from "lucide-react";
 
 import { Avatar, PageHeader } from "@/components/ui/corporativo";
 
@@ -21,17 +27,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { separarCliente } from "@/nucleo/clientes";
-import type { Cliente } from "@/nucleo/tipos";
+import { PERSONAS, contarPorTipo, documentoCliente, ordenarPorTipo, tipoPersonaDe, unirDatos } from "@/nucleo/personas";
+import type { Cliente, TipoPersona } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 import { VARIANTES, VARIANTE_BASE, varianteDe } from "@/nucleo/variantes";
 import { Paginacion, usePaginacion } from "@/components/ui/Paginacion";
 
 /** Cliente en blanco para el formulario de alta (el id se genera al abrir). */
-const VACIO: Cliente = { id: "", nombre: "", nit: "", direccion: "", contacto: "", cargo: "", correo: "", telefono: "", sitio: "" };
-/** Campos editables del formulario con su etiqueta (`activo` se maneja con el botón Desactivar/Reactivar). */
-const CAMPOS: [Exclude<keyof Cliente, "activo">, string][] = [
-  ["nombre", "Razón social"],
-  ["nit", "NIT o C.C."],
+const VACIO: Cliente = { id: "", tipoPersona: "juridica", nombre: "", nit: "", direccion: "", contacto: "", cargo: "", correo: "", telefono: "", sitio: "" };
+/**
+ * Campos de texto del formulario con su etiqueta (`activo` se maneja con el botón Desactivar/Reactivar;
+ * el tipo de persona, con su selector). Nombre y documento toman la etiqueta del tipo (PERSONAS).
+ */
+const CAMPOS: [Exclude<keyof Cliente, "activo" | "tipoPersona" | "variante">, string][] = [
+  ["nombre", ""],
+  ["nit", ""],
   ["direccion", "Dirección"],
   ["contacto", "Persona de contacto"],
   ["cargo", "Cargo"],
@@ -84,8 +94,12 @@ export default function Clientes() {
   // Búsqueda y páginas de a 20: el directorio crece con cada cliente que escriben los técnicos
   const [q, setQ] = useState("");
   const t = q.trim().toLowerCase();
-  const lista = t ? demo.clientes.filter((c) => `${c.nombre} ${c.nit} ${c.contacto} ${c.correo} ${c.telefono} ${c.direccion}`.toLowerCase().includes(t)) : demo.clientes;
-  const pag = usePaginacion(lista, 20, t, "pag");
+  const buscados = t ? demo.clientes.filter((c) => `${c.nombre} ${c.nit ?? ""} ${c.contacto} ${c.correo} ${c.telefono} ${c.direccion}`.toLowerCase().includes(t)) : demo.clientes;
+  // Clasificados por tipo de persona: filtro «Todos · Jurídicos · Naturales» y, en «Todos», jurídicos primero
+  const [tipo, setTipo] = useState<TipoPersona | "todos">("todos");
+  const cuenta = contarPorTipo(buscados);
+  const lista = ordenarPorTipo(tipo === "todos" ? buscados : buscados.filter((c) => tipoPersonaDe(c) === tipo));
+  const pag = usePaginacion(lista, 20, `${t}|${tipo}`, "pag");
 
   return (
     <div className="space-y-4">
@@ -131,13 +145,35 @@ export default function Clientes() {
           onSubmit={(e) => {
             e.preventDefault();
             // Por si se escribió (no pegó) el nombre con su NIT y se guardó sin salir del campo
-            demo.guardarCliente(conNombreSeparado(form, form.nombre) ?? form);
+            const c = conNombreSeparado(form, form.nombre) ?? form;
+            demo.guardarCliente({ ...c, tipoPersona: tipoPersonaDe(c) });
             abrir(null);
           }}
         >
-          {CAMPOS.map(([k, l]) => (
+          <fieldset className="sm:col-span-2">
+            <legend className="text-xs text-slate-500">Tipo de cliente</legend>
+            <div role="radiogroup" aria-label="Tipo de cliente" className="mt-1 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+              {(["juridica", "natural"] as const).map((tp) => {
+                const elegido = tipoPersonaDe(form) === tp;
+                const Icono = tp === "juridica" ? Building2 : UserRound;
+                return (
+                  <button
+                    key={tp}
+                    type="button"
+                    role="radio"
+                    aria-checked={elegido}
+                    onClick={() => setForm({ ...form, tipoPersona: tp })}
+                    className={cn("inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition", elegido ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:text-slate-800")}
+                  >
+                    <Icono className="h-4 w-4" aria-hidden /> {PERSONAS[tp].singular}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+          {CAMPOS.map(([k, etiqueta]) => (
             <label key={k} className="text-sm">
-              <span className="text-xs text-slate-500">{l}</span>
+              <span className="text-xs text-slate-500">{k === "nombre" ? PERSONAS[tipoPersonaDe(form)].nombre : k === "nit" ? PERSONAS[tipoPersonaDe(form)].documentoLargo : etiqueta}</span>
               <Input
                 required={k === "nombre"}
                 value={form[k] ?? ""}
@@ -219,45 +255,81 @@ export default function Clientes() {
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nombre, NIT, contacto o teléfono…" className="w-full rounded-md border border-slate-200 bg-white py-2 pl-8 pr-2 text-sm" />
         </label>
       )}
-      {lista.length === 0 && <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">No hay clientes con esa búsqueda.</p>}
+      {demo.clientes.length > 0 && (
+        <div role="tablist" aria-label="Tipo de cliente" className="inline-flex flex-wrap rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm">
+          {(["todos", "juridica", "natural"] as const).map((tp) => (
+            <button
+              key={tp}
+              type="button"
+              role="tab"
+              aria-selected={tipo === tp}
+              onClick={() => setTipo(tp)}
+              className={cn("rounded-md px-3 py-1.5 text-sm font-medium transition", tipo === tp ? "bg-sotec text-white" : "text-slate-600 hover:bg-slate-50")}
+            >
+              {tp === "todos" ? "Todos" : PERSONAS[tp].plural} <span className={cn("ml-1 text-xs", tipo === tp ? "text-white/80" : "text-slate-400")}>{cuenta[tp]}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {lista.length === 0 && (
+        <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+          {t ? "No hay clientes con esa búsqueda." : tipo === "natural" ? "Aún no hay clientes persona natural." : tipo === "juridica" ? "Aún no hay clientes persona jurídica." : "Aún no hay clientes."}
+        </p>
+      )}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {pag.visibles.map((c) => {
+        {pag.visibles.map((c, i) => {
           const n = demo.documentos.filter((d) => d.clienteId === c.id).length;
           const np = demo.proyectos.filter((p) => p.clienteId === c.id).length;
+          const tp = tipoPersonaDe(c);
+          // En «Todos», un encabezado donde empieza cada grupo (también al inicio de cada página)
+          const encabezado = tipo === "todos" && (i === 0 || tipoPersonaDe(pag.visibles[i - 1]) !== tp);
+          // Solo los datos que hay: sin «· ·» ni puntos sueltos cuando falta el contacto, el cargo o el teléfono
+          const linea1 = unirDatos([c.contacto, c.cargo, documentoCliente(c)]);
+          const linea2 = unirDatos([c.direccion, c.telefono]);
+          const correo = unirDatos([c.correo]);
           return (
-            <button
-              key={c.id}
-              onClick={() => abrir(c)}
-              aria-label={`Editar ${c.nombre}`}
-              className={cn("flex min-w-0 gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-sotec-greenDeep hover:shadow-md", c.activo === false && "opacity-70")}
-            >
-              <Avatar nombre={c.nombre} className="h-11 w-11 rounded-xl text-sm" />
-              <span className="min-w-0 flex-1">
-                <span className="flex items-start justify-between gap-2">
-                  <span className="min-w-0 break-words font-semibold text-slate-900">
-                    {c.nombre}
-                    {c.activo === false && <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 align-middle text-[11px] font-medium text-slate-600 ring-1 ring-slate-200">Inactivo</span>}
-                    {c.variante && c.variante !== VARIANTE_BASE && <span className="ml-2 rounded-full bg-slate-800 px-2 py-0.5 align-middle text-[11px] font-medium text-white">Formato {varianteDe(c.variante).marca}</span>}
+            <Fragment key={c.id}>
+              {encabezado && (
+                <h2 className="mt-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">
+                  {tp === "juridica" ? <Building2 className="h-4 w-4" aria-hidden /> : <UserRound className="h-4 w-4" aria-hidden />}
+                  Personas {tp === "juridica" ? "jurídicas" : "naturales"} · {cuenta[tp]}
+                </h2>
+              )}
+              <button
+                onClick={() => abrir(c)}
+                aria-label={`Editar ${c.nombre}`}
+                className={cn("flex min-w-0 gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-sotec-greenDeep hover:shadow-md", c.activo === false && "opacity-70")}
+              >
+                <Avatar nombre={c.nombre} className="h-11 w-11 rounded-xl text-sm" />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="min-w-0 break-words font-semibold text-slate-900">
+                      {c.nombre}
+                      <span data-tipo-persona={tp} className={cn("ml-2 rounded-full px-2 py-0.5 align-middle text-[11px] font-medium ring-1", tp === "juridica" ? "bg-sky-50 text-sky-800 ring-sky-200" : "bg-violet-50 text-violet-800 ring-violet-200")}>
+                        {tp === "juridica" ? "Jurídica" : "Natural"}
+                      </span>
+                      {c.activo === false && <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 align-middle text-[11px] font-medium text-slate-600 ring-1 ring-slate-200">Inactivo</span>}
+                      {c.variante && c.variante !== VARIANTE_BASE && <span className="ml-2 rounded-full bg-slate-800 px-2 py-0.5 align-middle text-[11px] font-medium text-white">Formato {varianteDe(c.variante).marca}</span>}
+                    </span>
+                    <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                      {n} docs{np ? ` · ${np} proy.` : ""}
+                    </span>
                   </span>
-                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                    {n} docs{np ? ` · ${np} proy.` : ""}
-                  </span>
-                </span>
-                <span className="mt-0.5 block break-words text-sm text-slate-600">
-                  {c.contacto} · {c.cargo}
-                  {c.nit ? ` · NIT ${c.nit}` : ""}
-                </span>
-                <span className="mt-0.5 block break-words text-xs text-slate-500">
-                  {c.direccion} · {c.telefono}
-                  {c.correo && (
-                    <>
-                      {" · "}
-                      <span className="[overflow-wrap:anywhere]">{c.correo}</span>
-                    </>
+                  {linea1 && <span className="mt-0.5 block break-words text-sm text-slate-600">{linea1}</span>}
+                  {(linea2 || correo) && (
+                    <span className="mt-0.5 block break-words text-xs text-slate-500">
+                      {linea2}
+                      {correo && (
+                        <>
+                          {linea2 && " · "}
+                          <span className="[overflow-wrap:anywhere]">{correo}</span>
+                        </>
+                      )}
+                    </span>
                   )}
                 </span>
-              </span>
-            </button>
+              </button>
+            </Fragment>
           );
         })}
       </div>

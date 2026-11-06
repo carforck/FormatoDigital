@@ -43,6 +43,9 @@ export interface Usuario {
   activo: boolean;
 }
 
+/** Tipo de persona del cliente (ver @/nucleo/personas). */
+export type TipoPersona = "juridica" | "natural";
+
 export interface Cliente {
   id: string;
   nombre: string;
@@ -52,8 +55,10 @@ export interface Cliente {
   correo: string;
   telefono: string;
   sitio: string;
-  /** NIT o C.C. (opcional): lo imprime la cotización. */
+  /** NIT (persona jurídica) o cédula (persona natural), opcional: lo imprime la cotización. */
   nit?: string;
+  /** Persona jurídica (empresa, con NIT) o natural (con cédula). Sin valor: jurídica (los clientes de antes). */
+  tipoPersona?: TipoPersona;
   /** Inactivo: sale de los selectores del generador, pero su historial se conserva. Por defecto, activo. */
   activo?: boolean;
   /**

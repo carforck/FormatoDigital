@@ -26,6 +26,8 @@ export const moduloRequerimientos: ModuloDocumento<DatosRequerimiento> = {
   Plantilla: PlantillaRequerimiento,
   clienteDe: (d) => d.cliente,
   campoCliente: "cliente",
+  // El cliente escrito a mano queda en el directorio al guardar (igual que reporte y cotización)
+  datosCliente: (d) => ({ nombre: d.cliente, sitio: d.sitio }),
   visibleCliente: false,
   color: "var(--serie-f)",
   // Cerrado = «Atendido»: convertido en cotización o cerrado sin cotizar por un revisor

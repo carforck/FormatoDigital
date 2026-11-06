@@ -52,6 +52,8 @@ import { puede, puedeCrearTipo, type Accion } from "@/nucleo/permisos";
 import type { TipoDoc } from "@/nucleo/tipos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { BotonInstalar } from "@/components/pwa/BotonInstalar";
+import { MarcaControlOne } from "@/components/marca/MarcaControlOne";
+import { logoBarra, nombreMarca } from "@/nucleo/marca";
 import { cn } from "@/lib/utils";
 
 /** Entrada del menú lateral. `req`: permiso necesario para verla; `contador`: insignia numérica. */
@@ -166,6 +168,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const demo = useDemo();
   const { usuario, listo } = demo;
   const empresa = demo.modo === "empresa";
+  const logoLateral = logoBarra(demo.modo);
   const path = usePathname().replace(/\/$/, "") || "/";
   const router = useRouter();
   const [menu, setMenu] = useState(false);
@@ -406,7 +409,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <div className={cn("flex items-center justify-between pb-4 pt-5", compacta ? "px-3" : "px-4")}>
           <Link href="/app" className="flex items-center gap-2.5" aria-label="Ir al tablero">
-            <img src={asset("/sotec-logo-v3-oscuro.png")} alt="SOTEC" className={cn("w-auto transition-all", compacta ? "h-9" : "h-12")} />
+            {/* Empresa: logo de SOTEC · demo: solo la marca ControlOne (nunca el logo de una empresa real) */}
+            {logoLateral ? (
+              <img src={asset(logoLateral)} alt="SOTEC" className={cn("w-auto transition-all", compacta ? "h-9" : "h-12")} />
+            ) : (
+              <MarcaControlOne compacta={compacta} />
+            )}
           </Link>
           <button className="rounded p-1 text-white/70 hover:text-white lg:hidden" onClick={() => setMenu(false)} aria-label="Cerrar menú">
             <X className="h-5 w-5" />
@@ -474,7 +482,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Menu className="h-5 w-5" />
           </button>
           <div className="min-w-0">
-            <p className="hidden text-[11px] text-slate-400 sm:block">SOTEC · SG-SST</p>
+            <p className="hidden text-[11px] text-slate-400 sm:block">{nombreMarca(demo.modo)} · SG-SST</p>
             <p className="truncate text-sm font-semibold text-slate-900">{titulo}</p>
           </div>
 

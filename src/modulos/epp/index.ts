@@ -12,6 +12,7 @@ import { createElement } from "react";
 
 import type { Paso } from "@/components/chat/ChatAsistente";
 import type { ModuloDocumento } from "@/modulos/contrato";
+import { clienteDeObra } from "@/nucleo/clientes";
 import { EPP_CATALOGO, MOTIVOS_EPP, eppVacio, itemEpp, itemsMarcados } from "./catalogo";
 import { PasoFotoEpp, fotoDeValor } from "./FotoEntrega";
 import { PlantillaEpp } from "./PlantillaEpp";
@@ -39,6 +40,9 @@ export const moduloEpp: ModuloDocumento<DatosEpp> = {
   Plantilla: PlantillaEpp,
   clienteDe: (d) => d.obra,
   campoCliente: "obra",
+  // «Cliente · sitio»: el cliente escrito a mano queda en el directorio al guardar; un área interna
+  // («Sede SOTEC», «Oficina»…) no es un cliente. Sin el sitio: tras « · » puede ir el nombre del proyecto.
+  datosCliente: (d) => ({ nombre: clienteDeObra(d.obra) }),
   visibleCliente: false,
   color: "var(--serie-e)",
   flujo: {

@@ -967,4 +967,25 @@ do $$ begin
 end $$;
 reset role;
 
+-- ------------------------------------------------- 15. clientes: persona jurídica o natural (0015)
+do $$ begin
+  assert not exists (select 1 from public.clientes where tipo_persona <> 'juridica'), 'los clientes que ya existían quedan como jurídicos';
+end $$;
+select pg_temp.como('00000000-0000-0000-0000-0000000000a3');
+insert into public.clientes (id, organizacion_id, nombre, nit, tipo_persona)
+values ('c0000000-0000-0000-0000-0000000000f2', '10000000-0000-0000-0000-000000000001', 'Rosa Inventada Pérez', '1.234.567.890', 'natural');
+reset role;
+do $$ begin
+  assert (select tipo_persona from public.clientes where id = 'c0000000-0000-0000-0000-0000000000f2') = 'natural', 'el técnico registra una persona natural';
+  assert (select tipo_persona from public.clientes where id = 'c0000000-0000-0000-0000-0000000000f1') = 'juridica', 'sin tipo: jurídica';
+  update public.clientes set tipo_persona = 'otra' where id = 'c0000000-0000-0000-0000-0000000000f2';
+  raise exception 'FALLO: aceptó un tipo de persona inválido';
+exception when check_violation then null; end $$;
+select pg_temp.como('00000000-0000-0000-0000-0000000000a1');
+update public.clientes set tipo_persona = 'juridica' where id = 'c0000000-0000-0000-0000-0000000000f2';
+reset role;
+do $$ begin
+  assert (select tipo_persona from public.clientes where id = 'c0000000-0000-0000-0000-0000000000f2') = 'juridica', 'la administración cambia el tipo de persona';
+end $$;
+
 select 'OK: todas las pruebas pasaron' as resultado;

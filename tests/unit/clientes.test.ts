@@ -4,9 +4,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { avisoPlan, buscarCliente, claveNombre, completarVacios, digitoVerificacion, mismoNombre, nombreLimpio, normalizarNit, planCliente, separarCliente } from "../../src/nucleo/clientes";
+import { avisoPlan, buscarCliente, claveNombre, clienteDeObra, completarVacios, digitoVerificacion, mismoNombre, nombreLimpio, normalizarNit, planCliente, planProyectoNuevo, separarCliente } from "../../src/nucleo/clientes";
 import { buscarOpcion, comparable, unirOpciones } from "../../src/nucleo/opciones";
-import type { Cliente, Documento } from "../../src/nucleo/tipos";
+import { PERSONAS, contarPorTipo, datoVacio, documentoCliente, ordenarPorTipo, tipoPersonaDe, unirDatos } from "../../src/nucleo/personas";
+import type { Cliente, Documento, Proyecto } from "../../src/nucleo/tipos";
 
 let fallos = 0;
 let casos = 0;
@@ -69,6 +70,29 @@ igual("sin cambios: sin aviso", avisoPlan(planCliente(clientes, reporte({ client
 // La legalización de gastos no registra clientes («cliente u obra» puede ser interno)
 igual("gasto no registra", planCliente(clientes, { ...reporte({}), tipo: "gasto", datos: { clienteObra: "Administración" } } as unknown as Documento, "c-n").accion, "nada");
 
+// Todo formato con cliente lo registra (pedido de Magno: cliente, reporte, cotización y requerimiento relacionados)
+const otroTipo = (tipo: string, datos: Record<string, unknown>, clienteId = "") => ({ ...reporte({}, clienteId), tipo, datos }) as unknown as Documento;
+const rq = planCliente(clientes, otroTipo("requerimiento", { cliente: "Constructora Ficticia Delta", sitio: "Bodega 3" }), "c-n");
+igual("requerimiento: crea el cliente con su sitio", rq.accion === "crear" && [rq.cliente.nombre, rq.cliente.sitio], ["Constructora Ficticia Delta", "Bodega 3"]);
+igual("requerimiento: enlaza el existente", planCliente(clientes, otroTipo("requerimiento", { cliente: "Ferretería El Tornillo", sitio: "" }), "c-n").accion, "enlazar");
+const epp = planCliente(clientes, otroTipo("epp", { obra: "Hotel Ficticio Mar Azul · Cocina" }), "c-n");
+igual("EPP: el cliente es lo de antes de « · » (sin el sitio)", epp.accion === "crear" && [epp.cliente.nombre, epp.cliente.sitio], ["Hotel Ficticio Mar Azul", ""]);
+igual("EPP: área interna no es cliente", planCliente(clientes, otroTipo("epp", { obra: "Sede SOTEC" }), "c-n").accion, "nada");
+igual("EPP: parecido se pregunta", planCliente(clientes, otroTipo("epp", { obra: "Ferreteria el tornillo SAS · Patio" }), "c-n").accion, "parecido");
+igual("cliente de la obra", ["Sede SOTEC", "Oficina principal", "Administración", "N/A", "Ladrillera Ficticia · Hornos", " Granja  Sol | Galpón 2"].map(clienteDeObra), ["", "", "", "", "Ladrillera Ficticia", "Granja Sol"]);
+
+// Proyecto nuevo desde un formato: con el cliente ya resuelto; no se duplica uno abierto igual
+const pry = (x: Partial<Proyecto>): Proyecto => ({ id: "p-1", codigo: "PRY-001-26", consecutivo: 1, nombre: "Ampliación CCTV", clienteId: "c-1", sitio: "", responsableId: "u", fechaInicio: "", estado: "activo", descripcion: "", creado: "", actualizado: "", historial: [], ...x });
+const pend = { id: "p-n", nombre: "  Ampliación  cctv ", sitio: "" };
+igual("proyecto: sin cliente no se crea", planProyectoNuevo([], pend, "").accion, "nada");
+igual("proyecto: nombre corto", planProyectoNuevo([], { ...pend, nombre: "ab" }, "c-1").accion, "nada");
+igual("proyecto: cliente sin proyectos → se crea", planProyectoNuevo([], pend, "c-1").accion, "crear");
+const igualAbierto = planProyectoNuevo([pry({})], pend, "c-1");
+igual("proyecto: uno abierto igual del cliente se enlaza", igualAbierto.accion === "enlazar" && igualAbierto.proyecto.id, "p-1");
+igual("proyecto: uno cerrado igual no cuenta", planProyectoNuevo([pry({ estado: "cerrado" })], pend, "c-1").accion, "crear");
+igual("proyecto: el de otro cliente no cuenta", planProyectoNuevo([pry({ clienteId: "c-9" })], pend, "c-1").accion, "crear");
+igual("proyecto: guardado dos veces (mismo id) se enlaza", planProyectoNuevo([pry({ id: "p-n", nombre: "Otro nombre" })], pend, "c-1").accion, "enlazar");
+
 // Nombre pegado con otros datos (caso típico: «* Razón social: FARO ANDINO S.A.S. * NIT: 900123456»)
 const sep = (t: string) => {
   const r = separarCliente(t);
@@ -98,6 +122,26 @@ igual("comparable sin tildes", comparable("  ALIMENTACIÓN  extra "), "alimentac
 igual("ñ no es n", comparable("Señal") === comparable("Senal"), false);
 igual("buscar opción existente", buscarOpcion(["Alimentación", "Peajes"], "alimentacion"), "Alimentación");
 igual("unir sin repetir y «Otro» al final", unirOpciones(["Transporte", "Otro"], ["transporte", " Peajes  "], ["Parqueadero"]), ["Transporte", "Peajes", "Parqueadero", "Otro"]);
+
+// Persona jurídica o natural (pedido de Magno): sin tipo cuenta como jurídica; el documento cambia de etiqueta
+const natural: Cliente = { ...base, id: "c-n1", nombre: "Rosa Inventada Pérez", nit: "1.234.567.890", tipoPersona: "natural" };
+igual("sin tipo: jurídica", tipoPersonaDe(base), "juridica");
+igual("natural", tipoPersonaDe(natural), "natural");
+igual("tipo desconocido: jurídica", tipoPersonaDe({ tipoPersona: "otra" as never }), "juridica");
+igual("documento de la natural: C.C.", documentoCliente(natural), "C.C. 1.234.567.890");
+igual("documento de la jurídica: NIT", documentoCliente({ ...base, nit: "901.624.955" }), "NIT 901.624.955");
+igual("sin documento: vacío", documentoCliente(base), "");
+igual("etiquetas del formulario", [PERSONAS.juridica.documentoLargo, PERSONAS.natural.documentoLargo, PERSONAS.juridica.nombre, PERSONAS.natural.nombre], ["NIT", "Cédula", "Razón social", "Nombre completo"]);
+igual("conteo por tipo", contarPorTipo([base, inactivo, natural]), { todos: 3, juridica: 2, natural: 1 });
+igual("jurídicos primero, en su orden", ordenarPorTipo([natural, base, inactivo]).map((c) => c.id), ["c-1", "c-2", "c-n1"]);
+
+// Datos unidos sin separadores sueltos (DAGAR S.A.S, Fortox, VS TURBACO: sin contacto ni cargo)
+igual("sin contacto ni cargo: solo el NIT", unirDatos(["", " ", "NIT 901624955"]), "NIT 901624955");
+igual("puntos y guiones sueltos no cuentan", unirDatos([".", "-", "·", "Calle 5 # 3-20", undefined, null]), "Calle 5 # 3-20");
+igual("todo vacío: cadena vacía", unirDatos(["", ".", undefined]), "");
+igual("con todo", unirDatos(["Marta Gómez", "Compras", "NIT 1"]), "Marta Gómez · Compras · NIT 1");
+igual("recorta espacios", unirDatos(["  Ana  ", "3001234567 "]), "Ana · 3001234567");
+igual("dato vacío", [datoVacio(" . "), datoVacio("Ñ"), datoVacio("7")], [true, false, false]);
 
 console.log(fallos ? `\n${fallos} de ${casos} casos fallaron` : `✓ clientes: ${casos} casos`);
 process.exit(fallos ? 1 : 0);

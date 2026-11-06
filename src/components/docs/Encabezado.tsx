@@ -7,6 +7,7 @@
 import { cn } from "@/lib/utils";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { asset } from "@/nucleo/rutas";
+import { logoFormato } from "@/nucleo/marca";
 import { formatoDe } from "@/modulos/registro";
 import type { TipoDoc } from "@/nucleo/tipos";
 import { VARIANTE_BASE, formatoEnVariante } from "@/nucleo/variantes";
@@ -15,8 +16,8 @@ import { useVarianteActual } from "./VarianteFormato";
 
 /**
  * Logo de los formatos impresos. En el modo empresa va el logo de la organización
- * (SOTEC); en la demo va la marca ControlOne con «by SOTEC» debajo en pequeño
- * (public/controlone-logo.png, generado por scripts/generar-logo-formato.py).
+ * (SOTEC); en la demo va solo la marca ControlOne, sin «by SOTEC» (el crédito va en el pie)
+ * (public/controlone-logo.png, generado por scripts/generar-logo-formato.py; rutas en @/nucleo/marca).
  * `className` da el tamaño del logo de la empresa; `anchoDemo`, el ancho máximo de la marca.
  * En la empresa, dentro de otra variante de formato (`ConVariante`, p. ej. FORTOX) va el logo
  * de esa variante o, mientras no lo haya, su marca como logo de texto. En la demo todo documento
@@ -36,11 +37,10 @@ export function LogoFormato({ className, anchoDemo = "max-w-[190px]", alt = "SOT
       </span>
     );
   }
-  if (modo === "empresa") return <img src={asset("/sotec-logo-v3.png")} alt={alt} className={className} />;
+  if (modo === "empresa") return <img src={asset(logoFormato(modo))} alt={alt} className={className} />;
   return (
-    <span className="inline-flex flex-col items-center">
-      <img src={asset("/controlone-logo.png")} alt="ControlOne" className={cn("h-auto w-full object-contain", anchoDemo)} />
-      <span className="mt-0.5 text-[9px] font-medium uppercase tracking-[0.18em] text-slate-500">by SOTEC</span>
+    <span className="inline-flex flex-col items-center" data-logo-formato="controlone">
+      <img src={asset(logoFormato(modo))} alt="ControlOne" className={cn("h-auto w-full object-contain", anchoDemo)} />
     </span>
   );
 }

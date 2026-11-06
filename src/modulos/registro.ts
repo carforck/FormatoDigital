@@ -16,6 +16,7 @@ import { moduloPermisos } from "./permisos";
 import { moduloReportes } from "./reportes";
 import { moduloRequerimientos } from "./requerimientos";
 import { ETIQUETA_ESTADO } from "@/nucleo/catalogos";
+import { celularSinPrefijo, textoNit } from "@/nucleo/contacto";
 import type { Accion } from "@/nucleo/permisos";
 import type { Cliente, Config, DatosDe, Documento, Estado, Proyecto, TipoDoc } from "@/nucleo/tipos";
 
@@ -190,10 +191,11 @@ export function moduloDe<T extends TipoDoc>(tipo: T): ModuloDocumento<DatosDe<T>
   return DOCUMENTOS[tipo];
 }
 
-/** Datos de la organización (Configuración) para las plantillas; lo vacío queda con el valor de la plantilla. */
+/** Datos de la organización (Configuración) para las plantillas: NIT y celular tal cual (vacío = no salen); sin correo, el de la plantilla. */
 export function empresaDe(config: Config): Partial<EmpresaPlantilla> {
-  const e: Partial<EmpresaPlantilla> = { nombre: config.empresa, nit: `NIT ${config.nit}` };
-  if (config.telefono) e.telefonos = config.telefono;
-  if (config.correo) e.correo = config.correo;
+  // Sin «NIT NIT …» ni «Cel. Cel. …» si el prefijo se escribió en el campo
+  // Vacío en Configuración = no sale en el pie (sin el NIT ni el celular de ejemplo de la plantilla)
+  const e: Partial<EmpresaPlantilla> = { nombre: config.empresa, nit: textoNit(config.nit), telefonos: celularSinPrefijo(config.telefono) };
+  if (config.correo?.trim()) e.correo = config.correo.trim();
   return e;
 }

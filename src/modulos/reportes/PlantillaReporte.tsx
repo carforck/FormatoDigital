@@ -19,7 +19,9 @@ import type { DatosReporte, FotoReporte } from "@/nucleo/tipos";
 import { EditableText } from "@/components/docs/EditableText";
 import { ElegirImagen, avisoSobrantes, mensajeImagenIlegible } from "@/components/docs/ElegirImagen";
 import { Encabezado, Firma } from "@/components/docs/Encabezado";
+import { PieContacto } from "@/components/docs/PieContacto";
 import { PieFormato, useEtiquetas, useVariante } from "@/components/docs/VarianteFormato";
+import type { EmpresaPlantilla } from "@/modulos/contrato";
 import { EncabezadoFortox, HojaFortox, PieFortox } from "@/modulos/reportes/HojaFortox";
 import { EncabezadoSevin, HojaSevin } from "@/modulos/reportes/HojaSevin";
 import { EquiposEnFormato } from "@/modulos/equipos/EquiposEnFormato";
@@ -36,13 +38,15 @@ interface Props {
   resaltar?: string;
   /** Equipos atendidos (módulo Equipos), resueltos por quien muestra el formato. */
   equipos?: EquipoAtendido[];
+  /** Datos de la organización para el pie (NIT, celular): `empresaDe(config)`. */
+  empresa?: Partial<EmpresaPlantilla>;
 }
 
 /** Campos de texto del formato (todo menos el registro fotográfico). */
 type CampoTexto = Exclude<keyof DatosReporte, "fotos">;
 
 /** Réplica del FO-GSST-22 · Formato de reporte técnico (carta). El anexo de fotos solo sale si hay fotos o se está editando. */
-export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, equipos = [] }: Props) {
+export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, equipos = [], empresa }: Props) {
   const fotos = datos.fotos ?? [];
   // Etiquetas de los campos según la variante de formato (FORTOX puede nombrarlos distinto)
   const et = useEtiquetas("reporte");
@@ -71,7 +75,7 @@ export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, e
     </div>
   );
 
-  const anexo = (fotos.length > 0 || editar) && <AnexoFotos fotos={fotos} codigoDoc={codigoDoc} editar={editar} resaltar={resaltar === "fotos"} hojaPropia={hoja} />;
+  const anexo = (fotos.length > 0 || editar) && <AnexoFotos fotos={fotos} codigoDoc={codigoDoc} editar={editar} resaltar={resaltar === "fotos"} hojaPropia={hoja} empresa={empresa} />;
 
   if (hoja) {
     const Hoja = hoja === "fortox" ? HojaFortox : HojaSevin;
@@ -167,6 +171,7 @@ export function PlantillaReporte({ datos, codigoDoc, editar, firmar, resaltar, e
         Documento emitido por el Servicio de Calidad de la Compañía. El documento es propiedad de SOTEC. La compañía protegerá
         sus propios derechos en los tribunales civiles y penales de acuerdo con la ley.
       </PieFormato>
+      <PieContacto tipo="reporte" empresa={empresa} className="text-[9.5px]" />
     </article>
     {anexo}
     </div>
@@ -180,7 +185,7 @@ const FOTOS_POR_HOJA = 6;
  * Hoja(s) anexa(s) «Registro fotográfico»: cada grupo de 6 fotos es una hoja propia
  * con su encabezado, así ninguna foto queda partida entre páginas al imprimir.
  */
-function AnexoFotos({ fotos, codigoDoc, editar, resaltar, hojaPropia }: { fotos: FotoReporte[]; codigoDoc?: string; editar?: Props["editar"]; resaltar: boolean; hojaPropia?: "fortox" | "sevin" }) {
+function AnexoFotos({ fotos, codigoDoc, editar, resaltar, hojaPropia, empresa }: { fotos: FotoReporte[]; codigoDoc?: string; editar?: Props["editar"]; resaltar: boolean; hojaPropia?: "fortox" | "sevin"; empresa?: Props["empresa"] }) {
   const hojas: FotoReporte[][] = [];
   for (let i = 0; i < fotos.length; i += FOTOS_POR_HOJA) hojas.push(fotos.slice(i, i + FOTOS_POR_HOJA));
   if (hojas.length === 0) hojas.push([]);
@@ -199,6 +204,7 @@ function AnexoFotos({ fotos, codigoDoc, editar, resaltar, hojaPropia }: { fotos:
           resaltar={resaltar && h === 0}
           ultima={h === hojas.length - 1}
           hojaPropia={hojaPropia}
+          empresa={empresa}
         />
       ))}
     </>
@@ -217,6 +223,7 @@ function HojaFotos({
   resaltar,
   ultima,
   hojaPropia,
+  empresa,
 }: {
   fotos: FotoReporte[];
   grupo: FotoReporte[];
@@ -229,6 +236,7 @@ function HojaFotos({
   ultima: boolean;
   /** Variante con hoja propia (FORTOX, SEVIN): encabezado y pie de su formato. */
   hojaPropia?: "fortox" | "sevin";
+  empresa?: Props["empresa"];
 }) {
   const cambiar = (id: string, patch: Partial<FotoReporte>) => editar?.({ fotos: fotos.map((f) => (f.id === id ? { ...f, ...patch } : f)) });
   /** Agrega hasta 12 fotos comprimidas; devuelve el aviso si alguna no se pudo leer (HEIC fuera de Safari). */
@@ -293,6 +301,8 @@ function HojaFotos({
           Documento emitido por el Servicio de Calidad de la Compañía. El documento es propiedad de SOTEC.
         </PieFormato>
       )}
+      {/* SOTEC: NIT y celular; FORTOX y SEVIN conservan su pie (en la demo, solo el crédito de la marca) */}
+      <PieContacto tipo="reporte" empresa={empresa} className="text-[9.5px]" />
     </article>
   );
 }

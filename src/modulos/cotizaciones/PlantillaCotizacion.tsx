@@ -339,7 +339,7 @@ export function PlantillaCotizacion({ datos, codigoDoc, editar, firmar, resaltar
 
         </div>
 
-        <PieFormato empresa={empresa} codigo={FORMATO_COTIZACION.codigo} />
+        <PieFormato tipo="cotizacion" empresa={empresa} codigo={FORMATO_COTIZACION.codigo} />
       </article>
     </div>
   );

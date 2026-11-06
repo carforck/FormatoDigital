@@ -25,6 +25,7 @@ import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { cop } from "@/nucleo/letras";
 import { puede, puedeCrearTipo, puedeUsarTipo, puedeVerProyecto } from "@/nucleo/permisos";
 import { resumenProyecto } from "@/nucleo/proyectos";
+import { unirDatos } from "@/nucleo/personas";
 import { rutaCuenta, rutaDoc } from "@/nucleo/rutas";
 import type { TipoDoc } from "@/nucleo/tipos";
 
@@ -165,13 +166,13 @@ function Detalle() {
               </dd>
             </div>
           </div>
-          {cliente && (
+          {cliente && unirDatos([cliente.contacto, cliente.cargo]) && (
             <div className="flex min-w-0 gap-2">
               <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
               <div className="min-w-0">
                 <dt className="text-xs text-slate-500">Contacto del cliente</dt>
                 <dd className="break-words text-slate-800">
-                  {cliente.contacto} · {cliente.cargo}
+                  {unirDatos([cliente.contacto, cliente.cargo])}
                 </dd>
               </div>
             </div>

@@ -93,7 +93,11 @@ igual("el técnico no convierte", puedeConvertirRequerimiento(tecnico, req("en_r
 igual("SST no convierte (no cotiza)", puedeConvertirRequerimiento(sst, req("aprobado"), []), false);
 igual("en borrador no", puedeConvertirRequerimiento(admin, req("borrador"), []), false);
 igual("rechazado no", puedeConvertirRequerimiento(admin, req("rechazado"), []), false);
-igual("propio en revisión no (convertir lo aprueba)", puedeConvertirRequerimiento(admin, req("en_revision", admin.id), []), false);
+igual("propio en revisión sí (quien cotiza lo aprueba al convertir)", puedeConvertirRequerimiento(admin, req("en_revision", admin.id), []), true);
+igual("propio aprobado sí", puedeConvertirRequerimiento(admin, req("aprobado", admin.id), []), true);
+igual("propio en borrador no", puedeConvertirRequerimiento(admin, req("borrador", admin.id), []), false);
+igual("propio ya convertido no", puedeConvertirRequerimiento(admin, req("en_revision", admin.id), [cot]), false);
+igual("el técnico no convierte ni el suyo aprobado", puedeConvertirRequerimiento(tecnico, req("aprobado"), []), false);
 igual("ya convertido no", puedeConvertirRequerimiento(admin, req("aprobado"), [cot]), false);
 igual("cotizacionDe encuentra la cotización", cotizacionDe("d-rq", [cot])?.codigo, "COT-001-26");
 igual("cotizacionDe sin cotización", cotizacionDe("d-otro", [cot]), undefined);

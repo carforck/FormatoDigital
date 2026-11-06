@@ -80,6 +80,7 @@ const ARCHIVOS = [
   "/lottie/digitaliza.json",
   "/sotec-logo-v3.png",
   "/sotec-logo-v3-oscuro.png",
+  "/controlone-logo.png",
 ];
 
 /** Ruta sin la barra final (las copias de las páginas se guardan por ruta, sin la query). */

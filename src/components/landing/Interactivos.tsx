@@ -15,6 +15,7 @@ import { PlantillaPermiso } from "@/modulos/permisos/PlantillaPermiso";
 import { PlantillaReporte } from "@/modulos/reportes/PlantillaReporte";
 import { PERFILES } from "@/nucleo/perfiles";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
+import { documentosSeed } from "@/nucleo/datos/seed";
 import { cn } from "@/lib/utils";
 
 /**
@@ -23,10 +24,12 @@ import { cn } from "@/lib/utils";
  * (a escala reducida, sin interacción).
  */
 export function VitrinaFormatos() {
-  const demo = useDemo();
   const [tab, setTab] = useState<"reporte" | "permiso">("reporte");
-  const rt = demo.documentos.find((d) => d.id === "d-rt-clay");
-  const pt = demo.documentos.find((d) => d.id === "d-pt-clay");
+  // Siempre los ejemplos ficticios de la semilla: no dependen de la sesión abierta en el navegador
+  // (con la cuenta de la empresa o una demo modificada la vitrina quedaba vacía)
+  const [ejemplos] = useState(documentosSeed);
+  const rt = ejemplos.find((d) => d.id === "d-rt-clay");
+  const pt = ejemplos.find((d) => d.id === "d-pt-clay");
 
   const info = {
     reporte: {

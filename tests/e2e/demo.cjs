@@ -11,7 +11,8 @@
  * en sitio, retirar para corregir —anula la firma del cliente—, cámara o galería,
  * clientes nuevos al directorio y los que solo se parecen se preguntan); corregir en revisión
  * mientras nadie lo haya revisado (sigue en revisión; ya aprobado no se modifica); requerimiento del técnico que la
- * administración convierte en cotización una sola vez; que ninguna pantalla se desborde en 8 anchos y los controles del shell.
+ * administración convierte en cotización una sola vez (también el suyo propio); clientes por tipo de persona
+ * (jurídica o natural) sin separadores sueltos; que ninguna pantalla se desborde en 8 anchos y los controles del shell.
  */
 const fs = require("fs");
 const os = require("os");
@@ -19,7 +20,7 @@ const path = require("path");
 const puppeteer = require("puppeteer-core");
 
 const BASE = (process.env.BASE || "http://localhost:3100").replace(/\/$/, "");
-const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion" | "campo" | "revision" | "variantes" | "listas" | "epp" | "paginacion" | "logos" | "asistente" | "requerimiento"
+const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion" | "campo" | "revision" | "variantes" | "listas" | "epp" | "paginacion" | "logos" | "asistente" | "requerimiento" | "relaciones" | "clientes"
 const CLAVE = "sotec-demo-v10";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -1157,7 +1158,7 @@ async function formatoSugerido(p) {
  * reporte con variante de formato FORTOX o SEVIN (se agregan copias en localStorage).
  */
 async function logos(b, errores) {
-  console.log("\n— Logos de la app en los documentos de la demo");
+  console.log("\n— Logos de la demo: marca ControlOne en la app, los documentos, /imprimir y /firmar (sin SOTEC)");
   const p = await nuevaPagina(b, errores);
   await p.evaluateOnNewDocument(() => {
     window.print = () => {};
@@ -1169,11 +1170,35 @@ async function logos(b, errores) {
   await clic(p, "Administrador");
   await p.waitForFunction(() => location.pathname.startsWith("/app"));
   await sleep(600);
+  /** Ninguna imagen de la página con el logo de SOTEC (la demo solo lleva la marca ControlOne). */
+  const imgsSotec = () => p.evaluate(() => [...document.querySelectorAll("img")].map((i) => i.getAttribute("src") || "").filter((x) => x.includes("sotec-logo")));
+  // Barra lateral y barra superior de la app (escritorio)
+  const shell = await p.evaluate(() => ({
+    marca: !!document.querySelector("aside [data-marca=controlone]"),
+    texto: document.querySelector("aside [data-marca=controlone]")?.textContent.trim() || "",
+    // Marca de la barra superior («ControlOne · SG-SST»); el nombre del usuario de la semilla puede decir SOTEC
+    superior: [...document.querySelectorAll("header p")].find((x) => x.textContent.includes("SG-SST"))?.textContent || "",
+  }));
+  ok(shell.marca && shell.texto === "ControlOne", `barra lateral de la demo: marca ControlOne limpia, sin «by SOTEC» («${shell.texto}»)`);
+  ok(shell.superior.startsWith("ControlOne") && !shell.superior.includes("SOTEC"), `barra superior de la demo con la marca ControlOne («${shell.superior}»)`);
+  ok(!(await imgsSotec()).length, `app de la demo sin el logo de SOTEC (${(await imgsSotec()).join(", ") || "ninguno"})`);
+  // Celular: el menú lateral también lleva la marca de la app
+  await p.setViewport({ width: 390, height: 844 });
+  await sleep(300);
+  await p.click('button[aria-label="Abrir menú"]');
+  await sleep(400);
+  const movil = await p.evaluate(() => !!document.querySelector("aside [data-marca=controlone]"));
+  ok(movil && !(await imgsSotec()).length, "menú del celular en la demo: marca ControlOne y sin el logo de SOTEC");
+  await p.setViewport({ width: 1440, height: 900 });
+  await sleep(300);
   /** Logos dentro de las hojas: la marca de la app y ninguno de empresa. */
   const revisar = () =>
     p.evaluate(() => {
       const srcs = [...document.querySelectorAll(".doc-print img")].map((i) => i.getAttribute("src") || "");
-      return { hojas: document.querySelectorAll(".doc-print").length, app: srcs.some((x) => x.includes("controlone-logo")), empresa: srcs.filter((x) => /sotec-logo|fortox-logo|sevin-logo|laclay-logo/.test(x)) };
+      // El logo de la demo va limpio: sin «by SOTEC» debajo (el crédito va en el pie)
+      const conBy = [...document.querySelectorAll(".doc-print [data-logo-formato]")].some((l) => /by SOTEC/i.test(l.textContent || ""));
+      const pagina = [...document.querySelectorAll("img")].map((i) => i.getAttribute("src") || "").filter((x) => x.includes("sotec-logo"));
+      return { hojas: document.querySelectorAll(".doc-print").length, app: srcs.some((x) => x.includes("controlone-logo")) && !conBy, empresa: [...srcs.filter((x) => /sotec-logo|fortox-logo|sevin-logo|laclay-logo/.test(x)), ...pagina.map((x) => `página: ${x}`)] };
     });
   const esperar = () => p.waitForSelector("[data-impresion-lista]", { timeout: 20000 });
   // Copias de un reporte con variante FORTOX y SEVIN
@@ -1221,6 +1246,8 @@ async function logos(b, errores) {
   await sleep(500);
   const firmar = await p.evaluate(() => [...document.querySelectorAll("header img")].map((i) => i.getAttribute("src") || ""));
   ok(firmar.some((x) => x.includes("controlone-logo")) && !firmar.some((x) => x.includes("sotec-logo")), `/firmar: el encabezado lleva la marca de la app (${firmar.join(", ")})`);
+  const firmarTodo = await p.evaluate(() => ({ sotec: [...document.querySelectorAll("img")].some((i) => (i.getAttribute("src") || "").includes("sotec-logo")), by: /by SOTEC/i.test(document.querySelector("header [data-logo-formato]")?.textContent || "") }));
+  ok(!firmarTodo.sotec && !firmarTodo.by, "/firmar: ninguna imagen con el logo de SOTEC y el logo sin «by SOTEC»");
   await p.close();
 }
 
@@ -1580,6 +1607,150 @@ async function campo(b, errores) {
   await sleep(600);
   const ceiba = (await estado()).clientes.find((c) => c.nombre === "Distribuidora La Ceiba");
   ok(ceiba && !ceiba.correo && !ceiba.contacto && !ceiba.direccion, "el cliente nuevo no hereda los datos del anterior");
+  await p.close();
+}
+
+/**
+ * Pedido de Magno: «en el pie de página que salga el NIT y mi celular, centrado en la página».
+ * La administración escribe NIT, celular y correo en Configuración; cada formato SOTEC (cotización,
+ * requerimiento, reporte, permiso, gasto, EPP) los muestra centrados en la hoja, en la vista previa
+ * y en /imprimir, sin cambiar sus páginas; FORTOX, SEVIN y LA CLAY conservan su pie. En la demo,
+ * todo pie lleva además «© <año> ControlOne by SOTEC».
+ */
+async function pie(b, errores) {
+  console.log("\n— Pie de página: NIT y celular centrados");
+  const p = await nuevaPagina(b, errores);
+  await p.evaluateOnNewDocument(() => {
+    window.print = () => {};
+  });
+  await p.setViewport({ width: 1280, height: 900 });
+  await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "networkidle0" });
+  await clic(p, "Administrador");
+  await p.waitForFunction(() => location.pathname.startsWith("/app"));
+  await sleep(600);
+
+  // 1. Configuración: NIT, celular y correo (con el prefijo escrito a mano: no se duplica)
+  const escribir = (etiqueta, valor) =>
+    p.evaluate(
+      (t, v) => {
+        const l = [...document.querySelectorAll("main label")].find((x) => x.querySelector("span")?.textContent.trim() === t);
+        const i = l?.querySelector("input");
+        if (!i) return false;
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(i, v);
+        i.dispatchEvent(new Event("input", { bubbles: true }));
+        return true;
+      },
+      etiqueta,
+      valor,
+    );
+  await p.goto(`${BASE}/app/config`, { waitUntil: "networkidle0" });
+  await sleep(500);
+  ok(await p.evaluate(() => document.querySelector("main").innerText.includes("Salen en el pie de página de los formatos")), "Configuración: «Teléfono / celular» y «Correo» con la ayuda «Salen en el pie de página de los formatos»");
+  const puestos = [await escribir("NIT", "NIT 900.123.456-7"), await escribir("Teléfono / celular", "Cel. 301 234 5678"), await escribir("Correo", "contacto@empresa-ficticia.example")];
+  ok(puestos.every(Boolean), "Configuración: campos NIT, Teléfono / celular y Correo");
+  await clic(p, "Guardar");
+  const cfg = await p.evaluate((k) => JSON.parse(localStorage.getItem(k)).config, CLAVE);
+  ok(cfg.nit === "NIT 900.123.456-7" && cfg.telefono === "Cel. 301 234 5678" && cfg.correo === "contacto@empresa-ficticia.example", "se guardan en la configuración de la empresa");
+  const LINEA = "NIT 900.123.456-7 · Cel. 301 234 5678";
+
+  // Documentos ficticios solo para esta prueba: el reporte en FORTOX y SEVIN, y entregas de EPP (SOTEC y LA CLAY)
+  await p.evaluate((k) => {
+    const s = JSON.parse(localStorage.getItem(k));
+    const rt = s.documentos.find((d) => d.id === "d-rt-0");
+    const items = Array.from({ length: 8 }, (_, i) => ({ id: `pe-${i}`, elemento: `Casco de seguridad ${i + 1}`, cantidad: 1, talla: "M", motivo: "Ingreso", fecha: "2026-11-01" }));
+    const epp = { ...rt, id: "pie-epp", tipo: "epp", codigo: "EPP-901-26", datos: { fecha: "2026-11-01", trabajador: "Trabajador Ficticio", cedula: "1000000", cargo: "Técnico", obra: "Obra ficticia", items, observaciones: "", firmaRecibe: "", entregaNombre: "Entrega Ficticia", entregaCargo: "SST", firmaEntrega: "" } };
+    s.documentos.push({ ...rt, id: "pie-fortox", variante: "fortox" }, { ...rt, id: "pie-sevin", variante: "sevin" }, epp, { ...epp, id: "pie-laclay", variante: "laclay" });
+    localStorage.setItem(k, JSON.stringify(s));
+  }, CLAVE);
+
+  /** Pie de cada hoja: texto de la línea de contacto, el crédito y la distancia entre su centro y el de la hoja. */
+  const medir = () =>
+    p.evaluate(() =>
+      [...document.querySelectorAll(".doc-print")].map((h) => {
+        const hr = h.getBoundingClientRect();
+        const centro = (e) => {
+          if (!e) return null;
+          const r = e.getBoundingClientRect();
+          return Math.abs(r.left + r.width / 2 - (hr.left + hr.width / 2));
+        };
+        const linea = h.querySelector("[data-pie-linea] span");
+        const credito = h.querySelector("[data-pie-credito] span");
+        return { linea: linea?.textContent ?? "", credito: credito?.textContent ?? "", dLinea: centro(linea), dCredito: centro(credito), texto: h.innerText };
+      }),
+    );
+  const paginas = async () => {
+    const pdf = await p.pdf({ format: "letter", printBackground: true });
+    return Number((Buffer.from(pdf).toString("latin1").match(/\/Count (\d+)/) || [])[1] || 0);
+  };
+  const anio = new Date().getFullYear();
+  const CREDITO = `© ${anio} ControlOne by SOTEC`;
+
+  // 2. Formatos SOTEC: vista previa (detalle) e /imprimir (pantalla y papel), con sus páginas de siempre
+  const sotec = [
+    ["d-cot-1", "cotización", 1, true],
+    ["d-rq-0", "requerimiento", 1, true],
+    ["d-rt-0", "reporte técnico", 1, false],
+    ["d-pt-0", "permiso de trabajo", 1, false],
+    ["d-lg-0", "legalización de gastos", 2, false],
+    ["pie-epp", "entrega de EPP", 1, false],
+  ];
+  for (const [id, nombre, hojas, conCorreo] of sotec) {
+    await p.goto(`${BASE}/app/documentos/ver?id=${id}`, { waitUntil: "networkidle0" });
+    await sleep(500);
+    const vista = await medir();
+    const bien = (m) => m.length > 0 && m.every((x) => x.linea.startsWith(LINEA) && !/NIT NIT|Cel\. Cel\./.test(x.texto) && x.credito === CREDITO && x.dLinea !== null && x.dLinea <= 3 && x.dCredito <= 3);
+    ok(bien(vista) && (!conCorreo || vista[0].linea === `${LINEA} · contacto@empresa-ficticia.example · www.sotecse.com`), `${nombre}: vista previa con «${vista[0]?.linea}» centrado en la hoja (desfase ${vista.map((x) => x.dLinea?.toFixed(1)).join("/")} px) y «${CREDITO}»`);
+    await p.goto(`${BASE}/imprimir?doc=${id}&auto=0`, { waitUntil: "networkidle0" });
+    await p.waitForSelector("[data-impresion-lista]", { timeout: 20000 });
+    await sleep(300);
+    const imp = await medir();
+    await p.emulateMediaType("print");
+    const papel = await medir();
+    // Sin emulación: p.pdf() usa los estilos de impresión
+    await p.emulateMediaType(null);
+    ok(bien(imp) && bien(papel), `${nombre}: /imprimir en pantalla y en papel, centrado (desfase en papel ${papel.map((x) => x.dLinea?.toFixed(1)).join("/")} px)`);
+    const n = await paginas();
+    ok(n === hojas, `${nombre}: imprime en ${hojas} página(s) carta, como antes (${n})`);
+  }
+
+  // 3. La cotización en el generador (vista previa del borrador) también trae el pie
+  await p.goto(`${BASE}/app/nuevo/cotizacion`, { waitUntil: "networkidle0" });
+  await sleep(800);
+  await p.evaluate(() => [...document.querySelectorAll("button")].find((x) => x.textContent.trim() === "Formato")?.click());
+  await sleep(300);
+  const gen = await medir();
+  ok(gen.length > 0 && gen[0].linea.startsWith(LINEA) && gen[0].dLinea <= 3 && gen[0].credito === CREDITO, `generador: la vista previa de la cotización trae «${LINEA}» centrado y el crédito`);
+
+  // 4. FORTOX, SEVIN y LA CLAY: su pie sin cambios (sin NIT ni celular de SOTEC); en la demo, el crédito discreto
+  const propias = [
+    ["pie-fortox", "FORTOX", (t) => t.includes("FORMA: 7PA/F1-15") && t.includes("PBX")],
+    ["pie-sevin", "SEVIN", (t) => t.includes("GSE-FO-03")],
+    ["pie-laclay", "LA CLAY", (t) => t.includes("NOMBRE COMPLETO") && t.includes("NUMERO DE IDENTIFICACIÓN")],
+  ];
+  for (const [id, nombre, suPie] of propias) {
+    await p.goto(`${BASE}/imprimir?doc=${id}&auto=0`, { waitUntil: "networkidle0" });
+    await p.waitForSelector("[data-impresion-lista]", { timeout: 20000 });
+    await sleep(300);
+    const m = await medir();
+    ok(m.length > 0 && suPie(m[0].texto) && m.every((x) => !x.linea && !x.texto.includes("900.123.456-7") && !x.texto.includes("301 234 5678")), `${nombre}: conserva su pie, sin el NIT ni el celular de la configuración`);
+    ok(m.every((x) => x.credito === CREDITO), `${nombre}: en la demo lleva «${CREDITO}» al pie`);
+    const n = await paginas();
+    ok(n === 1, `${nombre}: sigue en una página carta (${n})`);
+  }
+
+  // 5. Sin celular configurado no sale «Cel.»
+  await p.evaluate((k) => {
+    const s = JSON.parse(localStorage.getItem(k));
+    s.config.telefono = "";
+    localStorage.setItem(k, JSON.stringify(s));
+  }, CLAVE);
+  await p.goto(`${BASE}/imprimir?doc=d-pt-0&auto=0`, { waitUntil: "networkidle0" });
+  await p.waitForSelector("[data-impresion-lista]", { timeout: 20000 });
+  await sleep(300);
+  const sinCel = await medir();
+  ok(sinCel[0]?.linea === "NIT 900.123.456-7" && !sinCel[0].texto.includes("Cel."), `sin celular configurado el pie queda «${sinCel[0]?.linea}» (sin «Cel.»)`);
   await p.close();
 }
 
@@ -2773,6 +2944,29 @@ async function asistente(b, errores) {
   await p.close();
 }
 
+/** Página de inicio: la vitrina de formatos sale aunque la sesión del navegador no tenga los ejemplos (cuenta de empresa o demo modificada). */
+async function landing(b, errores) {
+  console.log("\n— Landing: vitrina de formatos independiente de la sesión");
+  const p = await nuevaPagina(b, errores);
+  await p.setViewport({ width: 1440, height: 900 });
+  await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "networkidle0" });
+  await p.evaluate((k) => {
+    const s = JSON.parse(localStorage.getItem(k));
+    s.documentos = s.documentos.filter((x) => !x.id.includes("clay"));
+    localStorage.setItem(k, JSON.stringify(s));
+  }, CLAVE);
+  await p.goto(`${BASE}/`, { waitUntil: "networkidle0" });
+  await sleep(1500);
+  const alto = () => p.evaluate(() => Math.max(0, ...[...document.querySelectorAll(".doc-print")].map((x) => x.getBoundingClientRect().height)));
+  ok((await alto()) > 300 && (await p.evaluate(() => document.body.innerText.includes("Ladrillera Arcillas del Caribe"))), "la vitrina muestra el reporte técnico de ejemplo aunque la sesión no lo tenga");
+  await clic(p, "Permiso de trabajo");
+  await sleep(800);
+  ok((await alto()) > 300, "la pestaña «Permiso de trabajo» también muestra su formato");
+  await p.close();
+}
+
 /**
  * Paginación y listas que escalan: con volumen ficticio inyectado en la demo (60 documentos
  * en revisión, 30 por cerrar, 35 clientes y 40 eventos de auditoría, todos inventados), la
@@ -3015,6 +3209,154 @@ async function revision(b, errores) {
  * comercial y lo envía a revisión; la administración lo convierte en cotización (cliente, proyecto
  * e ítems precargados, precio de referencia del catálogo), una sola vez; el técnico y SST no convierten.
  */
+/**
+ * Relaciones cliente ↔ documentos ↔ proyectos (pedidos de Magno): el cliente nuevo escrito en un
+ * requerimiento o en una entrega de EPP queda en el directorio y enlazado (y pasa a la cotización
+ * al convertir el requerimiento); a un cliente sin proyectos se le crea uno con «＋ Proyecto nuevo»
+ * desde el asistente del reporte (o desde el selector «Proyecto u obra») y el documento queda en él.
+ */
+async function relaciones(b, errores) {
+  console.log("\n— Relaciones: cliente nuevo en requerimiento y EPP; proyecto nuevo desde el reporte");
+  const p = await nuevaPagina(b, errores);
+  p.setDefaultNavigationTimeout(120000);
+  await p.setViewport({ width: 1440, height: 900 });
+  await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "networkidle0" });
+  const estado = () => p.evaluate((k) => JSON.parse(localStorage.getItem(k)), CLAVE);
+  const principal = () => p.evaluate(() => document.querySelector("main").innerText.replace(/\s+/g, " "));
+  const ir = async (r, ms = 800) => {
+    await p.goto(`${BASE}${r}`, { waitUntil: "networkidle0" });
+    await sleep(ms);
+  };
+  const alDetalle = async () => {
+    await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
+    await sleep(700);
+    return new URL(p.url()).searchParams.get("id");
+  };
+  const escribir = async (etiqueta, valor) => {
+    await p.click(`main input[aria-label="${etiqueta}"]`);
+    await p.type(`main input[aria-label="${etiqueta}"]`, valor);
+  };
+  await clic(p, "Técnico de campo");
+  await p.waitForFunction(() => location.pathname.startsWith("/app"));
+  await sleep(800);
+
+  // 1. Requerimiento con un cliente nuevo escrito a mano: al enviarlo queda en el directorio y enlazado
+  const CLI_RQ = "Constructora Ficticia Delta";
+  await ir("/app/nuevo/requerimiento", 900);
+  await responder(p, CLI_RQ);
+  ok((await principal()).includes(`«${CLI_RQ}» es un cliente nuevo`), "requerimiento: avisa que el cliente nuevo queda en el directorio al guardar");
+  await sinProyecto(p);
+  await responder(p, "Bodega 3");
+  await clic(p, "Materiales para ampliación de CCTV");
+  await clic(p, "Instalación de cámara IP");
+  await clic(p, "Continuar con 1");
+  await p.evaluate((t) => {
+    const a = document.querySelector("main form textarea");
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(a, t);
+    a.dispatchEvent(new Event("input", { bubbles: true }));
+  }, "2 unidades x Instalación de cámara IP");
+  await clic(p, "Enviar", "form button");
+  await clic(p, "Omitir");
+  await clic(p, "Omitir");
+  await clic(p, "Firmar ahora");
+  await firmar(p);
+  await clic(p, "Continuar");
+  await clic(p, "Enviar a revisión");
+  const rqId = await alDetalle();
+  let s = await estado();
+  const rq = s.documentos.find((d) => d.id === rqId);
+  const cliRq = s.clientes.find((c) => c.nombre === CLI_RQ);
+  ok(rq && cliRq && rq.clienteId === cliRq.id && cliRq.sitio === "Bodega 3", `requerimiento ${rq && rq.codigo}: el cliente nuevo queda en el directorio (con su sitio) y enlazado`);
+  ok((await principal()).includes(`Guardé «${CLI_RQ}» en el directorio de clientes`), "requerimiento: el detalle avisa «Guardé … en el directorio de clientes»");
+
+  // 2. La administración lo convierte: la cotización queda con el mismo cliente del directorio
+  await comoUsuario(p, "u-adm");
+  await ir("/app/clientes", 900);
+  ok((await principal()).includes(CLI_RQ), "el cliente nuevo aparece en Clientes");
+  await ir(`/app/nuevo/cotizacion?requerimiento=${rqId}`, 1200);
+  const cliSel = await p.evaluate(() => document.querySelector("main select")?.selectedOptions[0]?.textContent ?? "");
+  ok(cliSel.includes(CLI_RQ), "al convertirlo, la cotización llega con el cliente del directorio elegido");
+  await clic(p, "Guardar borrador");
+  const cotId = await alDetalle();
+  s = await estado();
+  const cot = s.documentos.find((d) => d.id === cotId);
+  ok(cot && cot.origenId === rqId && cot.clienteId === cliRq.id && s.clientes.filter((c) => c.nombre === CLI_RQ).length === 1, "la cotización convertida queda enlazada al mismo cliente (sin duplicarlo)");
+
+  // 3. Entrega de EPP con un cliente nuevo: queda en el directorio y enlazada; un área interna no
+  await comoUsuario(p, "u-tec1");
+  const CLI_EPP = "Hotel Ficticio Mar Azul";
+  await ir("/app/nuevo/epp", 900);
+  await responder(p, CLI_EPP);
+  ok((await principal()).includes(`«${CLI_EPP}» es un cliente nuevo`), "EPP: avisa que el cliente nuevo queda en el directorio al guardar");
+  await sinProyecto(p);
+  await clic(p, "Guardar borrador");
+  const eppId = await alDetalle();
+  s = await estado();
+  const ep = s.documentos.find((d) => d.id === eppId);
+  const cliEpp = s.clientes.find((c) => c.nombre === CLI_EPP);
+  ok(ep && cliEpp && ep.clienteId === cliEpp.id, `EPP ${ep && ep.codigo}: el cliente nuevo queda en el directorio y enlazado`);
+  await ir("/app/nuevo/epp", 900);
+  await clic(p, "Sede SOTEC");
+  await sinProyecto(p);
+  await clic(p, "Guardar borrador");
+  const sedeId = await alDetalle();
+  s = await estado();
+  ok(s.documentos.find((d) => d.id === sedeId)?.clienteId === "" && !s.clientes.some((c) => /sede sotec/i.test(c.nombre)), "EPP para «Sede SOTEC» (área interna): no crea un cliente");
+
+  // 4. Reporte para un cliente nuevo (sin proyectos): «＋ Proyecto nuevo» destacado → nombre y sitio
+  const CLI_RT = "Granja Ficticia El Roble";
+  const PRY_RT = "Cerramiento eléctrico galpón 2";
+  await ir("/app/nuevo/reporte", 900);
+  await responder(p, CLI_RT);
+  const destacado = await p.evaluate(() => [...document.querySelectorAll("main button")].find((x) => x.textContent.trim() === "＋ Proyecto nuevo")?.className.includes("ring-2") ?? false);
+  ok(destacado && (await principal()).includes("aún no tiene proyectos"), "cliente sin proyectos: «＋ Proyecto nuevo» aparece destacado");
+  await clic(p, "＋ Proyecto nuevo");
+  await escribir("Nombre del proyecto nuevo", PRY_RT);
+  await escribir("Sitio del proyecto nuevo", "Galpón 2");
+  await clic(p, "Crear proyecto");
+  ok((await principal()).includes(`Proyecto nuevo «${PRY_RT}»`) && (await principal()).includes("se crea activo al guardar"), "el asistente confirma que el proyecto se crea al guardar y sigue el flujo");
+  await formatoSugerido(p);
+  ok((await principal()).includes("¿Qué tipo de reporte es?"), "después del proyecto sigue la pregunta siguiente del reporte");
+  await clic(p, "Guardar borrador");
+  const rtId = await alDetalle();
+  s = await estado();
+  const rt = s.documentos.find((d) => d.id === rtId);
+  const cliRt = s.clientes.find((c) => c.nombre === CLI_RT);
+  const pry = s.proyectos.find((x) => x.id === rt?.proyectoId);
+  ok(rt && cliRt && pry && rt.clienteId === cliRt.id && pry.clienteId === cliRt.id && pry.nombre === PRY_RT && pry.sitio === "Galpón 2" && pry.estado === "activo", `reporte ${rt && rt.codigo}: crea el cliente y el proyecto ${pry && pry.codigo} (activo) y lo enlaza a los dos`);
+  ok(pry && pry.historial.some((e) => e.accion === `Creó el proyecto desde el reporte técnico ${rt.codigo}`) && s.auditoria.some((a) => a.accion === "Creó proyecto desde un formato" && a.detalle.includes(rt.codigo)), "queda en el historial del proyecto («Creó el proyecto desde el reporte RT-…») y en la auditoría");
+  const det = await principal();
+  ok(pry && det.includes(pry.codigo) && (await principal()).includes(`Creé el proyecto «${PRY_RT}»`), "el detalle del reporte muestra el proyecto y avisa que se creó");
+  await ir(`/app/proyectos/ver?id=${pry && pry.id}`, 900);
+  ok((await principal()).includes(rt.codigo) && (await principal()).includes(PRY_RT), "la página del proyecto lista el reporte");
+
+  // 5. Desde el formulario: «＋ Proyecto nuevo…» en «Proyecto u obra» para un cliente del directorio
+  await ir("/app/nuevo/reporte", 900);
+  await p.select('main select[aria-label="Proyecto u obra"]', "").catch(() => {});
+  await p.evaluate((nombre) => {
+    const sel = [...document.querySelectorAll("main select")].find((x) => [...x.options].some((o) => o.textContent === nombre));
+    const id = [...sel.options].find((o) => o.textContent === nombre).value;
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(sel, id);
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+  }, CLI_RT);
+  await sleep(400);
+  await p.select('main select[aria-label="Proyecto u obra"]', "__nuevo");
+  await sleep(300);
+  await escribir("Nombre del proyecto nuevo", "Iluminación perimetral");
+  await clic(p, "Crear proyecto", "main form[aria-label='Proyecto nuevo'] button");
+  const opcion = await p.evaluate(() => document.querySelector('main select[aria-label="Proyecto u obra"]').selectedOptions[0]?.textContent ?? "");
+  ok(opcion.includes("Iluminación perimetral") && opcion.includes("se crea al guardar"), "formulario: el proyecto nuevo queda elegido (se crea al guardar)");
+  await clic(p, "Guardar borrador");
+  const rt2Id = await alDetalle();
+  s = await estado();
+  const rt2 = s.documentos.find((d) => d.id === rt2Id);
+  const pry2 = s.proyectos.find((x) => x.id === rt2?.proyectoId);
+  ok(rt2 && pry2 && pry2.nombre === "Iluminación perimetral" && pry2.clienteId === cliRt.id && s.proyectos.filter((x) => x.clienteId === cliRt.id).length === 2, "formulario: crea el segundo proyecto del cliente y enlaza el reporte");
+  await p.close();
+}
+
 async function requerimiento(b, errores) {
   console.log("\n— Requerimiento: el técnico lo envía y la administración lo convierte en cotización");
   const p = await nuevaPagina(b, errores);
@@ -3136,6 +3478,144 @@ async function requerimiento(b, errores) {
   // 9. Semilla: RQ-001-26 ya convertido en COT-003-26
   await ir("/app/documentos/ver?id=d-rq-1");
   ok((await principal()).includes("Convertido en la cotización COT-003-26"), "semilla: RQ-001-26 enlazado a COT-003-26");
+
+  // 10. Requerimiento propio de la administración (caso de Magno): no se lo aprueba, pero sí lo convierte
+  const propioId = "d-rq-propio";
+  await p.evaluate(
+    (k, i, nuevo) => {
+      const s = JSON.parse(localStorage.getItem(k));
+      const base = s.documentos.find((d) => d.id === i);
+      s.documentos.unshift({ ...base, id: nuevo, codigo: "RQ-099-26", consecutivo: 99, autorId: "u-adm", estado: "en_revision", historial: [{ fecha: new Date().toISOString(), usuarioId: "u-adm", accion: "Envió a revisión" }] });
+      localStorage.setItem(k, JSON.stringify(s));
+    },
+    CLAVE,
+    id,
+    propioId,
+  );
+  await ir(`/app/documentos/ver?id=${propioId}`);
+  bt = await botones();
+  ok(bt.some((x) => x.includes("Convertir a cotización")) && !bt.some((x) => x.includes("Aprobar requerimiento")), "admin: en su propio requerimiento en revisión ve «Convertir a cotización» (no «Aprobar»)");
+  ok((await principal()).includes("al guardarla, el requerimiento queda aprobado y atendido"), "admin: la pista explica que convertirlo lo aprueba");
+  const avisosAntes = await p.evaluate((k) => JSON.parse(localStorage.getItem(k)).notificaciones.length, CLAVE);
+  await clic(p, "Convertir a cotización");
+  await p.waitForFunction(() => location.pathname.includes("/app/nuevo/cotizacion") && location.search.includes("requerimiento="), { timeout: 15000 });
+  await sleep(900);
+  ok((await principal()).includes("Desde el requerimiento RQ-099-26"), "admin: abre la cotización desde su propio requerimiento");
+  await editarCampo(p, "Precio ítem 3", "380000");
+  await clic(p, "Guardar borrador");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 15000 });
+  await sleep(700);
+  const cotPropia = await leer(new URL(p.url()).searchParams.get("id"));
+  const rqPropio = await leer(propioId);
+  const avisosDespues = await p.evaluate((k) => JSON.parse(localStorage.getItem(k)).notificaciones.length, CLAVE);
+  ok(cotPropia && cotPropia.origenId === propioId && rqPropio.estado === "cerrado" && rqPropio.historial.some((e) => e.accion === "Aprobó" && e.usuarioId === "u-adm") && rqPropio.historial.some((e) => e.accion === "Convertido en cotización" && e.detalle === cotPropia.codigo), `admin: su requerimiento queda aprobado y atendido con la cotización ${cotPropia && cotPropia.codigo}`);
+  ok(avisosDespues === avisosAntes, "admin: sin aviso a sí mismo al convertir su propio requerimiento");
+  await ir(`/app/documentos/ver?id=${propioId}`);
+  ok(!(await botones()).some((x) => x.includes("Convertir a cotización")), "admin: su requerimiento ya convertido no se convierte dos veces");
+  await p.close();
+}
+
+/**
+ * Clientes por tipo de persona (pedido de Magno): jurídica (NIT) o natural (cédula), filtro
+ * «Todos · Jurídicos · Naturales» con sus cuentas, insignia en cada tarjeta y sin «· ·» ni puntos
+ * sueltos cuando faltan el contacto, el cargo o el teléfono. Datos ficticios.
+ */
+async function clientes(b, errores) {
+  console.log("\n— Clientes: persona jurídica o natural, sin separadores sueltos");
+  const p = await nuevaPagina(b, errores);
+  await p.setViewport({ width: 1440, height: 900 });
+  await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "networkidle0" });
+  await clic(p, "Administrador");
+  await p.waitForFunction(() => location.pathname.startsWith("/app"));
+  await sleep(800);
+  const estado = () => p.evaluate((k) => JSON.parse(localStorage.getItem(k)), CLAVE);
+  const ir = async (r, ms = 600) => {
+    await p.goto(`${BASE}${r}`, { waitUntil: "networkidle0" });
+    await sleep(ms);
+  };
+  const tarjetas = () =>
+    p.evaluate(() =>
+      [...document.querySelectorAll('main button[aria-label^="Editar"]')].map((x) => ({ nombre: x.getAttribute("aria-label").slice(7), texto: x.innerText, tipo: x.querySelector("[data-tipo-persona]")?.getAttribute("data-tipo-persona") })),
+    );
+  const pestanas = () => p.evaluate(() => [...document.querySelectorAll('main [role=tablist][aria-label="Tipo de cliente"] [role=tab]')].map((x) => x.textContent.replace(/\s+/g, " ").trim()));
+  const huerfanos = /·\s*·|^\s*·|·\s*$/m;
+
+  // Clientes con datos vacíos o con un punto (como DAGAR S.A.S, Fortox o VS TURBACO en la empresa real)
+  await p.evaluate((k) => {
+    const st = JSON.parse(localStorage.getItem(k));
+    const vacio = { direccion: "", contacto: "", cargo: "", correo: "", telefono: "", sitio: "" };
+    st.clientes.push({ ...vacio, id: "c-sin-datos", nombre: "Distribuidora Ficticia Uno S.A.S", nit: "901.000.111" });
+    st.clientes.push({ ...vacio, id: "c-puntos", nombre: "Vigilancia Inventada Dos", nit: "", contacto: ".", cargo: "-", telefono: ".", direccion: "Calle Falsa 123" });
+    localStorage.setItem(k, JSON.stringify(st));
+  }, CLAVE);
+  await ir("/app/clientes");
+  const total = (await estado()).clientes.length;
+  let pt = await pestanas();
+  ok(pt[0] === `Todos ${total}` && pt[1] === `Jurídicos ${total}` && pt[2] === "Naturales 0", `los clientes de antes cuentan como jurídicos (${pt.join(" | ")})`);
+  let t = await tarjetas();
+  const sinDatos = t.find((x) => x.nombre === "Distribuidora Ficticia Uno S.A.S");
+  const puntos = t.find((x) => x.nombre === "Vigilancia Inventada Dos");
+  ok(sinDatos && sinDatos.texto.includes("NIT 901.000.111") && !huerfanos.test(sinDatos.texto), `sin contacto ni cargo: solo «NIT 901.000.111», sin «· ·» (${sinDatos && JSON.stringify(sinDatos.texto)})`);
+  ok(puntos && puntos.texto.includes("Calle Falsa 123") && !/^\s*[.\-·]\s*$/m.test(puntos.texto) && !puntos.texto.includes(" · ."), `datos con un punto: no quedan líneas ni puntos sueltos (${puntos && JSON.stringify(puntos.texto)})`);
+  ok(t.every((x) => !huerfanos.test(x.texto)), "ninguna tarjeta tiene separadores huérfanos");
+  ok(t.length > 0 && t.every((x) => x.tipo === "juridica") && t[0].texto.includes("Jurídica"), "cada tarjeta lleva su insignia de tipo");
+
+  // Nuevo cliente persona natural: las etiquetas pasan a «Nombre completo» y «Cédula»
+  await clic(p, "Nuevo cliente");
+  const etiquetas = () => p.evaluate(() => [...document.querySelectorAll("main form label > span")].slice(0, 2).map((x) => x.textContent.trim()));
+  ok(JSON.stringify(await etiquetas()) === JSON.stringify(["Razón social", "NIT"]), "persona jurídica por defecto: «Razón social» y «NIT»");
+  await clic(p, "Persona natural", "main form [role=radio]");
+  await sleep(150);
+  ok(JSON.stringify(await etiquetas()) === JSON.stringify(["Nombre completo", "Cédula"]), "persona natural: «Nombre completo» y «Cédula»");
+  const campos = await p.$$("main form input");
+  await campos[0].type("Rosa Inventada Pérez");
+  await campos[1].type("1.234.567.890");
+  await clic(p, "Guardar", "form button[type=submit]");
+  await sleep(300);
+  const rosa = (await estado()).clientes.find((c) => c.nombre === "Rosa Inventada Pérez");
+  ok(rosa && rosa.tipoPersona === "natural" && rosa.nit === "1.234.567.890", "se guarda como persona natural con su cédula en el mismo campo");
+  pt = await pestanas();
+  ok(pt[0] === `Todos ${total + 1}` && pt[2] === "Naturales 1", `las pestañas cuentan por tipo (${pt.join(" | ")})`);
+  t = await tarjetas();
+  const tr = t.find((x) => x.nombre === "Rosa Inventada Pérez");
+  ok(tr && tr.tipo === "natural" && tr.texto.includes("Natural") && tr.texto.includes("C.C. 1.234.567.890") && !tr.texto.includes("NIT"), `su tarjeta: insignia «Natural» y «C.C.» (${tr && JSON.stringify(tr.texto)})`);
+  const encabezados = await p.evaluate(() => [...document.querySelectorAll("main h2")].map((h) => h.textContent.trim()));
+  ok(encabezados.some((h) => /^Personas jurídicas/.test(h)) && encabezados.some((h) => /^Personas naturales · 1/.test(h)), `en «Todos» salen clasificados (${encabezados.join(" | ")})`);
+  ok(t.findIndex((x) => x.tipo === "natural") > t.map((x) => x.tipo).lastIndexOf("juridica"), "jurídicos primero y luego naturales");
+
+  // Filtrar por tipo
+  await clic(p, "Naturales", "main [role=tab]");
+  await sleep(250);
+  t = await tarjetas();
+  ok(t.length === 1 && t[0].nombre === "Rosa Inventada Pérez", "«Naturales» muestra solo las personas naturales");
+  await clic(p, "Jurídicos", "main [role=tab]");
+  await sleep(250);
+  t = await tarjetas();
+  ok(t.length === Math.min(total, 20) && t.every((x) => x.tipo === "juridica"), "«Jurídicos» muestra solo las jurídicas");
+
+  // Reabrir: conserva el tipo; se puede cambiar
+  await clic(p, "Todos", "main [role=tab]");
+  await sleep(250);
+  await clic(p, "Rosa Inventada Pérez", "main button[aria-label]");
+  ok(await p.evaluate(() => document.querySelector('main form [role=radio][aria-checked="true"]')?.textContent.includes("Persona natural")), "al editar conserva «Persona natural»");
+  await clic(p, "Persona jurídica", "main form [role=radio]");
+  await clic(p, "Guardar", "form button[type=submit]");
+  await sleep(300);
+  ok((await estado()).clientes.find((c) => c.id === rosa.id).tipoPersona === "juridica", "se puede cambiar el tipo de persona");
+
+  // Detalle de proyecto con cliente sin contacto ni cargo: sin «·» suelto
+  await p.evaluate((k) => {
+    const st = JSON.parse(localStorage.getItem(k));
+    const c = st.clientes.find((x) => x.id === st.proyectos[0].clienteId);
+    c.contacto = "";
+    c.cargo = "";
+    localStorage.setItem(k, JSON.stringify(st));
+  }, CLAVE);
+  const pid = (await estado()).proyectos[0].id;
+  await ir(`/app/proyectos/ver?id=${pid}`);
+  ok(!(await p.evaluate(() => document.querySelector("main").innerText.includes("Contacto del cliente"))), "proyecto: sin contacto ni cargo no queda la línea con «·» suelto");
   await p.close();
 }
 
@@ -3160,8 +3640,12 @@ async function requerimiento(b, errores) {
     if (!SOLO || SOLO === "epp") await epp(b, errores);
     if (!SOLO || SOLO === "paginacion") await paginacion(b, errores);
     if (!SOLO || SOLO === "logos") await logos(b, errores);
+    if (!SOLO || SOLO === "landing") await landing(b, errores);
     if (!SOLO || SOLO === "asistente") await asistente(b, errores);
     if (!SOLO || SOLO === "requerimiento") await requerimiento(b, errores);
+    if (!SOLO || SOLO === "pie") await pie(b, errores);
+    if (!SOLO || SOLO === "relaciones") await relaciones(b, errores);
+    if (!SOLO || SOLO === "clientes") await clientes(b, errores);
   } catch (e) {
     ok(false, `error: ${e.message}`);
   } finally {

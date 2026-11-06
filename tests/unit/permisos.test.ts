@@ -1,6 +1,6 @@
 // Pruebas de quién edita un documento (pedido de Magno): el autor corrige en borrador, rechazado y
 // en revisión mientras nadie lo haya revisado; aprobado o cerrado ya no. Uso: npx tsx tests/unit/permisos.test.ts
-import { CORRIGIO_EN_REVISION, puedeEditarDoc, puedeRetirarDoc, revisionSinTocar } from "../../src/nucleo/permisos";
+import { CORRIGIO_EN_REVISION, puedeConvertirRequerimiento, puedeEditarDoc, puedeRetirarDoc, puedeRevisarDoc, revisionSinTocar } from "../../src/nucleo/permisos";
 import type { Documento, Estado, Evento, Usuario } from "../../src/nucleo/tipos";
 
 let fallos = 0;
@@ -46,6 +46,16 @@ igual("otro técnico no edita", puedeEditarDoc(otroTecnico, doc("en_revision", e
 igual("la revisora no edita contenido ajeno", puedeEditarDoc(revisora, doc("en_revision", enviado)), false);
 igual("el cliente no edita", puedeEditarDoc(cliente, doc("en_revision", enviado)), false);
 igual("revisionSinTocar solo en revisión", revisionSinTocar(doc("borrador", enviado)), false);
+
+// Requerimiento propio de la administración (pedido de Magno): no lo revisa, pero sí lo convierte en cotización
+const gerencia: Usuario = { id: "u-a", nombre: "Gerencia Inventada", cargo: "Gerente", rol: "admin", email: "a@ejemplo.test", activo: true };
+const rqPropio = (estado: Estado) => ({ ...doc(estado, enviado, "requerimiento"), codigo: "RQ-001-26", autorId: gerencia.id }) as Documento;
+igual("RQ propio: la administración no se lo revisa", puedeRevisarDoc(gerencia, rqPropio("en_revision")), false);
+igual("RQ propio en revisión: lo convierte", puedeConvertirRequerimiento(gerencia, rqPropio("en_revision"), []), true);
+igual("RQ propio aprobado: lo convierte", puedeConvertirRequerimiento(gerencia, rqPropio("aprobado"), []), true);
+igual("RQ propio en borrador: no", puedeConvertirRequerimiento(gerencia, rqPropio("borrador"), []), false);
+igual("RQ propio ya convertido: no", puedeConvertirRequerimiento(gerencia, rqPropio("en_revision"), [{ id: "d-cot", tipo: "cotizacion", origenId: "d-1" } as Documento]), false);
+igual("RQ: el técnico no convierte", puedeConvertirRequerimiento(tecnico, { ...doc("aprobado", enviado, "requerimiento") }, []), false);
 
 console.log(fallos ? `\n${fallos} de ${casos} casos fallaron` : `✓ permisos: ${casos} casos`);
 process.exit(fallos ? 1 : 0);

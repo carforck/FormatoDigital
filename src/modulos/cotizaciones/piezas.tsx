@@ -4,7 +4,9 @@
  */
 
 import { LogoFormato } from "@/components/docs/Encabezado";
+import { PieContacto } from "@/components/docs/PieContacto";
 import { cn } from "@/lib/utils";
+import type { TipoDoc } from "@/nucleo/tipos";
 
 import type { EmpresaCotizacion } from "./catalogo";
 
@@ -45,19 +47,17 @@ export function FranjaEncabezado({ empresa, titulo, compacto = false }: { empres
 }
 
 /**
- * Pie de página: en pantalla al final de la hoja; al imprimir se repite en cada hoja
- * (posición fija: Chrome y Safari la dibujan en todas las páginas; el margen inferior
+ * Pie de página: «NIT · Cel. · correo · web» centrado en la hoja y el código del formato a la
+ * derecha sin descentrarlo (PieContacto). En pantalla al final de la hoja; al imprimir se repite
+ * en cada hoja (posición fija: Chrome y Safari la dibujan en todas las páginas; el margen inferior
  * de la hoja deja su espacio, ver .doc-pie-fijo en globals.css).
  */
-export function PieFormato({ empresa, codigo }: { empresa: EmpresaCotizacion; codigo: string }) {
+export function PieFormato({ tipo, empresa, codigo }: { tipo: TipoDoc; empresa: EmpresaCotizacion; codigo: string }) {
   return (
     <>
       <div aria-hidden="true" className="min-h-8 flex-1 print:hidden" />
-      <footer className="pie-cotizacion flex items-end gap-3 border-t border-slate-400 pt-2 text-[9.5px] text-slate-700 sm:text-[10.5px]">
-        <p className="flex-1 text-center">
-          {empresa.telefonos} · {empresa.correo} · {empresa.web} · {empresa.nit}
-        </p>
-        <p className="shrink-0 text-slate-500">{codigo}</p>
+      <footer className="pie-cotizacion border-t border-slate-400 pt-2 text-[9.5px] text-slate-700 sm:text-[10.5px]">
+        <PieContacto tipo={tipo} empresa={empresa} extras={[empresa.correo, empresa.web]} codigo={codigo} className="mt-0 print:mt-0" />
       </footer>
     </>
   );

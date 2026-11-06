@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import type { DatosReporte } from "@/nucleo/tipos";
 
 import { Firma, LogoFormato } from "@/components/docs/Encabezado";
+import { PieContacto } from "@/components/docs/PieContacto";
 import { Renglones } from "@/components/docs/Renglones";
 import { EquiposEnFormato } from "@/modulos/equipos/EquiposEnFormato";
 import type { EquipoAtendido } from "@/modulos/equipos/tipos";
@@ -238,6 +239,8 @@ export function HojaFortox({ datos, codigoDoc, campo, editar, firmar, resaltar, 
       </section>
 
       <PieFortox />
+      {/* Su pie no cambia; en la demo, debajo, el crédito de la marca */}
+      <PieContacto tipo="reporte" />
     </article>
   );
 }

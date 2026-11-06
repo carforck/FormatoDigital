@@ -37,8 +37,8 @@ import type { ApiEquipos, Equipo } from "@/modulos/equipos/tipos";
 import { CATALOGO_SERVICIOS, IVA_GENERAL, type ServicioCatalogo } from "@/modulos/cotizaciones/catalogo";
 import { infoDoc, prefijoDe } from "@/modulos/registro";
 import { COTIZACION_ELIMINADA, CONVERTIDO_EN } from "@/modulos/requerimientos/conversion";
-import { planCliente } from "@/nucleo/clientes";
-import { prefijoVariante, serieConsecutivo, type TipoProyecto } from "@/nucleo/variantes";
+import { planCliente, planProyectoNuevo, type ProyectoPendiente } from "@/nucleo/clientes";
+import { TIPO_PROYECTO_BASE, prefijoVariante, serieConsecutivo, type TipoProyecto } from "@/nucleo/variantes";
 import { buscarOpcion, comparable, limpiarOpcion } from "@/nucleo/opciones";
 import { CORRIGIO_EN_REVISION, puede, puedeConvertirRequerimiento, puedeCrearTipo, puedeEditarDoc, puedeFirmaClienteEnSitio, puedeRetirarDoc, puedeUsarTipo, puedeVerCuenta, puedeVerDoc, puedeVerProyecto } from "@/nucleo/permisos";
 import {
@@ -240,8 +240,11 @@ interface Api extends Estado, ApiEquipos {
    * Crea (con el consecutivo definitivo) o actualiza el contenido de un documento propio en borrador, rechazado o en revisión sin revisar (sigue en revisión y queda «Corrigió mientras estaba en revisión»).
    * Con `registrar_clientes`, el cliente escrito que no está en el directorio se crea y se enlaza; si ya está,
    * se enlaza y se llenan solo sus campos vacíos (`planCliente`, @/nucleo/clientes).
+   * Con `proyectoNuevo` («＋ Proyecto nuevo» del generador) crea ese proyecto ACTIVO para el cliente ya
+   * resuelto en el directorio (por eso aquí, junto con el cliente nuevo) y lo enlaza (`planProyectoNuevo`);
+   * lo puede hacer quien puede guardar el documento y queda en el historial del proyecto y en la auditoría.
    */
-  guardar: (doc: Documento) => Documento;
+  guardar: (doc: Documento, opciones?: { proyectoNuevo?: ProyectoPendiente }) => Documento;
   /**
    * Vista previa del siguiente id y código; el definitivo se asigna en `guardar`. Con una
    * `variante` de formato que tenga prefijo propio (@/nucleo/variantes), el de su serie.
@@ -760,6 +763,45 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
       }
       return sinCambio;
     };
+    /**
+     * Proyecto nuevo escrito en el generador: se crea al guardar, después del directorio (el cliente
+     * nuevo ya existe), activo y del cliente del documento; si ya hay uno abierto igual, se enlaza.
+     * Sin cliente del directorio no se crea y el documento queda sin proyecto.
+     */
+    const conProyectoNuevo = (prev: Estado, doc: Documento, p?: ProyectoPendiente): Pick<Estado, "proyectos" | "consecutivos" | "auditoria"> & { doc: Documento } => {
+      const sinCambio = { doc, proyectos: prev.proyectos, consecutivos: prev.consecutivos, auditoria: prev.auditoria };
+      if (!p || doc.proyectoId !== p.id) return sinCambio;
+      const plan = planProyectoNuevo(prev.proyectos, p, doc.clienteId);
+      const cliente = prev.clientes.find((c) => c.id === doc.clienteId);
+      const conDatos = (pr: Proyecto) => ({ ...doc, proyectoId: pr.id, datos: { ...doc.datos, ...(infoDoc(doc.tipo).alElegirProyecto?.(pr, cliente)?.cambio ?? {}) } }) as Documento;
+      if (plan.accion === "nada") return { ...sinCambio, doc: { ...doc, proyectoId: undefined } as Documento };
+      if (plan.accion === "enlazar") return { ...sinCambio, doc: conDatos(plan.proyecto) };
+      const anio = anioDe(hoy());
+      const n = (prev.consecutivos[`proyecto-${anio}`] ?? 0) + 1;
+      const info = infoDoc(doc.tipo);
+      const nuevo: Proyecto = {
+        id: p.id,
+        codigo: codigo(prev.config.prefijoProyecto || "PRY", n, anio),
+        consecutivo: n,
+        nombre: p.nombre.trim().replace(/\s+/g, " "),
+        clienteId: doc.clienteId,
+        sitio: p.sitio?.trim() || cliente?.sitio || "",
+        responsableId: p.responsableId || prev.usuarioId || "",
+        fechaInicio: p.fechaInicio || hoy(),
+        estado: "activo",
+        tipo: p.tipo || TIPO_PROYECTO_BASE,
+        descripcion: "",
+        creado: ahora(),
+        actualizado: ahora(),
+        historial: [evento(prev, `Creó el proyecto desde ${info.formato.el} ${info.formato.corto.toLowerCase()} ${doc.codigo}`)],
+      };
+      return {
+        doc: conDatos(nuevo),
+        proyectos: [nuevo, ...prev.proyectos],
+        consecutivos: { ...prev.consecutivos, [`proyecto-${anio}`]: n },
+        auditoria: registrar(prev, "Creó proyecto desde un formato", `${nuevo.codigo} · ${nuevo.nombre} · ${doc.codigo}`),
+      };
+    };
     /** Código visible: PREFIJO-001-26. */
     const codigo = (pref: string, n: number, anio: string) => `${pref}-${String(n).padStart(3, "0")}-${anio.slice(2)}`;
 
@@ -836,7 +878,7 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
         return { id: uid("d"), consecutivo, codigo: codigo(prefijoVariante(tipo, variante) ?? prefijo(s, tipo), consecutivo, anio) };
       },
 
-      guardar(doc) {
+      guardar(doc, opciones) {
         const actualizado = { ...doc, actualizado: ahora() };
         setS((prev) => {
           const existente = prev.documentos.find((d) => d.id === doc.id);
@@ -845,7 +887,10 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
             const autor = prev.usuarios.find((x) => x.id === prev.usuarioId);
             if (!autor || !puedeEditarDoc(autor, existente)) return prev;
             // La variante de formato se recalcula mientras es borrador (el generador la resuelve por proyecto o cliente)
-            const dir = conDirectorio(prev, { ...existente, datos: doc.datos, clienteId: doc.clienteId, proyectoId: doc.proyectoId || undefined, variante: doc.variante ?? existente.variante, actualizado: ahora() } as Documento);
+            const dir0 = conDirectorio(prev, { ...existente, datos: doc.datos, clienteId: doc.clienteId, proyectoId: doc.proyectoId || undefined, variante: doc.variante ?? existente.variante, actualizado: ahora() } as Documento);
+            // Proyecto nuevo del generador: después del directorio (su cliente ya está resuelto)
+            const pry = conProyectoNuevo({ ...prev, clientes: dir0.clientes, auditoria: dir0.auditoria }, dir0.doc, opciones?.proyectoNuevo);
+            const dir = { ...dir0, doc: pry.doc, auditoria: pry.auditoria };
             const merged = { ...dir.doc, equiposIds: equiposDelCliente(prev, dir.doc) } as Documento;
             if (existente.estado === "en_revision") {
               // Corrige sin retirarlo: sigue en revisión, queda en el historial y el revisor recibe un aviso
@@ -863,12 +908,14 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
               return {
                 ...prev,
                 clientes: dir.clientes,
+                proyectos: pry.proyectos,
+                consecutivos: pry.consecutivos,
                 documentos: prev.documentos.map((d) => (d.id === doc.id ? corregido : d)),
                 notificaciones: [...revisoresDe(existente.tipo).map((r) => ({ id: uid("n"), para: r, texto, docId: existente.id, fecha: ahora(), leida: false })), ...prev.notificaciones],
                 auditoria: registrar({ ...prev, auditoria: anula.auditoria }, CORRIGIO_EN_REVISION, existente.codigo),
               };
             }
-            return { ...prev, clientes: dir.clientes, auditoria: dir.auditoria, documentos: prev.documentos.map((d) => (d.id === doc.id ? merged : d)) };
+            return { ...prev, clientes: dir.clientes, proyectos: pry.proyectos, consecutivos: pry.consecutivos, auditoria: dir.auditoria, documentos: prev.documentos.map((d) => (d.id === doc.id ? merged : d)) };
           }
           // Documento nuevo: solo de un módulo que el perfil puede diligenciar (lo comercial, la administración)
           const r = rolDe(prev);
@@ -887,8 +934,10 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
             historial: [evento(prev, "Creó el documento")],
           } as Documento;
           const dir = conDirectorio(prev, base);
-          let nuevo = { ...dir.doc, equiposIds: equiposDelCliente(prev, dir.doc) } as Documento;
-          let auditoria = registrar({ ...prev, auditoria: dir.auditoria }, "Creó", nuevo.codigo);
+          // Proyecto nuevo del generador: después del directorio (su cliente ya está resuelto)
+          const pry = conProyectoNuevo({ ...prev, clientes: dir.clientes, auditoria: dir.auditoria }, dir.doc, opciones?.proyectoNuevo);
+          let nuevo = { ...pry.doc, equiposIds: equiposDelCliente(prev, pry.doc) } as Documento;
+          let auditoria = registrar({ ...prev, auditoria: pry.auditoria }, "Creó", nuevo.codigo);
           let notificaciones = prev.notificaciones;
           let documentos = prev.documentos;
           // Cotización convertida desde un requerimiento (pedido de Magno): una sola vez por requerimiento.
@@ -900,7 +949,8 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
               const eventos = [...(req.estado === "en_revision" ? [evento(prev, "Aprobó")] : []), evento(prev, CONVERTIDO_EN, nuevo.codigo)];
               const convertido = { ...req, estado: "cerrado", actualizado: ahora(), historial: [...req.historial, ...eventos] } as Documento;
               documentos = documentos.map((d) => (d.id === req.id ? convertido : d));
-              notificaciones = notificar(prev, req.autorId, `${req.codigo} fue aprobado y la administración lo pasó a cotización`, req.id);
+              // El requerimiento propio de la administración (lo convierte quien lo creó): sin aviso a sí mismo
+              if (req.autorId !== autor.id) notificaciones = notificar(prev, req.autorId, `${req.codigo} fue aprobado y la administración lo pasó a cotización`, req.id);
               auditoria = registrar({ ...prev, auditoria }, CONVERTIDO_EN, `${req.codigo} → ${nuevo.codigo}`);
             } else {
               // Ya convertido (otra pestaña u otro equipo) o sin permiso: la cotización queda suelta
@@ -910,7 +960,8 @@ function DatosProvider({ children, modo, cambiarModo }: { children: React.ReactN
           return {
             ...prev,
             clientes: dir.clientes,
-            consecutivos: { ...prev.consecutivos, [clave]: n },
+            proyectos: pry.proyectos,
+            consecutivos: { ...pry.consecutivos, [clave]: n },
             documentos: [nuevo, ...documentos],
             notificaciones,
             auditoria,

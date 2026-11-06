@@ -16,6 +16,7 @@ import { Plus, Trash2 } from "lucide-react";
 
 import { EditableText } from "@/components/docs/EditableText";
 import { Firma, LogoFormato } from "@/components/docs/Encabezado";
+import { PieContacto } from "@/components/docs/PieContacto";
 import { useVariante } from "@/components/docs/VarianteFormato";
 import { SelectConOtro } from "@/components/ui/SelectConOtro";
 import { cn } from "@/lib/utils";
@@ -249,6 +250,8 @@ export function HojaLaClay({ datos, codigoDoc, editar, firmar, resaltar }: Props
         </div>
         <FotoEntrega className="w-[150px] shrink-0" altoFoto="h-[100px]" foto={datos.fotoRecibe} resaltado={resaltar === "fotoRecibe"} onCambiar={editar ? (fotoRecibe) => editar({ fotoRecibe }) : undefined} />
       </div>
+      {/* Su pie no cambia; en la demo, debajo, el crédito de la marca */}
+      <PieContacto tipo="epp" />
     </article>
   );
 }

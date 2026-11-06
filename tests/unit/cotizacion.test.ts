@@ -4,6 +4,7 @@ import { CATALOGO_SERVICIOS, cotizacionVacia, itemDeCatalogo, leerItems, leerNum
 import type { DatosCotizacion, ItemCotizacion } from "../../src/modulos/cotizaciones/tipos";
 import { faltantesCotizacion } from "../../src/modulos/cotizaciones/validar";
 import { cop, pesosEnLetras } from "../../src/nucleo/letras";
+import { celularSinPrefijo, creditoDemo, nitSinPrefijo, partesContacto, textoNit } from "../../src/nucleo/contacto";
 
 let fallos = 0;
 let casos = 0;
@@ -82,6 +83,19 @@ igual("ítem sin precio", faltantesCotizacion({ ...lista, items: [it(2, 0)] }), 
 igual("ítem sin cantidad", faltantesCotizacion({ ...lista, items: [it(0, 1000)] }), ["Ítem 1: cantidad"]);
 igual("correo inválido", faltantesCotizacion({ ...lista, correo: "sin-arroba" }), ["Correo del cliente válido"]);
 igual("condiciones vacías", faltantesCotizacion({ ...lista, formaPago: " ", tiempoEntrega: "" }), ["Forma de pago", "Tiempo de entrega"]);
+
+// Pie de los formatos (Configuración): sin «NIT NIT» ni «Cel. Cel.», y sin «Cel.» suelto
+igual("nit sin prefijo", nitSinPrefijo("NIT 900.123.456-7"), "900.123.456-7");
+igual("nit con dos puntos", nitSinPrefijo("nit: 900123456-7"), "900123456-7");
+igual("nit con puntos", nitSinPrefijo("N.I.T. 900123456-7"), "900123456-7");
+igual("nit tal cual", textoNit("900.123.456-7"), "NIT 900.123.456-7");
+igual("nit vacío", textoNit("  "), "");
+igual("celular con prefijo", celularSinPrefijo("Cel. 301 234 5678"), "301 234 5678");
+igual("celular escrito Celular:", celularSinPrefijo("Celular: 301 234 5678"), "301 234 5678");
+igual("teléfono con prefijo", celularSinPrefijo("Tel 605 000 0000"), "605 000 0000");
+igual("línea completa", partesContacto({ nit: "NIT 900.123.456-7", telefono: "301 234 5678", extras: ["info@x.example", ""] }), ["NIT 900.123.456-7", "Cel. 301 234 5678", "info@x.example"]);
+igual("sin celular", partesContacto({ nit: "900.123.456-7", telefono: "" }), ["NIT 900.123.456-7"]);
+igual("crédito de la demo", creditoDemo(2026), "© 2026 ControlOne by SOTEC");
 
 console.log(fallos ? `${fallos} fallo(s) de ${casos}` : `✓ ${casos} casos de cotización`);
 process.exit(fallos ? 1 : 0);

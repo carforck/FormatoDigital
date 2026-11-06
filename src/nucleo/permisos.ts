@@ -150,13 +150,13 @@ export function puedeRevisarDoc(u: Usuario, d: Documento): boolean {
 
 /**
  * Convierte un requerimiento en cotización (pedido de Magno) quien puede crear cotizaciones
- * (la administración), una sola vez: si ya hay una cotización con ese origen, no. En revisión
- * solo si además lo puede revisar (no es suyo): convertirlo lo aprueba. Ya aprobado (por SST o
- * la administración), sí.
+ * (la administración), una sola vez: si ya hay una cotización con ese origen, no. En revisión o
+ * ya aprobado, también el que creó la misma administración (decisión de Magno: quien cotiza
+ * aprueba el pedido al convertirlo, aunque sea suyo). En borrador o rechazado, no.
  */
 export function puedeConvertirRequerimiento(u: Usuario, d: Documento, documentos: Documento[]): boolean {
   if (d.tipo !== "requerimiento" || !puedeCrearTipo(u.rol, "cotizacion") || cotizacionDe(d.id, documentos)) return false;
-  return d.estado === "aprobado" || (d.estado === "en_revision" && puedeRevisarDoc(u, d));
+  return d.estado === "aprobado" || d.estado === "en_revision";
 }
 
 /** El cliente solo ve sus cuentas ya emitidas; la administración, todas. */

@@ -15,6 +15,8 @@ import { EditableText } from "@/components/docs/EditableText";
 import { ElegirImagen } from "@/components/docs/ElegirImagen";
 import { SelectConOtro } from "@/components/ui/SelectConOtro";
 import { Firma, LogoFormato } from "@/components/docs/Encabezado";
+import { PieContacto } from "@/components/docs/PieContacto";
+import type { EmpresaPlantilla } from "@/modulos/contrato";
 import { cn } from "@/lib/utils";
 import { formatoDe } from "@/modulos/registro";
 import { comprimirImagen } from "@/nucleo/imagenes";
@@ -33,6 +35,8 @@ interface Props {
   editar?: (patch: Partial<DatosGasto> | ((d: DatosGasto) => Partial<DatosGasto>)) => void;
   firmar?: (campo: CampoFirmaGasto) => void;
   resaltar?: string;
+  /** Datos de la organización para el pie (NIT, celular): `empresaDe(config)`. */
+  empresa?: Partial<EmpresaPlantilla>;
 }
 
 // Colores del formato FO-GSST-25 enviado por SOTEC
@@ -45,7 +49,7 @@ type CampoTexto = Exclude<keyof DatosGasto, "items">;
 const SOPORTES_POR_HOJA = 6;
 
 /** Réplica del FO-GSST-25 · Legalización y registro de gastos operativos (A4). */
-export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: Props) {
+export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar, empresa }: Props) {
   const f = formatoDe("gasto");
   const total = totalGastos(datos);
   const conSoporte = datos.items.filter((i) => i.soporte);
@@ -291,6 +295,7 @@ export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: P
           <span>Documento emitido por el Sistema de Gestión de SOTEC</span>
           <span>Hoja 1 · Formato{conSoporte.length ? ` · ${conSoporte.length} soporte${conSoporte.length === 1 ? "" : "s"} anexo${conSoporte.length === 1 ? "" : "s"}` : ""}</span>
         </div>
+        <PieContacto tipo="gasto" empresa={empresa} className="text-[9.5px] text-slate-600" />
         </div>
       </article>
 
@@ -324,6 +329,7 @@ export function PlantillaGasto({ datos, codigoDoc, editar, firmar, resaltar }: P
             <span>Documento emitido por el Sistema de Gestión de SOTEC</span>
             <span>Hoja {h + 2} · Soportes</span>
           </div>
+          <PieContacto tipo="gasto" empresa={empresa} className="text-[9.5px] text-slate-600" />
         </article>
       ))}
     </div>

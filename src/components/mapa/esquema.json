@@ -13,7 +13,9 @@
     "0010_equipos.sql",
     "0011_comercial_solo_admin.sql",
     "0012_espacio_empresa.sql",
-    "0013_campo_tecnico.sql"
+    "0013_campo_tecnico.sql",
+    "0014_corregir_en_revision.sql",
+    "0015_clientes_tipo_persona.sql"
   ],
   "tablas": [
     {
@@ -318,6 +320,15 @@
           "unico": false,
           "fk": null,
           "defecto": "now()"
+        },
+        {
+          "nombre": "tipo_persona",
+          "tipo": "text",
+          "pk": false,
+          "nulo": false,
+          "unico": false,
+          "fk": null,
+          "defecto": "'juridica'"
         }
       ],
       "migracion": "0001_nucleo.sql",

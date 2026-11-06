@@ -57,7 +57,8 @@ export const EMPRESA_COTIZACION: EmpresaCotizacion = {
   nombre: "SOTEC",
   lema: "Tu acceso eficaz a la seguridad electrónica",
   direccion: ["Cartagena de Indias, Bolívar", "Colombia"],
-  telefonos: "300 000 0000",
+  // El celular sale solo si la administración lo configura (Configuración · Teléfono / celular)
+  telefonos: "",
   correo: "info@sotecse.com",
   web: "www.sotecse.com",
   nit: "NIT 900.000.000-0",

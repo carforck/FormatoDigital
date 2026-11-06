@@ -222,7 +222,7 @@ export function PlantillaRequerimiento({ datos, codigoDoc, editar, firmar, resal
           <p className="mt-3 text-[10px] text-slate-500">Documento interno de {empresa.nombre}: la administración lo revisa y, si aplica, lo convierte en la cotización para el cliente.</p>
         </div>
 
-        <PieFormato empresa={empresa} codigo={FORMATO_REQUERIMIENTO.codigo} />
+        <PieFormato tipo="requerimiento" empresa={empresa} codigo={FORMATO_REQUERIMIENTO.codigo} />
       </article>
     </div>
   );

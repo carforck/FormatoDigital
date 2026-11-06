@@ -7,6 +7,7 @@
 
 import { LogoFormato } from "@/components/docs/Encabezado";
 import { cop, pesosEnLetras } from "@/nucleo/letras";
+import { documentoCliente, tipoPersonaDe } from "@/nucleo/personas";
 import type { Cliente, Config, Documento, Proyecto } from "@/nucleo/tipos";
 
 import { totalItem, totales, type CuentaCobro } from "./tipos";
@@ -50,9 +51,9 @@ export function PlantillaCuentaCobro({ cuenta, cliente, proyecto, config, docume
         </p>
 
         <div className="mt-4">
-          <p>Señores:</p>
+          <p>{cliente && tipoPersonaDe(cliente) === "natural" ? "Señor(a):" : "Señores:"}</p>
           <p className="font-bold uppercase">{cliente?.nombre ?? "—"}</p>
-          {cliente?.nit && <p>NIT {cliente.nit}</p>}
+          {cliente && documentoCliente(cliente) && <p>{documentoCliente(cliente)}</p>}
           {cliente?.direccion && <p>{cliente.direccion}</p>}
           {cliente?.contacto && (
             <p>

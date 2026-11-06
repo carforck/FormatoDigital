@@ -48,10 +48,13 @@ export interface Paso {
   render?: (avanzar: (v: ValorPaso, eco: string) => void) => React.ReactNode;
   /**
    * «＋ Agregar otro» en listas (select y multi): por defecto se ofrece y lo nuevo se guarda
-   * para toda la empresa. `false` lo quita (p. ej. proyecto o confirmar); «servicio» pide
-   * descripción, unidad y precio (catálogo de la cotización).
+   * para toda la empresa. `false` lo quita (p. ej. confirmar); «servicio» pide
+   * descripción, unidad y precio (catálogo de la cotización); «proyecto» es «＋ Proyecto nuevo»
+   * (nombre y sitio opcional, `onAgregarProyecto`): no va a la lista de la empresa.
    */
-  agregar?: false | "servicio";
+  agregar?: false | "servicio" | "proyecto";
+  /** Resalta «＋ Agregar…» como la acción principal (p. ej. un cliente sin proyectos). */
+  agregarDestacado?: boolean;
   /** Texto de ayuda del formulario de «Agregar otro». */
   ayudaAgregar?: string;
   /**
@@ -92,6 +95,8 @@ interface Props {
   onAgregarOpcion?: (pasoId: string, valor: string) => void;
   /** Agrega un servicio al catálogo y devuelve su etiqueta (la opción que queda marcada). */
   onAgregarServicio?: (s: ServicioNuevo) => string;
+  /** «＋ Proyecto nuevo»: lo deja pendiente en el documento y devuelve su opción (o `{ error }` si no se puede). */
+  onAgregarProyecto?: (p: { nombre: string; sitio: string }) => string | { error: string };
 }
 
 interface Msg {
@@ -112,7 +117,7 @@ const FIN = "¡Listo! Revisa el formato: puedes editar cualquier campo con un cl
  * respuesta; al corregirla se regresa a donde se iba (o directo a la firma), sin
  * repetir las siguientes. Las respuestas largas se recortan en el eco (140).
  */
-export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFirmar, firmado, ejecutoresIniciales = [], bienvenida, retomando, acciones, onAgregarOpcion, onAgregarServicio }: Props) {
+export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFirmar, firmado, ejecutoresIniciales = [], bienvenida, retomando, acciones, onAgregarOpcion, onAgregarServicio, onAgregarProyecto }: Props) {
   const [i, setI] = useState(retomando ? pasos.length : 0);
   // Hasta dónde llegó: al corregir una respuesta anterior se vuelve aquí sin repetir las siguientes
   const [tope, setTope] = useState(retomando ? pasos.length : 0);
@@ -132,6 +137,9 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
   const [otroAbierto, setOtroAbierto] = useState(false);
   const [otro, setOtro] = useState("");
   const [servicio, setServicio] = useState({ unidad: "Unidades", precio: "" });
+  // «＋ Proyecto nuevo»: sitio opcional y por qué no se pudo
+  const [sitioNuevo, setSitioNuevo] = useState("");
+  const [errorNuevo, setErrorNuevo] = useState<string | null>(null);
   // Paso de firma de un tercero (cliente): quién firma y su cargo
   const [firmante, setFirmante] = useState({ nombre: "", cargo: "" });
   const [avisoFirma, setAvisoFirma] = useState<string | null>(null);
@@ -163,6 +171,8 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
     setOtroAbierto(false);
     setOtro("");
     setServicio({ unidad: "Unidades", precio: "" });
+    setSitioNuevo("");
+    setErrorNuevo(null);
     setFirmante({ nombre: paso?.firmante?.nombre ?? "", cargo: paso?.firmante?.cargo ?? "" });
     setAvisoFirma(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -203,7 +213,7 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
 
   /** Lista con «＋ Agregar otro»: select avanza con lo nuevo; multi lo deja marcado; gastos lo pone como tipo del gasto. */
   const agregaAqui =
-    paso && (paso.tipo === "select" || paso.tipo === "multi" || paso.tipo === "gastos") && paso.agregar !== false && (paso.agregar === "servicio" ? Boolean(onAgregarServicio) : Boolean(onAgregarOpcion));
+    paso && (paso.tipo === "select" || paso.tipo === "multi" || paso.tipo === "gastos") && paso.agregar !== false && (paso.agregar === "servicio" ? Boolean(onAgregarServicio) : paso.agregar === "proyecto" ? Boolean(onAgregarProyecto) : Boolean(onAgregarOpcion));
 
   function agregarOtro(e: React.FormEvent) {
     e.preventDefault();
@@ -211,6 +221,19 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
     const v = otro.trim().replace(/\s+/g, " ");
     if (!v) return;
     let opcion = v;
+    if (paso.agregar === "proyecto") {
+      const r = onAgregarProyecto!({ nombre: v, sitio: sitioNuevo.trim().replace(/\s+/g, " ") });
+      if (typeof r !== "string") {
+        setErrorNuevo(r.error);
+        return;
+      }
+      setOtroAbierto(false);
+      setOtro("");
+      setSitioNuevo("");
+      setErrorNuevo(null);
+      avanzar(r, `Proyecto nuevo: ${v}`);
+      return;
+    }
     if (paso.agregar === "servicio") {
       const precio = Number(servicio.precio.replace(/\D/g, ""));
       opcion = onAgregarServicio!({ descripcion: v, unidad: servicio.unidad, precioReferencia: precio });
@@ -231,7 +254,15 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
     otroAbierto ? (
       <form onSubmit={agregarOtro} className="space-y-2 rounded-lg border border-dashed border-sotec-greenDeep/50 bg-sotec-soft/50 p-2.5">
         <p className="text-[11px] text-slate-600">{paso?.ayudaAgregar ?? "Lo que agregues queda disponible en esta lista para todo el equipo."}</p>
-        <Input autoFocus value={otro} onChange={(e) => setOtro(e.target.value)} placeholder={paso?.agregar === "servicio" ? "Servicio o producto (p. ej. Cámara domo 4 MP)" : "Escribe la nueva opción"} aria-label="Nueva opción" />
+        {paso?.agregar === "proyecto" ? (
+          <>
+            <Input autoFocus value={otro} onChange={(e) => setOtro(e.target.value)} placeholder="Nombre del proyecto u obra (p. ej. Ampliación CCTV bodega 2)" aria-label="Nombre del proyecto nuevo" />
+            <Input value={sitioNuevo} onChange={(e) => setSitioNuevo(e.target.value)} placeholder="Sitio o área (opcional)" aria-label="Sitio del proyecto nuevo" />
+            {errorNuevo && <p role="alert" className="text-[11px] text-red-700">{errorNuevo}</p>}
+          </>
+        ) : (
+          <Input autoFocus value={otro} onChange={(e) => setOtro(e.target.value)} placeholder={paso?.agregar === "servicio" ? "Servicio o producto (p. ej. Cámara domo 4 MP)" : "Escribe la nueva opción"} aria-label="Nueva opción" />
+        )}
         {paso?.agregar === "servicio" && (
           <div className="grid grid-cols-2 gap-2">
             <SelectConOtro clave={LISTA.unidad} base={UNIDADES} value={servicio.unidad} onChange={(unidad) => setServicio({ ...servicio, unidad })} aria-label="Unidad" placeholderOtro="Unidad" className="h-10 min-w-0 rounded-md border border-slate-200 bg-white px-2 text-sm" />
@@ -240,7 +271,7 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
         )}
         <div className="flex gap-2">
           <Button type="submit" size="sm" className="flex-1" disabled={!otro.trim() || (paso?.agregar === "servicio" && !servicio.precio.replace(/\D/g, ""))}>
-            <Plus className="h-4 w-4" /> Agregar
+            <Plus className="h-4 w-4" /> {paso?.agregar === "proyecto" ? "Crear proyecto" : "Agregar"}
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => setOtroAbierto(false)}>
             Cancelar
@@ -251,9 +282,16 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
       <button
         type="button"
         onClick={() => setOtroAbierto(true)}
-        className="flex items-center gap-1 rounded-full border border-dashed border-sotec-greenDeep/60 px-2.5 py-1 text-[11px] font-semibold text-sotec-greenDeep transition hover:bg-sotec-soft"
+        className={cn(
+          "flex items-center gap-1 rounded-full border border-dashed border-sotec-greenDeep/60 px-2.5 py-1 text-[11px] font-semibold text-sotec-greenDeep transition hover:bg-sotec-soft",
+          paso?.agregarDestacado && "border-solid border-sotec-greenDeep bg-sotec-soft px-3 py-1.5 text-xs ring-2 ring-sotec-green/40",
+        )}
       >
-        <Plus className="h-3 w-3" /> {paso?.agregar === "servicio" ? "Agregar servicio o producto" : paso?.tipo === "gastos" ? "Otro tipo" : "Agregar otro"}
+        {paso?.agregar === "proyecto" ? "＋ Proyecto nuevo" : (
+          <>
+            <Plus className="h-3 w-3" /> {paso?.agregar === "servicio" ? "Agregar servicio o producto" : paso?.tipo === "gastos" ? "Otro tipo" : "Agregar otro"}
+          </>
+        )}
       </button>
     )
   ) : null;

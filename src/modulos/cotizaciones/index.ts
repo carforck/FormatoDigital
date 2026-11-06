@@ -5,6 +5,7 @@
  * usan otras pantallas (plantilla, cálculos y catálogo).
  */
 
+import { PERSONAS, tipoPersonaDe } from "@/nucleo/personas";
 import type { ModuloDocumento } from "@/modulos/contrato";
 import { cop, pesosEnLetras } from "@/nucleo/letras";
 
@@ -68,7 +69,7 @@ export const moduloCotizaciones: ModuloDocumento<DatosCotizacion> = {
 
   alElegirCliente: (c) => ({
     cambio: { cliente: c.nombre, clienteNit: c.nit ?? "", contacto: c.contacto, correo: c.correo, telefono: c.telefono, direccion: c.direccion, aceptaNombre: c.contacto, aceptaCargo: c.cargo },
-    mensaje: `Cliente ${c.nombre}: completé ${c.nit ? "NIT, " : ""}contacto (${c.contacto}), correo, teléfono y dirección.`,
+    mensaje: `Cliente ${c.nombre}: completé ${c.nit ? `${PERSONAS[tipoPersonaDe(c)].documento}, ` : ""}contacto (${c.contacto}), correo, teléfono y dirección.`,
   }),
 
   alElegirProyecto: (p) => ({

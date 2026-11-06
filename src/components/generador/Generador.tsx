@@ -9,6 +9,10 @@
  * desde el técnico, ver @/nucleo/clientes); uno desactivado no se recrea: se ofrece usarlo;
  * uno que solo se parece («…S.A.S.», sin tildes) se pregunta antes de enlazarlo. Cambiar a
  * mano el cliente elegido quita los datos que ese cliente había llenado (y su proyecto y equipos).
+ * Requerimiento y Entrega de EPP también registran el cliente nuevo (pedido de Magno: cliente, reporte,
+ * cotización y requerimiento relacionados). «＋ Proyecto nuevo» (paso del proyecto o selector «Proyecto u
+ * obra») deja un proyecto PENDIENTE en el documento: se crea al GUARDAR, después del cliente (que puede
+ * ser nuevo), activo y enlazado (`demo.guardar(doc, { proyectoNuevo })`).
  * La variante de formato (marca: SOTEC, FORTOX…) sale del tipo del proyecto o, sin proyecto, del
  * formato por defecto del cliente (@/nucleo/variantes); se ve en el chip «Formato: …», en la vista
  * previa y en la impresión, y queda guardada en el documento.
@@ -31,15 +35,16 @@ import { SelectorEquipos } from "@/modulos/equipos/SelectorEquipos";
 import type { EquipoMinimo } from "@/modulos/equipos/tipos";
 import { clienteDoc, empresaDe, infoDoc, moduloDe, prefijoDe } from "@/modulos/registro";
 import { ETIQUETA_ESTADO_PROYECTO } from "@/nucleo/catalogos";
-import { hoy, useDemo } from "@/nucleo/datos/DemoProvider";
+import { ahora, hoy, useDemo } from "@/nucleo/datos/DemoProvider";
 import { CLAVE_RETORNO_GENERADOR, abrirImpresion, leerBorradorImpresion, tituloArchivo } from "@/nucleo/impresion";
 import { rutaDoc } from "@/nucleo/rutas";
 import type { Cliente, Documento, Proyecto, TipoDoc } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 import { avance, faltantes } from "@/nucleo/validar";
 import { puede, puedeEditarDoc } from "@/nucleo/permisos";
-import { VARIANTE_BASE, formatoEnVariante, prefijoVariante, formatosPara, resolverVariante, varianteDe } from "@/nucleo/variantes";
-import { avisoPlan, buscarCliente, claveNombre, dejarAvisoCliente, mismoNombre, planCliente, preguntaParecido, separarCliente } from "@/nucleo/clientes";
+import { TIPO_PROYECTO_BASE, VARIANTE_BASE, formatoEnVariante, prefijoVariante, formatosPara, resolverVariante, tiposProyectoDe, varianteDe } from "@/nucleo/variantes";
+import { avisoPlan, buscarCliente, claveNombre, dejarAvisoCliente, mismoNombre, nombreLimpio, planCliente, planProyectoNuevo, preguntaParecido, separarCliente } from "@/nucleo/clientes";
+import { unirDatos } from "@/nucleo/personas";
 import { unirOpciones } from "@/nucleo/opciones";
 
 interface Props {
@@ -62,6 +67,8 @@ interface Props {
 }
 
 const SIN_PROYECTO = "Sin proyecto";
+/** Opción del selector «Proyecto u obra» que abre el proyecto nuevo. */
+const PROYECTO_NUEVO = "__nuevo";
 const etiquetaProyecto = (p: Proyecto) => `${p.codigo} · ${p.nombre}`;
 
 /**
@@ -87,6 +94,23 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   // La conversión de un requerimiento tiene su propia copia (no se mezcla con otra cotización a medias)
   const claveCache = `fd-generador-${tipo}-${usuario.id}${desde ? `-${desde.id}` : ""}`;
   const recuperado = useRef(false);
+  // Proyecto nuevo pendiente («＋ Proyecto nuevo»): se crea al guardar; se guarda aparte en el navegador
+  const claveProyectoNuevo = `${claveCache}-proyecto`;
+  const pendienteRef = useRef<Proyecto | null>(null);
+  const [proyectoNuevo, setProyectoNuevoState] = useState<Proyecto | null>(() => {
+    if (existente) return null;
+    try {
+      const p = JSON.parse(localStorage.getItem(claveProyectoNuevo) ?? "null") as Proyecto | null;
+      pendienteRef.current = p && typeof p.id === "string" && typeof p.nombre === "string" ? p : null;
+      return pendienteRef.current;
+    } catch {
+      return null;
+    }
+  });
+  const setProyectoNuevo = (p: Proyecto | null) => {
+    pendienteRef.current = p;
+    setProyectoNuevoState(p);
+  };
   // Los módulos están tipados por formato; el generador los trata de forma uniforme.
   const mod = modulo as unknown as {
     pasos: (c: { datos: unknown; clientes: typeof demo.clientes; usuarioNombre: string; hoy: string; serviciosPropios?: ServicioCatalogo[]; variante?: string }) => Paso[];
@@ -160,10 +184,14 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   const [aviso, setAviso] = useState<string | null>(null);
   // Aviso del cliente escrito a mano en el formato (p. ej. «se quitaron los datos de X»)
   const [avisoCliente, setAvisoCliente] = useState<string | null>(null);
+  // Formulario «＋ Proyecto nuevo…» del selector «Proyecto u obra»
+  const [formProyecto, setFormProyecto] = useState<{ nombre: string; sitio: string; error: string | null } | null>(null);
   // Nombres que el usuario dijo que NO son el cliente parecido del directorio (no se vuelve a preguntar)
   const noEsElMismo = useRef(new Set<string>());
   /** Cliente activo con ese nombre; si solo se parece, pregunta (y recuerda el «no»). */
-  const confirmarCliente = (texto: string): Cliente | undefined => {
+  const confirmarCliente = (escrito: string): Cliente | undefined => {
+    // Lo que el formato toma como nombre del cliente («Cliente · sitio» en la Entrega de EPP)
+    const texto = nombreDelCliente(escrito);
     const c = buscarCliente(demo.clientesActivos, texto);
     if (!c || mismoNombre(c.nombre, texto)) return c;
     if (noEsElMismo.current.has(claveNombre(texto) + "|" + c.id)) return undefined;
@@ -171,6 +199,11 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     noEsElMismo.current.add(claveNombre(texto) + "|" + c.id);
     return undefined;
   };
+  /** Nombre del cliente que el formato registraría (el texto tal cual si el formato no registra clientes). */
+  function nombreDelCliente(texto: string): string {
+    if (!info.datosCliente) return texto;
+    return nombreLimpio(info.datosCliente({ ...(doc.datos as unknown as Record<string, unknown>), [info.campoCliente]: texto })?.nombre ?? "");
+  }
   const [guardando, setGuardando] = useState(false);
   // Lo preseleccionado desde un proyecto no cuenta como cambio sin guardar
   const contenido = (d: Documento) => JSON.stringify([d.datos, d.equiposIds ?? []]);
@@ -182,10 +215,12 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     if (existente || guardando) return;
     try {
       if (sucio || recuperado.current) localStorage.setItem(claveCache, JSON.stringify(doc));
+      if (proyectoNuevo && doc.proyectoId === proyectoNuevo.id) localStorage.setItem(claveProyectoNuevo, JSON.stringify(proyectoNuevo));
+      else localStorage.removeItem(claveProyectoNuevo);
     } catch {
       /* sin almacenamiento */
     }
-  }, [doc, existente, guardando, sucio, claveCache]);
+  }, [doc, existente, guardando, sucio, claveCache, proyectoNuevo, claveProyectoNuevo]);
 
   // Aviso del navegador si se intenta salir con cambios sin guardar
   useEffect(() => {
@@ -254,9 +289,13 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     return { nombre: s.nombre, aviso: `${s.aviso}${s.nit && !campoNit ? " Este formato no lleva NIT: anótalo en Clientes." : ""}`, ponerNit };
   };
 
-  // Proyectos que se pueden elegir: los visibles, no cerrados, del cliente elegido (o todos si aún no hay cliente)
-  const proyectosElegibles = demo.proyectosVisibles.filter((p) => (p.estado !== "cerrado" || p.id === doc.proyectoId) && (!doc.clienteId || p.clienteId === doc.clienteId));
-  const proyecto = demo.proyectos.find((p) => p.id === doc.proyectoId);
+  // Proyectos que se pueden elegir: los visibles, no cerrados, del cliente elegido (o todos si aún no hay cliente).
+  // Un cliente escrito a mano que no está en el directorio es nuevo: no tiene proyectos (se le crea uno)
+  const clienteEscrito = !doc.clienteId && Boolean(clienteDoc(doc).trim());
+  const proyectosElegibles = clienteEscrito ? [] : demo.proyectosVisibles.filter((p) => (p.estado !== "cerrado" || p.id === doc.proyectoId) && (!doc.clienteId || p.clienteId === doc.clienteId));
+  // El proyecto nuevo pendiente cuenta como el proyecto del documento mientras siga elegido
+  const pendiente = proyectoNuevo && doc.proyectoId === proyectoNuevo.id ? proyectoNuevo : null;
+  const proyecto = demo.proyectos.find((p) => p.id === doc.proyectoId) ?? pendiente ?? undefined;
   // Variante de formato: la del tipo del proyecto; sin proyecto, la elegida («Sin proyecto · Servicios
   // Fortox», guardada en doc.variante) o la del cliente; si no, SOTEC
   const varianteDel = (p: Proyecto | undefined, clienteId: string, elegida?: string) =>
@@ -299,7 +338,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
       setDoc((d) => ({ ...d, clienteId: "", proyectoId: undefined, equiposIds: undefined, datos: { ...d.datos, ...quitar(d), [info.campoCliente]: texto } }) as Documento);
       const quitado = anterior ? `Quité los datos de «${anterior.nombre}»${proyAnterior || doc.equiposIds?.length ? ", su proyecto y sus equipos" : ""}: completa los del cliente nuevo. ` : "";
       // Cliente nuevo escrito en el chat: se guarda en el directorio cuando se guarde el documento (no en cada tecla)
-      const nombre = texto.trim();
+      const nombre = nombreDelCliente(texto);
       if (!nombre || !registraClientes) return quitado || undefined;
       const existente = buscarCliente(demo.clientes, nombre);
       if (existente?.activo === false) return `${quitado}«${existente.nombre}» está desactivado en el directorio de clientes. Al guardar te pregunto si quieres usarlo (no se crea otro).`;
@@ -332,8 +371,57 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     setDoc((d) => ({ ...conProyecto(d, p), variante: undefined }) as Documento);
     const c = demo.clientes.find((x) => x.id === p.clienteId);
     const r = info.alElegirProyecto?.(p, c);
-    return [`Proyecto ${etiquetaProyecto(p)}${c ? ` de ${c.nombre}` : ""}.`, r?.mensaje, avisoFormato(varianteDel(p, p.clienteId))].filter(Boolean).join(" ");
+    const nuevo = pendienteRef.current?.id === p.id;
+    const cual = nuevo
+      ? `Proyecto nuevo «${p.nombre}»${c ? ` de ${c.nombre}` : clienteDoc(doc) ? ` de ${clienteDoc(doc)}` : ""}: se crea activo al guardar ${info.formato.el} ${info.formato.corto.toLowerCase()}${c ? "" : ", junto con el cliente nuevo"}, y el documento queda en él.`
+      : `Proyecto ${etiquetaProyecto(p)}${c ? ` de ${c.nombre}` : ""}.`;
+    return [cual, nuevo ? undefined : r?.mensaje, avisoFormato(varianteDel(p, p.clienteId))].filter(Boolean).join(" ");
   }
+
+  /**
+   * «＋ Proyecto nuevo» (asistente o formulario): queda pendiente en el documento y se crea al guardar,
+   * después del cliente (que puede ser nuevo). Lo puede hacer quien diligencia el documento. Devuelve la
+   * opción del paso, o el motivo si no se puede (sin cliente, o uno escrito a mano que no se registraría).
+   */
+  function nuevoProyecto(nombre: string, sitio: string): { opcion: string; mensaje: string } | { error: string } {
+    const n = nombreLimpio(nombre);
+    if (n.length < 3) return { error: "Escribe el nombre del proyecto u obra (al menos 3 letras)." };
+    const escrito = nombreDelCliente(clienteDoc(doc));
+    if (!doc.clienteId && !escrito) return { error: "Primero indica el cliente: el proyecto es de un cliente." };
+    if (!doc.clienteId) {
+      // Cliente escrito a mano: solo si al guardar queda en el directorio (si no, el proyecto no tendría cliente)
+      const plan = registraClientes ? planCliente(demo.clientes, doc, "nuevo") : null;
+      if (!plan || plan.accion === "nada" || plan.accion === "inactivo")
+        return { error: `«${escrito || clienteDoc(doc)}» no se registra en el directorio de clientes: elige un cliente del directorio para crearle un proyecto.` };
+    }
+    // Ya hay uno abierto de este cliente con ese nombre: se usa ese
+    const repetido = doc.clienteId ? planProyectoNuevo(demo.proyectos, { id: "", nombre: n, sitio }, doc.clienteId) : null;
+    if (repetido?.accion === "enlazar" && demo.proyectosVisibles.some((p) => p.id === repetido.proyecto.id)) {
+      return { opcion: etiquetaProyecto(repetido.proyecto), mensaje: elegirProyecto(repetido.proyecto) ?? "" };
+    }
+    // Tipo: el que da el formato que ya tiene el documento sin proyecto (el del cliente), para no cambiarlo
+    const sinProyecto = varianteDel(undefined, doc.clienteId);
+    const tipoP = tiposProyectoDe(demo.config).find((t) => t.variante === sinProyecto)?.nombre ?? TIPO_PROYECTO_BASE;
+    const c = demo.clientes.find((x) => x.id === doc.clienteId);
+    const previo = pendienteRef.current;
+    const base = previo ?? { ...demo.nuevoCodigoProyecto(), descripcion: "", historial: [], creado: ahora(), actualizado: ahora() };
+    const p: Proyecto = {
+      ...base,
+      codigo: "Nuevo",
+      nombre: n,
+      sitio: nombreLimpio(sitio) || c?.sitio || "",
+      clienteId: doc.clienteId,
+      tipo: tipoP,
+      responsableId: usuario.id,
+      fechaInicio: hoy(),
+      estado: "activo",
+    } as Proyecto;
+    setProyectoNuevo(p);
+    return { opcion: etiquetaProyecto(p), mensaje: elegirProyecto(p) ?? "" };
+  }
+
+  // Mensaje del asistente del último «＋ Proyecto nuevo» (lo muestra el paso al avanzar)
+  const mensajeNuevo = useRef<string | null>(null);
 
   /** Aplica la respuesta de un paso del chat; devuelve el mensaje de confirmación del asistente. */
   function aplicar(id: string, v: ValorPaso): string | void {
@@ -358,7 +446,11 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
       s.ponerNit();
       return [s.aviso, r].filter(Boolean).join(" ") || undefined;
     }
-    if (id === "proyecto") return elegirProyecto(demo.proyectosVisibles.find((p) => etiquetaProyecto(p) === v));
+    if (id === "proyecto") {
+      // «＋ Proyecto nuevo» ya lo dejó elegido (y respondió en onAgregarProyecto)
+      if (pendienteRef.current && etiquetaProyecto(pendienteRef.current) === v) return mensajeNuevo.current ?? undefined;
+      return elegirProyecto(demo.proyectosVisibles.find((p) => etiquetaProyecto(p) === v));
+    }
     // Formato elegido en el asistente (SOTEC, Fortox, Sevin): manda sobre el del proyecto y el cliente
     if (id === "formato") {
       const f = formatos.find((x) => x.etiqueta === v);
@@ -387,15 +479,24 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
       // Lo agregado va antes de «Otro» (si la lista lo tiene) y sin repetir (ni por mayúsculas ni tildes)
       return { ...p, opciones: unirOpciones(p.opciones, extra) };
     });
+  // Hay cliente (del directorio o escrito a mano): se puede crear un proyecto nuevo para él
+  const hayCliente = Boolean(doc.clienteId || clienteDoc(doc).trim());
   const pasoProyecto: Paso = {
     id: "proyecto",
     tipo: "select",
     opcional: true,
     resaltar: "proyecto",
     pregunta: "¿A qué proyecto u obra pertenece?",
-    agregar: false,
-    ayuda: proyectosElegibles.length ? "Al elegirlo, el documento aparece en el proyecto y se llenan los campos de obra del formato." : "Este cliente no tiene proyectos abiertos; puedes seguir sin proyecto.",
-    opciones: [...proyectosElegibles.map(etiquetaProyecto), SIN_PROYECTO],
+    agregar: hayCliente ? "proyecto" : false,
+    // Cliente sin proyectos: crear uno es lo primero que se ofrece
+    agregarDestacado: hayCliente && !proyectosElegibles.length,
+    ayudaAgregar: "El proyecto se crea activo para este cliente al guardar el documento, y el documento queda en él.",
+    ayuda: proyectosElegibles.length
+      ? "Al elegirlo, el documento aparece en el proyecto y se llenan los campos de obra del formato. Si es otro, créalo con «＋ Proyecto nuevo»."
+      : hayCliente
+        ? "Este cliente aún no tiene proyectos abiertos: créale uno con «＋ Proyecto nuevo» o sigue sin proyecto."
+        : "No hay proyectos abiertos; puedes seguir sin proyecto.",
+    opciones: [...proyectosElegibles.map(etiquetaProyecto), ...(pendiente ? [etiquetaProyecto(pendiente)] : []), SIN_PROYECTO],
   };
   // Formato del documento (si hay más de uno para este tipo): el sugerido va primero
   const pasoFormato: Paso | null = formatos.length
@@ -514,13 +615,22 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
         plan = planCliente(demo.clientes, { ...doc, clienteId }, "nuevo");
       }
     }
+    // Proyecto nuevo: se crea con el cliente ya resuelto (elegido, enlazado o el que se crea ahora)
+    const clienteQueda = clienteId || (plan && (plan.accion === "crear" || plan.accion === "enlazar") ? plan.cliente.id : "");
+    const planPry = pendiente ? planProyectoNuevo(demo.proyectos, pendiente, clienteQueda) : null;
     setGuardando(true);
-    const g = demo.guardar({ ...docV, clienteId });
+    const g = demo.guardar({ ...docV, clienteId }, { proyectoNuevo: pendiente ?? undefined });
     if (enviar) demo.enviar(g.id);
-    const avisoDirectorio = plan && avisoPlan(plan);
+    const avisoDirectorio = [
+      plan && avisoPlan(plan),
+      planPry?.accion === "crear" ? `Creé el proyecto «${pendiente!.nombre}» (activo) y ${info.formato.el} ${info.formato.corto.toLowerCase()} quedó en él.` : planPry?.accion === "nada" ? planPry.motivo : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
     if (avisoDirectorio) dejarAvisoCliente(g.id, avisoDirectorio);
     try {
       localStorage.removeItem(claveCache);
+      localStorage.removeItem(claveProyectoNuevo);
     } catch {
       /* sin almacenamiento */
     }
@@ -670,6 +780,12 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
             acciones={acciones}
             onAgregarOpcion={(pasoId, valor) => demo.agregarOpcion(`${tipo}.${pasoId}`, valor)}
             onAgregarServicio={(sv) => etiquetaServicio(demo.agregarServicio(sv))}
+            onAgregarProyecto={({ nombre, sitio }) => {
+              const r = nuevoProyecto(nombre, sitio);
+              if ("error" in r) return r;
+              mensajeNuevo.current = r.mensaje;
+              return r.opcion;
+            }}
           />
         </div>
 
@@ -728,7 +844,19 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
               <span className="flex items-center gap-1 text-xs font-medium text-slate-600">
                 <FolderKanban className="h-3.5 w-3.5" aria-hidden /> Proyecto u obra
               </span>
-              <select className={sel} value={doc.proyectoId ?? ""} onChange={(e) => elegirProyecto(demo.proyectosVisibles.find((p) => p.id === e.target.value))}>
+              <select
+                className={sel}
+                aria-label="Proyecto u obra"
+                value={formProyecto ? PROYECTO_NUEVO : doc.proyectoId ?? ""}
+                onChange={(e) => {
+                  if (e.target.value === PROYECTO_NUEVO) {
+                    setFormProyecto({ nombre: pendiente?.nombre ?? "", sitio: pendiente?.sitio ?? "", error: null });
+                    return;
+                  }
+                  setFormProyecto(null);
+                  elegirProyecto(pendiente?.id === e.target.value ? pendiente : demo.proyectosVisibles.find((p) => p.id === e.target.value));
+                }}
+              >
                 <option value="">{SIN_PROYECTO}</option>
                 {proyectosElegibles.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -736,8 +864,35 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
                     {p.estado !== "activo" ? ` (${ETIQUETA_ESTADO_PROYECTO[p.estado].toLowerCase()})` : ""}
                   </option>
                 ))}
+                {pendiente && <option value={pendiente.id}>Nuevo: {pendiente.nombre} (se crea al guardar)</option>}
+                {hayCliente && <option value={PROYECTO_NUEVO}>＋ Proyecto nuevo…</option>}
               </select>
             </label>
+            {formProyecto && (
+              <form
+                aria-label="Proyecto nuevo"
+                className="grid gap-2 rounded-md border border-dashed border-sotec-greenDeep/50 bg-sotec-soft/50 p-2.5 sm:col-span-2 sm:grid-cols-[1fr_1fr_auto]"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const r = nuevoProyecto(formProyecto.nombre, formProyecto.sitio);
+                  if ("error" in r) return setFormProyecto({ ...formProyecto, error: r.error });
+                  setFormProyecto(null);
+                  setAvisoCliente(r.mensaje || null);
+                }}
+              >
+                <input autoFocus className={sel} value={formProyecto.nombre} onChange={(e) => setFormProyecto({ ...formProyecto, nombre: e.target.value })} placeholder="Nombre del proyecto u obra" aria-label="Nombre del proyecto nuevo" />
+                <input className={sel} value={formProyecto.sitio} onChange={(e) => setFormProyecto({ ...formProyecto, sitio: e.target.value })} placeholder="Sitio o área (opcional)" aria-label="Sitio del proyecto nuevo" />
+                <div className="flex gap-2">
+                  <Button type="submit" size="sm" disabled={!formProyecto.nombre.trim()}>
+                    Crear proyecto
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setFormProyecto(null)}>
+                    Cancelar
+                  </Button>
+                </div>
+                <p className="text-[11px] text-slate-600 sm:col-span-3">{formProyecto.error ?? "Se crea activo para este cliente al guardar el documento, y el documento queda en él."}</p>
+              </form>
+            )}
             {formatos.length > 0 && (
               <label className="block text-sm sm:col-span-2">
                 <span className="text-xs font-medium text-slate-600">Formato</span>
@@ -758,8 +913,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
             )}
             {clienteSel && (
               <p className="text-xs text-slate-500 sm:col-span-2">
-                {clienteSel.contacto} · {clienteSel.cargo} · {clienteSel.correo} · {clienteSel.telefono}
-                {proyecto?.sitio ? ` · Sitio: ${proyecto.sitio}` : clienteSel.sitio ? ` · Sitio: ${clienteSel.sitio}` : ""}
+                {unirDatos([clienteSel.contacto, clienteSel.cargo, clienteSel.correo, clienteSel.telefono, proyecto?.sitio || clienteSel.sitio ? `Sitio: ${proyecto?.sitio || clienteSel.sitio}` : ""])}
               </p>
             )}
           </section>

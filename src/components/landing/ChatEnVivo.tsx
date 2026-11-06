@@ -11,6 +11,7 @@ import { Bot, Check, PenLine, Send, User } from "lucide-react";
 import { useVisible } from "@/components/fx/Reveal";
 import { cn } from "@/lib/utils";
 import { asset } from "@/nucleo/rutas";
+import { LOGO_CONTROLONE } from "@/nucleo/marca";
 
 /**
  * Demostración en vivo del asistente: el bot «escribe», el técnico teclea su
@@ -181,7 +182,8 @@ export function ChatEnVivo() {
         {/* Formato que se llena */}
         <div className="flex h-[440px] flex-col rounded-3xl bg-white p-4 font-[Arial] text-[11px] text-black shadow-2xl ring-1 ring-black/5 sm:h-[480px]">
           <div className="flex items-center justify-between border border-black px-2 py-1.5">
-            <img src={asset("/sotec-logo-v3.png")} alt="" className="h-9 w-auto" />
+            {/* Formato de la demostración: marca de la app, no el logo de SOTEC */}
+            <img src={asset(LOGO_CONTROLONE)} alt="" className="h-6 w-auto max-w-[55%] object-contain sm:h-7" />
             <div className="text-right text-[9px] font-bold leading-tight">
               FORMATO DE REPORTE TÉCNICO
               <br />

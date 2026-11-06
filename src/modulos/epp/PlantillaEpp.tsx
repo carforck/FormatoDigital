@@ -13,7 +13,9 @@ import { Plus, Trash2 } from "lucide-react";
 
 import { EditableText } from "@/components/docs/EditableText";
 import { Encabezado, Firma } from "@/components/docs/Encabezado";
+import { PieContacto } from "@/components/docs/PieContacto";
 import { useVariante } from "@/components/docs/VarianteFormato";
+import type { EmpresaPlantilla } from "@/modulos/contrato";
 import { SelectConOtro } from "@/components/ui/SelectConOtro";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +33,8 @@ interface Props {
   editar?: (patch: Partial<DatosEpp> | ((d: DatosEpp) => Partial<DatosEpp>)) => void;
   firmar?: (campo: CampoFirmaEpp) => void;
   resaltar?: string;
+  /** Datos de la organización para el pie (NIT, celular): `empresaDe(config)`. */
+  empresa?: Partial<EmpresaPlantilla>;
 }
 
 type CampoTexto = Exclude<keyof DatosEpp, "items" | "fotoRecibe">;
@@ -39,7 +43,7 @@ type CampoTexto = Exclude<keyof DatosEpp, "items" | "fotoRecibe">;
 const FILAS_MINIMAS = 8;
 
 /** Réplica del registro de entrega de EPP (carta). */
-export function PlantillaEpp({ datos, codigoDoc, editar, firmar, resaltar }: Props) {
+export function PlantillaEpp({ datos, codigoDoc, editar, firmar, resaltar, empresa }: Props) {
   const hoja = useVariante("epp").hoja;
   if (hoja === "laclay")
     return (
@@ -220,6 +224,7 @@ export function PlantillaEpp({ datos, codigoDoc, editar, firmar, resaltar }: Pro
           Documento emitido por el Servicio de Calidad de la Compañía. El documento es propiedad de SOTEC. La compañía protegerá sus propios derechos en los
           tribunales civiles y penales de acuerdo con la ley.
         </p>
+        <PieContacto tipo="epp" empresa={empresa} className="text-[9.5px]" />
       </article>
     </div>
   );

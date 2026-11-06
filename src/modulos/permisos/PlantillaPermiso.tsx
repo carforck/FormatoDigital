@@ -13,6 +13,8 @@ import type { DatosPermiso, Ejecutor, SiNoNa } from "@/nucleo/tipos";
 import { EditableText } from "@/components/docs/EditableText";
 import { AgregarOtro, useListaPropia } from "@/components/ui/SelectConOtro";
 import { Encabezado, Firma } from "@/components/docs/Encabezado";
+import { PieContacto } from "@/components/docs/PieContacto";
+import type { EmpresaPlantilla } from "@/modulos/contrato";
 
 /** Campos que se firman en el pad; `ejecutor:<i>` es la fila i del grupo ejecutor. */
 export type CampoFirmaPermiso = "firmaAutoriza" | "firmaEncargado" | "firmaCierre" | `ejecutor:${number}`;
@@ -25,10 +27,12 @@ interface Props {
   resaltar?: string;
   /** Permite llenar el cierre aunque el resto esté bloqueado (lo usa el emisor). */
   editarCierre?: (patch: Partial<DatosPermiso>) => void;
+  /** Datos de la organización para el pie (NIT, celular): `empresaDe(config)`. */
+  empresa?: Partial<EmpresaPlantilla>;
 }
 
 /** Réplica del F-GSST-13 · Permiso de trabajo (A4). */
-export function PlantillaPermiso({ datos, codigoDoc, editar, firmar, resaltar, editarCierre }: Props) {
+export function PlantillaPermiso({ datos, codigoDoc, editar, firmar, resaltar, editarCierre, empresa }: Props) {
   const txt = (k: keyof DatosPermiso, opts: { type?: "text" | "date"; placeholder?: string; fn?: Props["editar"] } = {}) => {
     const fn = opts.fn ?? editar;
     return (
@@ -311,6 +315,7 @@ export function PlantillaPermiso({ datos, codigoDoc, editar, firmar, resaltar, e
           <div className="text-[9px] text-slate-500">NOMBRE Y FIRMA DE LA PERSONA QUE CIERRA</div>
         </div>
       </div>
+      <PieContacto tipo="permiso" empresa={empresa} className="mt-1 text-[9px] print:mt-0.5" />
     </article>
     </div>
   );

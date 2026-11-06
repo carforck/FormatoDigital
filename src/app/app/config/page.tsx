@@ -37,6 +37,18 @@ export default function Config() {
         <label className="text-sm">
           <span className="text-xs text-slate-500">NIT</span>
           <Input value={c.nit} onChange={(e) => setC({ ...c, nit: e.target.value })} />
+          <span className="text-xs text-slate-500">Sale en el pie de página de los formatos</span>
+        </label>
+        {/* Pie de los formatos SOTEC: «NIT … · Cel. …» centrado (PieContacto); vacío = no sale */}
+        <label className="text-sm">
+          <span className="text-xs text-slate-500">Teléfono / celular</span>
+          <Input type="tel" inputMode="tel" value={c.telefono ?? ""} placeholder="300 000 0000" onChange={(e) => setC({ ...c, telefono: e.target.value })} />
+          <span className="text-xs text-slate-500">Salen en el pie de página de los formatos (NIT · Cel.)</span>
+        </label>
+        <label className="text-sm">
+          <span className="text-xs text-slate-500">Correo</span>
+          <Input type="email" value={c.correo ?? ""} placeholder="info@empresa.com" onChange={(e) => setC({ ...c, correo: e.target.value })} />
+          <span className="text-xs text-slate-500">Sale en el pie de la cotización y el requerimiento</span>
         </label>
         {/* Un prefijo por formato registrado (los módulos nuevos aparecen solos) */}
         {TIPOS_DOC.map((t) => {

@@ -19,7 +19,7 @@
  * siendo del permiso `clientes` (Coordinador SST y administración).
  */
 import { infoDoc } from "@/modulos/registro";
-import type { Cliente, Documento } from "@/nucleo/tipos";
+import type { Cliente, Documento, Proyecto } from "@/nucleo/tipos";
 
 /** Campos del cliente que un formato puede completar (sin nombre, id ni estado). */
 export const CAMPOS_COMPLETABLES = ["nit", "direccion", "contacto", "cargo", "correo", "telefono", "sitio"] as const;
@@ -67,6 +67,18 @@ export function buscarCliente(clientes: Cliente[], nombre: string): Cliente | un
 /** Pregunta para confirmar un cliente que se parece pero no es el mismo nombre. */
 export const preguntaParecido = (escrito: string, c: Cliente) =>
   `«${nombreLimpio(escrito)}» se parece a «${c.nombre}» del directorio de clientes.\n\n¿Es el mismo cliente? (Si no, queda escrito a mano y no se crea otro: escribe un nombre que lo distinga.)`;
+
+/**
+ * Nombre del cliente en un campo «Cliente · sitio u obra» (Entrega de EPP): lo que va antes de
+ * « · ». Vacío si es un área interna («Sede SOTEC», «Administración», «Oficina», «Bodega»…):
+ * eso no es un cliente y no se registra en el directorio.
+ */
+export function clienteDeObra(texto: string): string {
+  const nombre = nombreLimpio(String(texto ?? "").split(/\s+[·|]\s+/)[0] ?? "");
+  const k = claveNombre(nombre);
+  if (!k || /^(sede|oficina|bodega|taller|almacen)( |$)/.test(k) || /^(administracion|interno|propio|n a|na|ninguno|ninguna)$/.test(k)) return "";
+  return nombre;
+}
 
 /** Datos del cliente escritos en el formato del documento, o null si el formato no registra clientes. */
 export function datosClienteDe(doc: Documento): Partial<Omit<Cliente, "id" | "activo">> | null {
@@ -142,6 +154,34 @@ export function avisoPlan(plan: PlanCliente): string | null {
 }
 
 const ETIQUETA_CAMPO: Record<CampoCompletable, string> = { nit: "NIT", direccion: "dirección", contacto: "contacto", cargo: "cargo", correo: "correo", telefono: "teléfono", sitio: "sitio" };
+
+/* ---------- Proyecto nuevo desde un formato (pedido de Magno) ---------- */
+
+/** Proyecto que se crea al guardar el documento: lo elegido en «＋ Proyecto nuevo» del asistente o del formulario. */
+export type ProyectoPendiente = Pick<Proyecto, "id" | "nombre" | "sitio"> & Partial<Pick<Proyecto, "tipo" | "responsableId" | "fechaInicio">>;
+
+/** Qué pasa con el proyecto nuevo al guardar el documento. */
+export type PlanProyecto =
+  | { accion: "nada"; motivo: string }
+  /** Se crea (activo) para el cliente del documento ya resuelto en el directorio. */
+  | { accion: "crear" }
+  /** Ya hay uno abierto de ese cliente con el mismo nombre (o el mismo id): se enlaza, no se duplica. */
+  | { accion: "enlazar"; proyecto: Proyecto };
+
+/**
+ * Plan para el proyecto nuevo escrito en un formato, con el cliente YA resuelto (`clienteId`
+ * después del directorio: elegido, enlazado o recién creado). Sin cliente no hay proyecto: el
+ * proyecto siempre es de un cliente del directorio.
+ */
+export function planProyectoNuevo(proyectos: Proyecto[], p: ProyectoPendiente, clienteId: string): PlanProyecto {
+  const nombre = nombreLimpio(p.nombre ?? "");
+  if (!clienteId) return { accion: "nada", motivo: `El proyecto «${nombre}» no se creó: el documento no quedó con un cliente del directorio.` };
+  if (nombre.length < 3) return { accion: "nada", motivo: "El proyecto nuevo no se creó: su nombre es muy corto." };
+  const mismo = proyectos.find((x) => x.id === p.id) ?? proyectos.find((x) => x.clienteId === clienteId && x.estado !== "cerrado" && claveNombre(x.nombre) === claveNombre(nombre));
+  if (mismo && mismo.clienteId === clienteId) return { accion: "enlazar", proyecto: mismo };
+  if (mismo) return { accion: "nada", motivo: `El proyecto «${nombre}» no se creó: ya existe con otro cliente.` };
+  return { accion: "crear" };
+}
 
 // Aviso del directorio para el detalle del documento: el generador lo deja al guardar y el
 // detalle lo muestra una vez (la navegación con `replace` no lleva estado).

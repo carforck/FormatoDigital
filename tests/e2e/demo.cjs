@@ -21,7 +21,7 @@ const puppeteer = require("puppeteer-core");
 
 const BASE = (process.env.BASE || "http://localhost:3100").replace(/\/$/, "");
 const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion" | "campo" | "revision" | "variantes" | "listas" | "epp" | "paginacion" | "logos" | "asistente" | "requerimiento" | "relaciones" | "clientes"
-const CLAVE = "sotec-demo-v10";
+const CLAVE = "sotec-demo-v11";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function chrome() {
@@ -975,7 +975,7 @@ async function navegacion(b, errores) {
   ok((await atras()) === "/app", "desde la landing, «atrás» regresa a la app con la sesión");
   await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
   await sleep(400);
-  await clic(p, "Continuar como Gerencia SOTEC", "a");
+  await clic(p, "Continuar como Gerencia", "a");
   await esperar(() => location.pathname === "/app");
   ok(ruta() === "/app", "con sesión, /acceso ofrece «Continuar como …» y vuelve al tablero");
 

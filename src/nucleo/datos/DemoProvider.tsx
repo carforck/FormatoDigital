@@ -73,7 +73,7 @@ import {
 } from "@/nucleo/datos/empresa";
 
 // Subir la versión al cambiar la semilla: los navegadores cargan los datos nuevos
-const KEY = "sotec-demo-v10";
+const KEY = "sotec-demo-v11";
 /** Evento del historial cuando la firma del cliente en sitio se anula al salir de revisión (igual en 0013). */
 const CERRADO_EN_SITIO = "Cerrado con la firma del cliente en sitio";
 export const FIRMA_ANULADA = "Se anuló la firma del cliente (el contenido cambió)";

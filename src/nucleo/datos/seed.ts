@@ -26,7 +26,7 @@ export const USUARIOS_SEED: Usuario[] = [
   { id: "u-tec1", nombre: "Andrés Camacho Ruiz", cargo: "Ingeniero de campo", rol: "tecnico", email: "acamacho@sotec.example", cedula: "1.000.000.001", activo: true },
   { id: "u-tec2", nombre: "Julián Herrera Pacheco", cargo: "Técnico electrónico", rol: "tecnico", email: "jherrera@sotec.example", cedula: "1.000.000.002", activo: true },
   { id: "u-sup", nombre: "Andrea Ríos Martínez", cargo: "Coordinadora SST", rol: "supervisor", email: "sst@sotec.example", cedula: "1.000.000.005", activo: true },
-  { id: "u-adm", nombre: "Gerencia SOTEC", cargo: "Gerente general", rol: "admin", email: "gerencia@sotec.example", activo: true },
+  { id: "u-adm", nombre: "Gerencia", cargo: "Gerente general", rol: "admin", email: "gerencia@sotec.example", activo: true },
   { id: "u-cli", nombre: "Ing. Daniel Ortega", cargo: "Ing. de sistemas · Ladrillera Arcillas del Caribe", rol: "cliente", email: "sistemas@arcillasdelcaribe.example", clienteId: "c-clay", activo: true },
 ];
 

@@ -43,7 +43,7 @@ export function saludo(): string {
   return h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches";
 }
 
-/** Nombre corto para saludar: "Ing. Daniel Ortega" → "Daniel", "Gerencia SOTEC" → "Gerencia". */
+/** Nombre corto para saludar: "Ing. Daniel Ortega" → "Daniel", "Gerencia General" → "Gerencia". */
 export function nombreCorto(nombre: string): string {
   return nombre.replace(/^(Ing\.|Arq\.|Dr\.|Dra\.)\s+/i, "").split(" ")[0];
 }

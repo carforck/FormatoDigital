@@ -60,8 +60,9 @@ export interface Paso {
   /**
    * Paso «firma» de alguien más (p. ej. el cliente): pide su nombre y cargo, prellenados con
    * estos valores. Al continuar firmado, `aplicar` recibe `[nombre, cargo]`; omitido, recibe "".
+   * `etiquetaCargo` cambia el segundo dato («C.C.» en el acta de entrega: nombre y cédula).
    */
-  firmante?: { nombre: string; cargo: string };
+  firmante?: { nombre: string; cargo: string; etiquetaCargo?: string };
   /** Paso «firma»: texto del botón para firmar («El cliente firma ahora»). Por defecto «Firmar ahora». */
   firmar?: string;
   /** Paso «firma»: texto del botón para seguir sin firma («El cliente firma después»). Por defecto «Después». */
@@ -603,8 +604,15 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
                       <Input className="mt-0.5 h-9 text-sm" placeholder="Nombre de quien firma" aria-label="Nombre de quien firma" value={firmante.nombre} onChange={(e) => setFirmante({ ...firmante, nombre: e.target.value })} />
                     </label>
                     <label className="block text-[11px] font-medium text-slate-600">
-                      Cargo
-                      <Input className="mt-0.5 h-9 text-sm" placeholder="Cargo" aria-label="Cargo de quien firma" value={firmante.cargo} onChange={(e) => setFirmante({ ...firmante, cargo: e.target.value })} />
+                      {paso.firmante.etiquetaCargo ?? "Cargo"}
+                      <Input
+                        className="mt-0.5 h-9 text-sm"
+                        placeholder={paso.firmante.etiquetaCargo ?? "Cargo"}
+                        aria-label={paso.firmante.etiquetaCargo ? `${paso.firmante.etiquetaCargo} de quien firma` : "Cargo de quien firma"}
+                        inputMode={paso.firmante.etiquetaCargo === "C.C." ? "numeric" : undefined}
+                        value={firmante.cargo}
+                        onChange={(e) => setFirmante({ ...firmante, cargo: e.target.value })}
+                      />
                     </label>
                   </div>
                 )}
@@ -620,7 +628,9 @@ export function ChatAsistente({ titulo, subtitulo, pasos, aplicar, onPaso, onFir
                         if (!paso.firmante) return avanzar("", "Firmado ✓");
                         const nombre = firmante.nombre.trim().replace(/\s+/g, " ");
                         if (nombre.length < 3) return setAvisoFirma("Escribe el nombre de quien firma.");
-                        avanzar([nombre, firmante.cargo.trim()], `Firmó ${nombre}${firmante.cargo.trim() ? ` (${firmante.cargo.trim()})` : ""} ✓`);
+                        const segundo = firmante.cargo.trim();
+                        if (paso.firmante.etiquetaCargo && !segundo) return setAvisoFirma(`Escribe ${paso.firmante.etiquetaCargo === "C.C." ? "la cédula" : paso.firmante.etiquetaCargo} de quien firma.`);
+                        avanzar([nombre, segundo], `Firmó ${nombre}${segundo ? ` (${paso.firmante.etiquetaCargo ? `${paso.firmante.etiquetaCargo} ` : ""}${segundo})` : ""} ✓`);
                       }}
                     >
                       Continuar

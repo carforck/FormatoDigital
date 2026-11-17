@@ -118,6 +118,7 @@ const META: Record<string, Meta> = {
     notaFlujo: "El cliente solo ve sus cuentas emitidas",
   },
   requerimientos: { rama: "se pide para", padre: ["proyectos", "clientes"], notaFlujo: "El técnico lo envía a revisión; la administración lo convierte en cotización (queda atendido) una sola vez. Interno: el cliente no lo ve" },
+  actas: { rama: "se entrega a", padre: ["proyectos", "clientes"], notaFlujo: "Formato propio de Fortox. El cliente firma el recibido en sitio; aprobada, se marca como entregada a Fortox. Claves del panel enmascaradas" },
   equipos: {
     padre: ["proyectos", "clientes"],
     rama: "se instala en",

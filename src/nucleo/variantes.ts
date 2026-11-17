@@ -31,6 +31,23 @@
  * «Informe de servicios» GSE-FO-03, versión 03, octubre 2023 (insumos/GSE-FO-03-informe-de-
  * servicio-sevin-v3.pdf). Hoja propia: src/modulos/reportes/HojaSevin.tsx.
  *
+ * Además, la «Programación y acta de entrega del sistema de seguridad electrónica» (FORMA
+ * 7PA/F1-13, insumos/fortox-7PA-F1-13-acta-de-entrega.pdf) es un formato PROPIO de Fortox
+ * (`propio: true` en `formatos.acta`): el tipo de documento «acta» solo existe con esta
+ * variante, no hay versión SOTEC (hoja: src/modulos/actas/HojaActaFortox.tsx).
+ *
+ * ══ FORMATOS PROPIOS DE UN CLIENTE ══════════════════════════════════════════════
+ * SOTEC diligencia los formatos de sus clientes (Fortox, Sevin, La Clay…). Cuando un formato
+ * no tiene versión SOTEC, su tipo de documento se declara en la variante del cliente con
+ * `propio: true` y el resto sale solo de aquí (ver `propietarioDe`):
+ *   - la variante dueña es SIEMPRE la del documento (`resolverVariante`, `varianteParaTipo`);
+ *     SOTEC no lo cubre y el asistente no pregunta «¿Con qué formato sale…?»;
+ *   - el menú y «Nuevo» lo nombran con el dueño: «Acta de entrega (Fortox)» (`nombreTipo`);
+ *   - el generador avisa «Este formato es de Fortox» si el cliente o el proyecto no son de
+ *     Fortox (`esDelPropietario`), pero deja seguir.
+ * Registrar otro = un módulo nuevo en src/modulos/ + `formatos: { <tipo>: { …, propio: true } }`
+ * en la variante del cliente. Nada más cambia.
+ *
  * ══ LA CLAY ═════════════════════════════════════════════════════════════════════
  * «Matriz Entrega de EPP's» de Ladrillera La Clay S.A.S. (Sistema Integrado de Gestión,
  * versión 0, fecha de edición 5/05/2026; el código viene en blanco en el papel). Solo cambia
@@ -49,6 +66,11 @@ export interface FormatoVariante extends Partial<Pick<InfoFormato, "codigo" | "n
    * Sin él, el documento sigue la misma serie del módulo (RT-…), que es lo predeterminado.
    */
   prefijo?: string;
+  /**
+   * Formato propio del cliente: el tipo de documento solo existe en esta variante (no hay
+   * versión SOTEC). Ver «Formatos propios de un cliente» arriba y `propietarioDe`.
+   */
+  propio?: boolean;
 }
 
 /** Hojas propias de las variantes (formatos que no son el de SOTEC con otra marca). */
@@ -100,6 +122,8 @@ const VARIANTE_FORTOX: VarianteFormato = {
   formatos: {
     // Fortox no maneja versión ni fecha del formato: solo la FORMA
     reporte: { nombre: "Reporte de mantenimiento de seguridad electrónica", codigo: "7PA/F1-15", version: "—", fecha: "—" },
+    // Formato propio de Fortox (sin versión SOTEC): su acta de entrega del sistema instalado
+    acta: { nombre: "Programación y acta de entrega del sistema de seguridad electrónica", codigo: "7PA/F1-13", version: "—", fecha: "—", propio: true },
   },
 };
 
@@ -152,13 +176,30 @@ export function varianteDe(clave?: string | null): VarianteFormato {
   return VARIANTES.find((v) => v.clave === clave) ?? VARIANTE_SOTEC;
 }
 
-/** Si la variante cambia ese tipo de documento (la base los cubre todos). */
-export const cubre = (v: VarianteFormato, tipo: TipoDoc) => v.clave === VARIANTE_BASE || Boolean(v.formatos[tipo]);
+/** Variante dueña de un formato propio (sin versión SOTEC, `propio: true`); undefined si el tipo es de SOTEC. */
+export function propietarioDe(tipo: TipoDoc): VarianteFormato | undefined {
+  return VARIANTES.find((v) => v.formatos[tipo]?.propio);
+}
 
-/** Variante con la que sale un tipo de documento: la pedida si lo cubre; si no, SOTEC. */
+/** Nombre del dueño para mostrar («FORTOX» → «Fortox», «LA CLAY» → «La Clay»). */
+export const nombreVariante = (v: VarianteFormato) => v.marca.toLowerCase().replace(/(^|\s)\S/g, (x) => x.toUpperCase());
+
+/** Nombre del tipo en menús y «Nuevo»: el corto y, si es un formato propio, su dueño («Acta de entrega (Fortox)»). */
+export function nombreTipo(tipo: TipoDoc, corto: string): string {
+  const dueño = propietarioDe(tipo);
+  return dueño ? `${corto} (${nombreVariante(dueño)})` : corto;
+}
+
+/**
+ * Si la variante cambia ese tipo de documento. La base los cubre todos, menos los formatos
+ * propios de un cliente (esos solo los cubre su dueño).
+ */
+export const cubre = (v: VarianteFormato, tipo: TipoDoc) => (v.clave === VARIANTE_BASE ? !propietarioDe(tipo) : Boolean(v.formatos[tipo]));
+
+/** Variante con la que sale un tipo de documento: la pedida si lo cubre; si no, la dueña del formato o SOTEC. */
 export function varianteParaTipo(tipo: TipoDoc, clave?: string | null): VarianteFormato {
   const v = varianteDe(clave);
-  return cubre(v, tipo) ? v : VARIANTE_SOTEC;
+  return cubre(v, tipo) ? v : (propietarioDe(tipo) ?? VARIANTE_SOTEC);
 }
 
 /** Control documental del formato en una variante (lo que la variante no define, del módulo). */
@@ -228,11 +269,31 @@ export function resolverVariante(a: {
   /** Variante elegida en el documento (asistente o selector «Formato»). */
   elegida?: string;
 }): string {
+  // Formato propio de un cliente (acta de Fortox): siempre el de su dueño
+  const dueño = propietarioDe(a.tipo);
+  if (dueño) return dueño.clave;
   if (a.elegida) return varianteParaTipo(a.tipo, a.elegida).clave;
   // En orden: proyecto, formato del cliente, nombre del cliente; vale el primero que cubra el tipo
   const candidatas = [varianteDeTipoProyecto(a.config, a.proyecto?.tipo), a.cliente?.variante, varianteDeNombreCliente(a.cliente?.nombre)];
   const clave = candidatas.find((c) => c && VARIANTES.some((v) => v.clave === c && cubre(v, a.tipo)));
   return clave ?? VARIANTE_BASE;
+}
+
+/**
+ * Formato propio de un cliente: si el documento es de ese cliente. Cuenta el tipo del proyecto
+ * («Servicios Fortox»), el formato por defecto del cliente o su nombre («Oficina Fortox»).
+ * `propietario` undefined = el tipo no es un formato propio (siempre `coincide`).
+ */
+export function esDelPropietario(a: {
+  tipo: TipoDoc;
+  proyecto?: Pick<Proyecto, "tipo"> | null;
+  cliente?: (Pick<Cliente, "variante"> & Partial<Pick<Cliente, "nombre">>) | null;
+  config: Pick<Config, "tiposProyecto">;
+}): { propietario?: VarianteFormato; coincide: boolean } {
+  const propietario = propietarioDe(a.tipo);
+  if (!propietario) return { coincide: true };
+  const candidatas = [varianteDeTipoProyecto(a.config, a.proyecto?.tipo), a.cliente?.variante, varianteDeNombreCliente(a.cliente?.nombre)];
+  return { propietario, coincide: candidatas.includes(propietario.clave) };
 }
 
 /**

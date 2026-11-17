@@ -12,7 +12,7 @@
  * clientes nuevos al directorio y los que solo se parecen se preguntan); corregir en revisión
  * mientras nadie lo haya revisado (sigue en revisión; ya aprobado no se modifica); requerimiento del técnico que la
  * administración convierte en cotización una sola vez (también el suyo propio); clientes por tipo de persona
- * (jurídica o natural) sin separadores sueltos; que ninguna pantalla se desborde en 8 anchos y los controles del shell.
+ * (jurídica o natural) sin separadores sueltos; acta de entrega de Fortox (formato propio del cliente, claves enmascaradas); que ninguna pantalla se desborde en 8 anchos y los controles del shell.
  */
 const fs = require("fs");
 const os = require("os");
@@ -20,7 +20,7 @@ const path = require("path");
 const puppeteer = require("puppeteer-core");
 
 const BASE = (process.env.BASE || "http://localhost:3100").replace(/\/$/, "");
-const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion" | "campo" | "revision" | "variantes" | "listas" | "epp" | "paginacion" | "logos" | "asistente" | "requerimiento" | "relaciones" | "clientes"
+const SOLO = process.env.SOLO; // "flujo" | "responsive" | "controles" | "magno" | "proyectos" | "crud" | "equipos" | "navegacion" | "comercial" | "impresion" | "campo" | "revision" | "variantes" | "listas" | "epp" | "paginacion" | "logos" | "asistente" | "requerimiento" | "relaciones" | "clientes" | "acta"
 const CLAVE = "sotec-demo-v11";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -1235,7 +1235,7 @@ async function logos(b, errores) {
     const r = await revisar();
     ok(r.hojas > 0 && r.app && !r.empresa.length, `detalle del reporte ${v.toUpperCase()}: marca de la app (${r.empresa.join(", ") || "sin logos de empresa"})`);
   }
-  for (const t of ["reporte", "permiso", "gasto", "cotizacion", "epp", "requerimiento"]) {
+  for (const t of ["reporte", "permiso", "gasto", "cotizacion", "epp", "requerimiento", "acta"]) {
     await p.goto(`${BASE}/app/nuevo/${t}`, { waitUntil: "networkidle0" });
     await sleep(700);
     const r = await revisar();
@@ -3619,6 +3619,225 @@ async function clientes(b, errores) {
   await p.close();
 }
 
+/**
+ * Acta de entrega de Fortox (FORMA 7PA/F1-13): formato propio del cliente. El técnico la diligencia
+ * con el asistente para un cliente ficticio (aviso «Este formato es de Fortox», pero sigue), con
+ * materiales, zonas y usuarios en bloque; las claves del panel quedan enmascaradas y solo el autor,
+ * la coordinación y la administración las revelan; el cliente nunca las ve; /imprimir: 2 hojas carta,
+ * marca ControlOne en la demo y sin degradados. Datos y claves ficticios.
+ */
+async function acta(b, errores) {
+  console.log("\n— Acta de entrega (Fortox): asistente, claves enmascaradas, permisos e impresión");
+  const p = await nuevaPagina(b, errores);
+  await p.evaluateOnNewDocument(() => {
+    window.print = () => {};
+  });
+  p.setDefaultNavigationTimeout(120000);
+  await p.setViewport({ width: 1440, height: 900 });
+  await p.goto(`${BASE}/acceso`, { waitUntil: "networkidle0" });
+  await p.evaluate(() => localStorage.clear());
+  await p.reload({ waitUntil: "networkidle0" });
+  const CLAVES = ["9137", "8642", "7315", "2468"];
+  const hoja = () => p.evaluate(() => [...document.querySelectorAll(".doc-print")].map((h) => h.innerText.replace(/\s+/g, " ")).join(" | "));
+  const html = () => p.evaluate(() => document.documentElement.outerHTML);
+  const conClave = async () => {
+    const h = await html();
+    return CLAVES.filter((c) => h.includes(c));
+  };
+  const ir = async (r, ms = 700) => {
+    await p.goto(`${BASE}${r}`, { waitUntil: "networkidle0" });
+    await sleep(ms);
+  };
+  const estado = () => p.evaluate((k) => JSON.parse(localStorage.getItem(k)), CLAVE);
+  const escribir = async (sel, texto) => {
+    await p.click(sel, { clickCount: 3 });
+    await p.type(sel, texto);
+  };
+  const bloque = async (texto) => {
+    await p.evaluate((t) => {
+      const a = document.querySelector("main form textarea");
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(a, t);
+      a.dispatchEvent(new Event("input", { bubbles: true }));
+    }, texto);
+    await clic(p, "Enviar", "form button");
+  };
+  const mostrar = (etiqueta) => p.evaluate((e) => !!document.querySelector(`.doc-print button[aria-label="Mostrar ${e}"]`), etiqueta);
+
+  // 1. Técnico: en el menú como «Acta de entrega (Fortox)»
+  await clic(p, "Técnico de campo");
+  await p.waitForFunction(() => location.pathname.startsWith("/app"));
+  await sleep(800);
+  const menu = await p.evaluate(() => [...document.querySelectorAll("aside a")].map((a) => [a.getAttribute("href"), a.textContent.trim()]));
+  ok(menu.some(([h, t]) => h === "/app/nuevo/acta" && t.includes("Acta de entrega (Fortox)")), "técnico: «Acta de entrega (Fortox)» en el menú");
+  await ir("/app/nuevo/acta", 1200);
+  let h = await hoja();
+  ok(h.includes("PROGRAMACIÓN Y ACTA DE ENTREGA DEL SISTEMA DE SEGURIDAD ELECTRÓNICA") && h.includes("REGISTRO DE USUARIOS ACTIVOS") && h.includes("FORMA: 7PA/F1-13") && h.includes("PBX: (1) 7477878"), "la hoja replica el acta de Fortox (dos hojas, sedes y FORMA)");
+  ok((await p.evaluate(() => document.querySelectorAll(".doc-print").length)) === 2, "el acta tiene dos hojas");
+  ok(!(await p.evaluate(() => document.querySelector("main").innerText)).includes("¿Con qué formato sale"), "no pregunta el formato: es de Fortox");
+
+  // 2. Cliente ficticio que no es de Fortox: avisa y deja seguir
+  await responder(p, "Panadería La Espiga Ficticia");
+  await clic(p, "Sin proyecto");
+  const aviso = await p.evaluate(() => document.querySelector("[data-aviso-dueno]")?.textContent || "");
+  ok(aviso.includes("Este formato es de Fortox"), `cliente que no es de Fortox: avisa «Este formato es de Fortox» (${aviso.slice(0, 60)}…)`);
+  await clic(p, "Cliente Nuevo");
+  await clic(p, "Cartagena");
+  await clic(p, String(new Date().getFullYear()));
+  await responder(p, "10234");
+  await clic(p, "Omitir");
+  await responder(p, "Calle 30 # 4-15, Cartagena");
+  await responder(p, "Getsemaní");
+  await responder(p, "3005550101");
+  await clic(p, "Omitir");
+  await responder(p, "Rosa Inventada Pérez");
+  await responder(p, "Administradora");
+  await clic(p, "DSC PowerSeries Neo HS2032");
+  await clic(p, "GPRS (Sim Card)");
+  await responder(p, "3105550000");
+  await clic(p, "Línea telefónica");
+  await clic(p, "Cada 24 horas");
+  // Claves del panel: campos de contraseña y en el chat solo «ocultas»
+  ok((await p.evaluate(() => document.querySelector('main input[aria-label="Clave maestra"]')?.type)) === "password", "la clave maestra se escribe en un campo de contraseña");
+  await p.type('main input[aria-label="Clave maestra"]', CLAVES[0]);
+  await p.type('main input[aria-label="Clave de instalador"]', CLAVES[1]);
+  await clic(p, "Guardar claves");
+  await bloque("Sensor de movimiento PIR | 4 | 4 | 0\nContacto magnético | 6 | 5 | 1\nSirena 30 W | 1 | 1");
+  await clic(p, "Alarma");
+  await clic(p, "CCTV");
+  await clic(p, "Continuar con 2");
+  await bloque("1 | Panadería\n2 | Bodega");
+  await bloque("1 | 2 | Puerta principal | 1\n2 | 1 | Sensor salón | 1\n3 | 1 | Bodega trasera | 2");
+  await clic(p, "Unidad nueva");
+  await bloque("Rosa Inventada Pérez | Administradora | 01 | 6055550101 | 3005550101\nMario Ficticio Ruiz | Panadero | 02 | | 3005550202");
+  await p.type('main input[aria-label="Clave telefónica de Rosa Inventada Pérez"]', CLAVES[2]);
+  await p.type('main input[aria-label="Clave telefónica de Mario Ficticio Ruiz"]', CLAVES[3]);
+  await clic(p, "Guardar claves");
+  await clic(p, "Lunes");
+  await clic(p, "Sábado");
+  await clic(p, "Continuar con 2");
+  await clic(p, "Lunes");
+  await clic(p, "Continuar con 1");
+  await clic(p, "Manejo del sistema de Seguridad Electrónica");
+  await clic(p, "Continuar con 1");
+  await clic(p, "Omitir");
+  await clic(p, "Llamar primero al contacto");
+  ok((await p.evaluate(() => document.querySelector('main input[aria-label="Nombre de quien firma"]')?.value)) === "Rosa Inventada Pérez", "la firma propone al contacto como quien firma");
+  await p.type('main input[aria-label="C.C. de quien firma"]', "1000000099");
+  await clic(p, "El cliente firma ahora");
+  await firmar(p);
+  await clic(p, "Continuar");
+  await clic(p, "Andrés Camacho Ruiz");
+  await sleep(400);
+  const chat = await p.evaluate(() => [...document.querySelectorAll("main")].map((x) => x.innerText).join(" "));
+  ok(chat.includes("registrada(s) (ocultas)") && !CLAVES.some((c) => chat.includes(c)), "el chat no repite ninguna clave");
+  h = await hoja();
+  ok(h.includes("Panadería La Espiga Ficticia") && h.includes("Puerta principal") && h.includes("Sensor de movimiento PIR") && h.includes("Mario Ficticio Ruiz") && h.includes("Bodega"), "la hoja trae cliente, materiales, zonas, particiones y usuarios");
+  ok(!CLAVES.some((c) => h.includes(c)) && (h.match(/●●●●/g) || []).length === 4, "en el formulario las 4 claves salen enmascaradas (●●●●)");
+  ok(await mostrar("Clave Maestra"), "el autor tiene «Mostrar» en sus claves");
+  await p.evaluate(() => document.querySelector('.doc-print button[aria-label="Mostrar Clave Maestra"]').click());
+  await sleep(200);
+  ok((await hoja()).includes(CLAVES[0]), "«Mostrar» revela la clave maestra al autor");
+
+  // 3. Enviar a revisión
+  await clic(p, "Enviar a revisión");
+  await p.waitForFunction(() => location.pathname.includes("/app/documentos/ver"), { timeout: 20000 });
+  await sleep(800);
+  const id = new URL(p.url()).searchParams.get("id");
+  let s = await estado();
+  let d = s.documentos.find((x) => x.id === id);
+  ok(d && d.tipo === "acta" && d.estado === "en_revision" && /^ACT-001-\d{2}$/.test(d.codigo) && d.variante === "fortox", `se envía a revisión como ${d && d.codigo} con el formato de Fortox`);
+  ok(d && d.datos.claveMaestra === CLAVES[0] && d.datos.usuarios.map((u) => u.claveTelefonica).join(",") === `${CLAVES[2]},${CLAVES[3]}` && d.datos.zonas.length === 3 && d.datos.materiales.length === 3 && d.datos.cedulaFirmaCliente === "1000000099", "guarda claves, zonas, materiales y la C.C. de quien firma");
+  ok(s.clientes.some((c) => c.nombre === "Panadería La Espiga Ficticia" && c.direccion.includes("Calle 30")), "el cliente nuevo queda en el directorio con sus datos");
+  ok(!CLAVES.some((c) => JSON.stringify([s.notificaciones, s.auditoria]).includes(c)), "ni los avisos ni la auditoría llevan claves");
+  ok(!(await conClave()).length, "detalle del autor: claves enmascaradas en la página");
+  ok(await mostrar("Clave Maestra"), "detalle del autor: con «Mostrar»");
+  // Búsqueda: escribir una clave no encuentra el acta
+  await ir(`/app/documentos?q=${CLAVES[0]}`);
+  await p.evaluate((c) => {
+    const i = [...document.querySelectorAll("main input")].find((x) => /buscar/i.test(x.placeholder || ""));
+    if (i) {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(i, c);
+      i.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }, CLAVES[0]);
+  await sleep(500);
+  ok(!(await p.evaluate(() => document.querySelector("main").innerText)).includes(d.codigo), "buscar una clave no encuentra el acta");
+
+  // 4. Otro técnico no la ve; la coordinación la revela y la aprueba
+  await comoUsuario(p, "u-tec2");
+  await ir(`/app/documentos/ver?id=${id}`);
+  ok(!(await conClave()).length && !(await p.evaluate(() => document.querySelector(".doc-print"))), "otro técnico no ve el acta ni sus claves");
+  await comoUsuario(p, "u-sup");
+  await ir(`/app/documentos/ver?id=${id}`);
+  ok(!(await conClave()).length && (await mostrar("Clave Maestra")), "coordinación: enmascaradas, con «Mostrar»");
+  await p.evaluate(() => document.querySelector('.doc-print button[aria-label="Mostrar Clave telefónica 1"]').click());
+  await sleep(200);
+  ok((await hoja()).includes(CLAVES[2]), "coordinación: revela la clave telefónica");
+  await clic(p, "Aprobar acta");
+  await sleep(500);
+  ok((await p.evaluate(() => document.querySelector("main").innerText)).includes("Aprobada"), "la coordinación aprueba el acta");
+
+  // 5. Administración: la ve en Documentos e imprime 2 hojas carta con las claves
+  await comoUsuario(p, "u-adm");
+  await ir("/app/documentos");
+  ok((await p.evaluate(() => document.querySelector("main").innerText)).includes(d.codigo), "la administración ve el acta en Documentos");
+  await ir(`/imprimir?doc=${id}&volver=/app/documentos`);
+  await p.waitForSelector("[data-impresion-lista]", { timeout: 20000 });
+  h = await hoja();
+  ok(h.includes(CLAVES[0]) && h.includes(CLAVES[1]) && h.includes(CLAVES[2]) && !h.includes("Mostrar"), "/imprimir (administración): el acta impresa lleva las claves");
+  const logo = await p.evaluate(() => [...document.querySelectorAll(".doc-print img")].map((i) => i.getAttribute("src") || ""));
+  ok(logo.some((x) => x.includes("controlone-logo")) && !logo.some((x) => /fortox-logo|sotec-logo/.test(x)), "/imprimir en la demo: marca ControlOne, sin el logo de Fortox ni de SOTEC");
+  ok(await p.evaluate(() => ![...document.querySelectorAll(".doc-print, .doc-print *")].some((e) => getComputedStyle(e).backgroundImage.includes("gradient"))), "el acta no usa degradados (el «cuadro negro» al imprimir)");
+  const pdf = await p.pdf({ format: "letter", printBackground: true });
+  const paginas = Number((Buffer.from(pdf).toString("latin1").match(/\/Count (\d+)/) || [])[1] || 0);
+  ok(paginas === 2, `el acta imprime en exactamente 2 páginas carta (${paginas})`);
+  if (process.env.ACTA_CAPTURAS) fs.writeFileSync(path.join(process.env.ACTA_CAPTURAS, "acta.pdf"), pdf);
+  // Con todas las tablas llenas (12 materiales, 36 zonas, 8 particiones, 27 usuarios) sigue en 2 hojas
+  await p.evaluate((k, i) => {
+    const st = JSON.parse(localStorage.getItem(k));
+    const o = st.documentos.find((x) => x.id === i);
+    const c = JSON.parse(JSON.stringify(o));
+    c.id = "d-acta-llena";
+    c.datos.materiales = Array.from({ length: 12 }, (_, n) => ({ id: `m${n}`, descripcion: `Material ficticio número ${n + 1} de referencia larga`, despacho: "10", instalado: "9", reintegro: "1" }));
+    c.datos.zonas = Array.from({ length: 36 }, (_, n) => ({ numero: n + 1, cantidad: "2", descripcion: `Zona ficticia ${n + 1}: sensor de movimiento del pasillo y contacto de la puerta`, particion: String((n % 8) + 1) }));
+    c.datos.particiones = Array.from({ length: 8 }, (_, n) => `Partición ficticia ${n + 1}`);
+    c.datos.usuarios = Array.from({ length: 27 }, (_, n) => ({ id: `u${n}`, nombre: `Usuario Ficticio Número ${n + 1}`, cargo: "Supervisor de turno", usuario: String(n + 1).padStart(2, "0"), claveTelefonica: "1357", telefono: "6055550000", celular: "3005550000" }));
+    c.datos.observaciones = "Protocolo ficticio: llamar primero al contacto, luego a la policía del cuadrante. ".repeat(3);
+    st.documentos.push(c);
+    localStorage.setItem(k, JSON.stringify(st));
+  }, CLAVE, id);
+  await ir("/imprimir?doc=d-acta-llena&volver=/app/documentos&auto=0");
+  await p.waitForSelector("[data-impresion-lista]", { timeout: 20000 });
+  const pdfLleno = await p.pdf({ format: "letter", printBackground: true });
+  const pagLleno = Number((Buffer.from(pdfLleno).toString("latin1").match(/\/Count (\d+)/) || [])[1] || 0);
+  ok(pagLleno === 2, `con todas las tablas llenas sigue en 2 páginas carta (${pagLleno})`);
+  if (process.env.ACTA_CAPTURAS) fs.writeFileSync(path.join(process.env.ACTA_CAPTURAS, "acta-llena.pdf"), pdfLleno);
+
+  // 6. El cliente (portal): la ve aprobada, sin claves ni «Mostrar», también al imprimir
+  await p.evaluate((k, cid) => {
+    const st = JSON.parse(localStorage.getItem(k));
+    st.usuarios.find((u) => u.id === "u-cli").clienteId = cid;
+    localStorage.setItem(k, JSON.stringify(st));
+  }, CLAVE, d.clienteId);
+  await comoUsuario(p, "u-cli");
+  await ir(`/app/documentos/ver?id=${id}`);
+  h = await hoja();
+  ok(h.includes("Panadería La Espiga Ficticia") && h.includes("●●●●"), "cliente: ve su acta aprobada con las claves enmascaradas");
+  ok(!(await conClave()).length && !(await mostrar("Clave Maestra")), "cliente: ninguna clave en la página y sin «Mostrar»");
+  await ir(`/imprimir?doc=${id}&volver=/app/documentos`);
+  await p.waitForSelector("[data-impresion-lista]", { timeout: 20000 });
+  ok(!(await conClave()).length && (await hoja()).includes("●●●●"), "cliente: /imprimir sale enmascarada");
+
+  // 7. Cliente y proyecto de Fortox: sin aviso y con el contacto autollenado
+  await comoUsuario(p, "u-tec1");
+  await ir("/app/nuevo/acta", 1000);
+  await clic(p, "Centro Comercial Mirador de la Bahía");
+  await clic(p, "PRY-012-25");
+  ok(!(await p.evaluate(() => document.querySelector("[data-aviso-dueno]"))), "proyecto «Servicios Fortox»: sin aviso");
+  ok((await hoja()).includes("seguridad@miradorbahia.example") && (await hoja()).includes("Luis Arrieta Gómez"), "autollena correo y contacto del directorio");
+  await p.close();
+}
+
 (async () => {
   const b = await puppeteer.launch({ executablePath: chrome(), headless: true, args: ["--no-sandbox", "--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream=device-count=2"] });
   const errores = [];
@@ -3646,6 +3865,7 @@ async function clientes(b, errores) {
     if (!SOLO || SOLO === "pie") await pie(b, errores);
     if (!SOLO || SOLO === "relaciones") await relaciones(b, errores);
     if (!SOLO || SOLO === "clientes") await clientes(b, errores);
+    if (!SOLO || SOLO === "acta") await acta(b, errores);
   } catch (e) {
     ok(false, `error: ${e.message}`);
   } finally {

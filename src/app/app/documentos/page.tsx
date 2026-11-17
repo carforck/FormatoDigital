@@ -20,7 +20,7 @@ import { useDemo } from "@/nucleo/datos/DemoProvider";
 import type { Estado, TipoDoc } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 import { avance } from "@/nucleo/validar";
-import { TIPOS_DOC, clienteDoc, formatoDe, rutaNuevo, tituloDoc } from "@/modulos/registro";
+import { TIPOS_DOC, clienteDoc, formatoDe, rutaNuevo, textoBusqueda, tituloDoc } from "@/modulos/registro";
 import { puedeCrearTipo } from "@/nucleo/permisos";
 import { IconoDoc } from "@/components/ui/icono-doc";
 import { Paginacion, usePaginacion } from "@/components/ui/Paginacion";
@@ -63,7 +63,8 @@ function Documentos() {
     .filter((d) => !proyecto || (proyecto === "ninguno" ? !d.proyectoId : d.proyectoId === proyecto))
     .filter((d) => {
       if (!q.trim()) return true;
-      const t = `${d.codigo} ${clienteDoc(d)} ${tituloDoc(d)} ${JSON.stringify(d.datos)}`.toLowerCase();
+      // Sin datos sensibles (claves del acta): una clave escrita no encuentra el documento
+      const t = textoBusqueda(d);
       return t.includes(q.toLowerCase());
     })
     .sort((a, b) => (antiguos ? a.creado.localeCompare(b.creado) : b.creado.localeCompare(a.creado)));

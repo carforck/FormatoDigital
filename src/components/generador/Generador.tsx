@@ -15,7 +15,10 @@
  * ser nuevo), activo y enlazado (`demo.guardar(doc, { proyectoNuevo })`).
  * La variante de formato (marca: SOTEC, FORTOX…) sale del tipo del proyecto o, sin proyecto, del
  * formato por defecto del cliente (@/nucleo/variantes); se ve en el chip «Formato: …», en la vista
- * previa y en la impresión, y queda guardada en el documento.
+ * previa y en la impresión, y queda guardada en el documento. Un formato PROPIO de un cliente (acta de
+ * entrega de Fortox) siempre sale con el de su dueño y, si el cliente o el proyecto no son de ese dueño,
+ * se avisa «Este formato es de Fortox» sin impedir seguir. Los datos sensibles (claves del acta) se ven
+ * enmascarados con «Mostrar» (`ConClaves`): quien diligencia es el autor.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -23,6 +26,7 @@ import Link from "next/link";
 import { AlertTriangle, Cctv, CheckCircle2, ClipboardList, Eye, FilePlus2, FolderKanban, MessageSquare, Printer, Save, SendHorizonal } from "lucide-react";
 
 import { ChatAsistente, type ValorPaso } from "@/components/chat/ChatAsistente";
+import { ConClaves } from "@/components/docs/Claves";
 import { FirmaPad } from "@/components/docs/FirmaPad";
 import { ChipVariante, ConVariante } from "@/components/docs/VarianteFormato";
 import { Button } from "@/components/ui/button";
@@ -42,7 +46,7 @@ import type { Cliente, Documento, Proyecto, TipoDoc } from "@/nucleo/tipos";
 import { cn } from "@/lib/utils";
 import { avance, faltantes } from "@/nucleo/validar";
 import { puede, puedeEditarDoc } from "@/nucleo/permisos";
-import { TIPO_PROYECTO_BASE, VARIANTE_BASE, formatoEnVariante, prefijoVariante, formatosPara, resolverVariante, tiposProyectoDe, varianteDe } from "@/nucleo/variantes";
+import { TIPO_PROYECTO_BASE, VARIANTE_BASE, esDelPropietario, formatoEnVariante, nombreVariante, prefijoVariante, formatosPara, propietarioDe, resolverVariante, tiposProyectoDe, varianteDe } from "@/nucleo/variantes";
 import { avisoPlan, buscarCliente, claveNombre, dejarAvisoCliente, mismoNombre, nombreLimpio, planCliente, planProyectoNuevo, preguntaParecido, separarCliente } from "@/nucleo/clientes";
 import { unirDatos } from "@/nucleo/personas";
 import { unirOpciones } from "@/nucleo/opciones";
@@ -314,9 +318,23 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   const razonSugerida = proyecto && sugerida !== VARIANTE_BASE ? ` por el tipo del proyecto (${proyecto.tipo})` : doc.clienteId || clienteDoc(doc) ? ` para ${demo.clientes.find((c) => c.id === doc.clienteId)?.nombre ?? clienteDoc(doc)}` : "";
   /** El documento con su variante: así se guarda y se imprime. */
   const docV = { ...doc, variante } as Documento;
-  /** Aviso del asistente cuando el formato no es el de SOTEC. */
+  /** Dueño del formato si es propio de un cliente (acta de entrega de Fortox); undefined si es de SOTEC. */
+  const dueño = propietarioDe(tipo);
+  /**
+   * Formato propio de un cliente: aviso si el cliente (o su proyecto) no es del dueño. No impide seguir:
+   * SOTEC puede diligenciar el acta de Fortox para un sitio que aún no está marcado como de Fortox.
+   */
+  const avisoDueño = (p: Proyecto | undefined, clienteId: string, nombre = clienteDoc(doc)): string => {
+    if (!dueño) return "";
+    const c = demo.clientes.find((x) => x.id === clienteId) ?? (nombre.trim() ? { nombre } : null);
+    if (!c) return "";
+    if (esDelPropietario({ tipo, proyecto: p, cliente: c, config: demo.config }).coincide) return "";
+    const n = nombreVariante(dueño);
+    return `⚠️ Este formato es de ${n}: «${c.nombre}» no aparece como cliente de ${n}${p ? ` ni el proyecto es de un tipo de ${n}` : ""}. Puedes seguir si el trabajo es para ${n}.`;
+  };
+  /** Aviso del asistente cuando el formato no es el de SOTEC (en un formato propio no hace falta: siempre es el del dueño). */
   const avisoFormato = (clave: string) =>
-    clave === VARIANTE_BASE ? "" : `Formato: ${varianteDe(clave).etiqueta}. ${info.formato.el === "la" ? "La" : "El"} ${info.formato.corto.toLowerCase()} sale con el encabezado de ${varianteDe(clave).marca}.`;
+    clave === VARIANTE_BASE || dueño ? "" : `Formato: ${varianteDe(clave).etiqueta}. ${info.formato.el === "la" ? "La" : "El"} ${info.formato.corto.toLowerCase()} sale con el encabezado de ${varianteDe(clave).marca}.`;
 
   // El cliente escrito a mano se registra en el directorio al guardar (si el formato lo registra y el perfil puede)
   const registraClientes = Boolean(info.datosCliente) && (puede(usuario.rol, "registrar_clientes") || puede(usuario.rol, "clientes"));
@@ -366,7 +384,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
   function elegirProyecto(p: Proyecto | undefined): string | undefined {
     if (!p) {
       setDoc((d) => ({ ...d, proyectoId: undefined, variante: undefined }) as Documento);
-      return ["Sin proyecto: el documento queda solo asociado al cliente.", avisoFormato(varianteDel(undefined, doc.clienteId))].filter(Boolean).join(" ");
+      return ["Sin proyecto: el documento queda solo asociado al cliente.", avisoFormato(varianteDel(undefined, doc.clienteId)), avisoDueño(undefined, doc.clienteId)].filter(Boolean).join(" ");
     }
     setDoc((d) => ({ ...conProyecto(d, p), variante: undefined }) as Documento);
     const c = demo.clientes.find((x) => x.id === p.clienteId);
@@ -375,7 +393,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     const cual = nuevo
       ? `Proyecto nuevo «${p.nombre}»${c ? ` de ${c.nombre}` : clienteDoc(doc) ? ` de ${clienteDoc(doc)}` : ""}: se crea activo al guardar ${info.formato.el} ${info.formato.corto.toLowerCase()}${c ? "" : ", junto con el cliente nuevo"}, y el documento queda en él.`
       : `Proyecto ${etiquetaProyecto(p)}${c ? ` de ${c.nombre}` : ""}.`;
-    return [cual, nuevo ? undefined : r?.mensaje, avisoFormato(varianteDel(p, p.clienteId))].filter(Boolean).join(" ");
+    return [cual, nuevo ? undefined : r?.mensaje, avisoFormato(varianteDel(p, p.clienteId)), avisoDueño(nuevo ? undefined : p, p.clienteId || doc.clienteId)].filter(Boolean).join(" ");
   }
 
   /**
@@ -658,6 +676,8 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
     }
   }
 
+  // Formato propio de un cliente: aviso fijo mientras el cliente o el proyecto no sean del dueño
+  const avisoDueñoActual = hayCliente ? avisoDueño(proyecto, doc.clienteId) : "";
   // Código y versión del formato según la variante (FORTOX trae los suyos)
   const f = formatoEnVariante(info.formato, tipo, variante);
   // Con prefijo propio de la variante, el código provisional es el de su serie
@@ -697,6 +717,11 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
             {existente ? "Continuar" : f.nuevo} {f.corto.toLowerCase()} <span className="font-mono text-base text-slate-500">{codigoVista}</span>
           </h1>
           <ChipVariante variante={variante} tipo={tipo} className="mt-1" />
+          {avisoDueñoActual && (
+            <p role="note" data-aviso-dueno className="mt-1.5 flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900 print:hidden">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden /> {avisoDueñoActual.replace(/^⚠️ /, "")}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <div className="hidden w-40 sm:block">
@@ -775,7 +800,7 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
                 ? `Retomamos ${doc.codigo}. Edita lo que necesites directamente en el formato.${enRevision ? "\n\nEstá en revisión: al guardar los cambios sigue en revisión con lo corregido." : ""}${doc.motivoRechazo ? `\n\nMotivo del rechazo: ${doc.motivoRechazo}` : ""}`
                 : recuperado.current
                   ? `Recuperé lo que estabas diligenciando en ${f.el} ${f.corto.toLowerCase()}. Revisa el formato y continúa donde quedaste.`
-                  : `Hola, ${usuario.nombre.split(" ")[0]}. Te guío para diligenciar ${f.el} ${f.corto.toLowerCase()}${formatos.length ? "" : ` (${f.codigo})`}. Lo que respondas aparece al instante en el formato.${proyecto ? `\n\nQueda en el proyecto ${etiquetaProyecto(proyecto)}${clienteSel ? ` de ${clienteSel.nombre}` : ""}.` : ""}`
+                  : `Hola, ${usuario.nombre.split(" ")[0]}. Te guío para diligenciar ${f.el} ${f.corto.toLowerCase()}${formatos.length ? "" : ` (${f.codigo})`}.${dueño ? ` Es un formato de ${nombreVariante(dueño)}: sale con su encabezado.` : ""} Lo que respondas aparece al instante en el formato.${proyecto ? `\n\nQueda en el proyecto ${etiquetaProyecto(proyecto)}${clienteSel ? ` de ${clienteSel.nombre}` : ""}.` : ""}`
             }
             acciones={acciones}
             onAgregarOpcion={(pasoId, valor) => demo.agregarOpcion(`${tipo}.${pasoId}`, valor)}
@@ -928,7 +953,10 @@ export function Generador({ tipo, existente, proyectoInicial, clienteInicial, eq
           <p className="text-xs text-slate-500 print:hidden">Clic sobre cualquier campo del formato para editarlo. Los campos resaltados en verde son los que el asistente está preguntando.</p>
           <div className="overflow-x-auto rounded-lg bg-slate-100 p-2 sm:p-4">
             <ConVariante variante={variante} tipo={tipo}>
-              <Plantilla datos={doc.datos} codigoDoc={codigoVista} empresa={empresaDe(demo.config)} equipos={equiposAtendidos(equiposIds, demo.equipos)} editar={editarFormato} firmar={(c) => setFirmando(c)} resaltar={resaltar} />
+              {/* Quien diligencia es el autor: ve sus claves con «Mostrar» */}
+              <ConClaves modo="revelables">
+                <Plantilla datos={doc.datos} codigoDoc={codigoVista} empresa={empresaDe(demo.config)} equipos={equiposAtendidos(equiposIds, demo.equipos)} editar={editarFormato} firmar={(c) => setFirmando(c)} resaltar={resaltar} />
+              </ConClaves>
             </ConVariante>
           </div>
           <div className="lg:hidden print:hidden">{acciones}</div>

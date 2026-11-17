@@ -43,7 +43,7 @@ const MATRIZ: Record<Rol, Accion[]> = {
 
 /** Texto de cada acción para la pantalla de usuarios y roles. */
 export const DESCRIPCION_ACCION: Record<Accion, string> = {
-  crear: "Crear reportes, permisos, legalizaciones de gastos, entregas de EPP y requerimientos",
+  crear: "Crear reportes, permisos, legalizaciones de gastos, entregas de EPP, requerimientos y actas de entrega",
   cotizar: "Crear, aprobar y enviar cotizaciones al cliente (comercial)",
   ver_todos: "Ver documentos de todo el equipo",
   revisar: "Aprobar o rechazar documentos",
@@ -157,6 +157,17 @@ export function puedeRevisarDoc(u: Usuario, d: Documento): boolean {
 export function puedeConvertirRequerimiento(u: Usuario, d: Documento, documentos: Documento[]): boolean {
   if (d.tipo !== "requerimiento" || !puedeCrearTipo(u.rol, "cotizacion") || cotizacionDe(d.id, documentos)) return false;
   return d.estado === "aprobado" || d.estado === "en_revision";
+}
+
+/**
+ * Datos sensibles de un documento (claves del panel de alarma del acta de entrega, ver
+ * @/modulos/actas/claves): los ven, con «Mostrar», el autor, la coordinación (supervisor) y la
+ * administración (quienes revisan); el cliente y los demás, enmascarados (●●●●). /imprimir los
+ * imprime solo para estos mismos perfiles.
+ */
+export function puedeVerSensibles(u: Usuario, d: Pick<Documento, "autorId" | "tipo">): boolean {
+  if (u.rol === "cliente" || !puedeUsarTipo(u.rol, d.tipo)) return false;
+  return d.autorId === u.id || puede(u.rol, "revisar");
 }
 
 /** El cliente solo ve sus cuentas ya emitidas; la administración, todas. */

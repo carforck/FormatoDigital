@@ -9,6 +9,7 @@
 import { createElement, type ComponentType } from "react";
 
 import type { EmpresaPlantilla, FlujoDocumento, InfoFormato, ModuloDocumento, PropsPlantilla } from "./contrato";
+import { moduloActas } from "./actas";
 import { moduloCotizaciones } from "./cotizaciones";
 import { moduloEpp } from "./epp";
 import { moduloGastos } from "./gastos";
@@ -57,6 +58,14 @@ export const MODULOS: InfoModulo[] = [
     relaciona: ["proyectos", "cotizaciones"],
   },
   {
+    clave: "actas",
+    nombre: "Acta de entrega (Fortox)",
+    descripcion: "Formato propio de Fortox «Programación y acta de entrega del sistema de seguridad electrónica»: contacto, panel y comunicación, materiales, zonificación, usuarios con clave, horarios y capacitación, con el recibido firmado del cliente. Las claves del panel quedan enmascaradas: solo el autor, la coordinación y la administración las ven.",
+    estado: "activo",
+    formato: "7PA/F1-13 (Fortox)",
+    relaciona: ["proyectos", "clientes"],
+  },
+  {
     clave: "equipos",
     nombre: "Equipos",
     descripcion: "Inventario simple de cada cliente por sistema (CCTV, alarmas, control de acceso, incendio, cómputo y redes, cerca eléctrica). El técnico marca en el reporte los equipos atendidos o crea uno nuevo; la ficha de cada equipo muestra su historial de reportes, también en el portal del cliente.",
@@ -73,13 +82,14 @@ export const DOCUMENTOS: { [T in TipoDoc]: ModuloDocumento<DatosDe<T>> } = {
   cotizacion: moduloCotizaciones,
   epp: moduloEpp,
   requerimiento: moduloRequerimientos,
+  acta: moduloActas,
 };
 
 /** Orden en el menú, el tablero, los filtros y los proyectos. */
-export const TIPOS_DOC: TipoDoc[] = ["reporte", "permiso", "gasto", "cotizacion", "epp", "requerimiento"];
+export const TIPOS_DOC: TipoDoc[] = ["reporte", "permiso", "gasto", "cotizacion", "epp", "requerimiento", "acta"];
 
 // Paleta de series (globals.css), en el orden de TIPOS_DOC
-const PALETA = ["var(--serie-a)", "var(--serie-b)", "var(--serie-c)", "var(--serie-d)", "var(--serie-e)", "var(--serie-f)"];
+const PALETA = ["var(--serie-a)", "var(--serie-b)", "var(--serie-c)", "var(--serie-d)", "var(--serie-e)", "var(--serie-f)", "var(--serie-g)"];
 
 /** Lo que el resto de la aplicación lee de un módulo, con los valores por defecto ya puestos. */
 export interface InfoDoc {
@@ -105,6 +115,8 @@ export interface InfoDoc {
   aplicarFirma: (campo: string, imagen: string, datos: unknown) => Record<string, unknown>;
   /** Si el formato registra equipos atendidos y después de qué paso del asistente se preguntan. */
   equipos?: { despuesDe: string };
+  /** Datos sensibles (claves): quitarlos o enmascararlos (ver `ModuloDocumento.sensibles`). */
+  sensibles?: { quitar: (datos: unknown) => unknown; ocultar: (datos: unknown) => unknown };
 }
 
 // Plantilla por defecto para un módulo que aún no tiene réplica del formato
@@ -144,6 +156,7 @@ export function infoDoc(tipo: TipoDoc): InfoDoc {
     valor: m.valor as InfoDoc["valor"],
     aplicarFirma: (campo, imagen, d) => (m.aplicarFirma ? m.aplicarFirma(campo, imagen, d as Record<string, unknown>) : { [campo]: imagen }),
     equipos: m.equipos,
+    sensibles: m.sensibles as InfoDoc["sensibles"],
   };
   cache.set(tipo, info);
   return info;
@@ -163,6 +176,21 @@ export function clienteDoc(d: Documento): string {
 /** Texto principal de un documento para listados, según su módulo. */
 export function tituloDoc(d: Documento): string {
   return (DOCUMENTOS[d.tipo] as unknown as ModuloDocumento<unknown>).titulo(d.datos);
+}
+
+/**
+ * Texto en el que se busca un documento (listado de Documentos): código, cliente, título y
+ * contenido, SIN los datos sensibles del formato (una clave escrita no encuentra el documento).
+ */
+export function textoBusqueda(d: Documento): string {
+  const s = infoDoc(d.tipo).sensibles;
+  return `${d.codigo} ${clienteDoc(d)} ${tituloDoc(d)} ${JSON.stringify(s ? s.quitar(d.datos) : d.datos)}`.toLowerCase();
+}
+
+/** Contenido que puede ver o imprimir un perfil: tal cual, o con los datos sensibles enmascarados. */
+export function datosPara(d: Pick<Documento, "tipo" | "datos">, verSensibles: boolean): Documento["datos"] {
+  const s = infoDoc(d.tipo).sensibles;
+  return (s && !verSensibles ? s.ocultar(d.datos) : d.datos) as Documento["datos"];
 }
 
 /** Valor monetario del documento (cotizado, gastado…) o null si el formato no lo maneja. */

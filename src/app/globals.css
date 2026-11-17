@@ -2,7 +2,7 @@
  * Estilos globales (importados por src/app/layout.tsx): variables de tema estilo shadcn
  * (HSL), reglas de impresión de los documentos (.doc-print, .doc-zona, /imprimir con
  * .fd-impresion), animaciones de íconos, modo oscuro del aplicativo (.dark, lo pone
- * AppShell) y colores de las series de las gráficas (--serie-a … --serie-f).
+ * AppShell) y colores de las series de las gráficas (--serie-a … --serie-g).
  */
 @tailwind base;
 @tailwind components;
@@ -92,6 +92,11 @@
   .doc-ajustado { font-size: 10.6px !important; line-height: 1.3 !important; padding: 0.6cm 0.9cm !important; }
   .doc-ajustado .h-14 { height: 2.9rem !important; }
   .doc-ajustado .h-12 { height: 2.4rem !important; }
+  /* Acta de entrega de Fortox: cada una de sus dos hojas cabe en una carta, como el papel */
+  .doc-acta { font-size: 8.6px !important; line-height: 1.15 !important; padding: 0.55cm 0.85cm 0.4cm !important; }
+  .doc-acta td, .doc-acta th { line-height: 9.6px !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+  .doc-acta tbody tr:not(.fila-alta) { height: 11.5px !important; }
+  .doc-acta .h-12 { height: 2.3rem !important; }
   /* Formatos densos (permiso de trabajo): caben en una hoja como el original */
   .doc-compacto { font-size: 8.6px !important; line-height: 1.22 !important; padding: 0.5cm 0.7cm !important; }
   .doc-compacto .h-12 { height: 1.9rem !important; }
@@ -151,9 +156,10 @@
   --serie-d: #D9963A;
   --serie-e: #3FB0AC;
   --serie-f: #E07AA0;
+  --serie-g: #6E8FB8;
 }
 /* Series de las gráficas en tema claro (el modo oscuro las redefine arriba en .dark) */
-:root { --serie-a: #4F6FD0; --serie-b: #4E9A2A; --serie-c: #9A6BD8; --serie-d: #B9741C; --serie-e: #1F8C88; --serie-f: #C2456F; }
+:root { --serie-a: #4F6FD0; --serie-b: #4E9A2A; --serie-c: #9A6BD8; --serie-d: #B9741C; --serie-e: #1F8C88; --serie-f: #C2456F; --serie-g: #17375E; }
 
 /* Superficies */
 .dark .bg-white { background-color: #171C19 !important; }

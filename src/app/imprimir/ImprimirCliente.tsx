@@ -5,19 +5,22 @@
  * cobro o el borrador del generador (se abre con abrirImpresion de @/nucleo/impresion).
  * Cualquier perfil con sesión, sujeto a puedeVerDoc / puedeVerCuenta. Otros params:
  * ?volver= (regreso, solo rutas /app), ?n= (evita reimprimir al recargar), ?auto=0 (no imprime solo).
+ * Datos sensibles (claves del acta de entrega): se imprimen tal cual solo para el autor, la
+ * coordinación y la administración (`puedeVerSensibles`); para los demás, enmascarados (●●●●).
  */
 import Link from "next/link";
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowLeft, Printer } from "lucide-react";
 
+import { ConClaves } from "@/components/docs/Claves";
 import { ConVariante } from "@/components/docs/VarianteFormato";
 import { PlantillaCuentaCobro } from "@/modulos/cobros/PlantillaCuentaCobro";
 import { equiposAtendidos, equiposIdsDe } from "@/modulos/equipos/logica";
-import { clienteDoc, empresaDe, infoDoc, prefijoDe } from "@/modulos/registro";
+import { clienteDoc, datosPara, empresaDe, infoDoc, prefijoDe } from "@/modulos/registro";
 import { hoy, useDemo } from "@/nucleo/datos/DemoProvider";
 import { CLAVE_ORIGEN_IMPRESION, leerBorradorImpresion, tituloArchivo } from "@/nucleo/impresion";
-import { puedeUsarTipo, puedeVerCuenta, puedeVerDoc } from "@/nucleo/permisos";
+import { puedeUsarTipo, puedeVerCuenta, puedeVerDoc, puedeVerSensibles } from "@/nucleo/permisos";
 import type { Documento, TipoDoc } from "@/nucleo/tipos";
 
 /**
@@ -111,10 +114,14 @@ function Imprimir() {
         const codigo = guardado ? doc.codigo : `${prefijoDe(demo.config, doc.tipo)}-borrador-${hoy()}`;
         titulo = tituloArchivo([codigo, info.formato.corto, clienteDoc(doc)]);
         const equipos = equiposAtendidos(equiposIdsDe(doc), guardado ? demo.equiposVisibles : demo.equipos);
+        // Claves del acta: impresas solo para quien puede verlas (el borrador es siempre del autor)
+        const verSensibles = puedeVerSensibles(u, guardado ?? doc);
         // Con la variante de formato del documento (o la que resolvió el generador para el borrador)
         hojas = (
           <ConVariante variante={doc.variante} tipo={doc.tipo}>
-            <Plantilla datos={doc.datos} codigoDoc={doc.codigo} empresa={empresaDe(demo.config)} equipos={equipos} />
+            <ConClaves modo={verSensibles ? "visibles" : "ocultas"}>
+              <Plantilla datos={datosPara(doc, verSensibles)} codigoDoc={doc.codigo} empresa={empresaDe(demo.config)} equipos={equipos} />
+            </ConClaves>
           </ConVariante>
         );
       }

@@ -18,13 +18,14 @@ import { EnviarDocumento } from "@/components/docs/EnviarDocumento";
 import { Volver, marcarEdicion, useAvisoDeRegreso, useOrigen } from "@/components/ui/volver";
 import { fondoQueCierra, useModal } from "@/components/ui/useModal";
 
+import { ConClaves } from "@/components/docs/Claves";
 import { FirmaPad } from "@/components/docs/FirmaPad";
 import { ChipVariante, ConVariante } from "@/components/docs/VarianteFormato";
 import { Button } from "@/components/ui/button";
 import { EstadoBadge } from "@/components/ui/badges";
 import { Input } from "@/components/ui/input";
 import { tomarAvisoCliente } from "@/nucleo/clientes";
-import { CORRIGIO_EN_REVISION, puede, puedeConvertirRequerimiento, puedeCrearTipo, puedeEditarDoc, puedeFirmaClienteEnSitio, puedeRetirarDoc, puedeRevisarDoc, puedeVerDoc } from "@/nucleo/permisos";
+import { CORRIGIO_EN_REVISION, puede, puedeConvertirRequerimiento, puedeCrearTipo, puedeEditarDoc, puedeFirmaClienteEnSitio, puedeRetirarDoc, puedeRevisarDoc, puedeVerDoc, puedeVerSensibles } from "@/nucleo/permisos";
 import { useDemo } from "@/nucleo/datos/DemoProvider";
 import { abrirImpresion, tituloArchivo } from "@/nucleo/impresion";
 import { rutaCuenta, rutaDoc, rutaEquipo, rutaProyecto, urlPublica } from "@/nucleo/rutas";
@@ -33,7 +34,7 @@ import { IconoEquipo } from "@/modulos/equipos/piezas";
 import type { DatosPermiso } from "@/nucleo/tipos";
 import { faltantes } from "@/nucleo/validar";
 import { VARIANTE_BASE, formatoEnVariante, varianteParaTipo } from "@/nucleo/variantes";
-import { clienteDoc, empresaDe, infoDoc, rutaNuevo } from "@/modulos/registro";
+import { clienteDoc, datosPara, empresaDe, infoDoc, rutaNuevo } from "@/modulos/registro";
 import { cotizacionDe } from "@/modulos/requerimientos/conversion";
 
 /**
@@ -108,7 +109,9 @@ function Detalle() {
   const proyecto = demo.proyectos.find((p) => p.id === doc.proyectoId);
   const datosLibres = doc.datos as unknown as Record<string, string | undefined>;
   const nombre = (uid: string) => demo.usuarios.find((x) => x.id === uid)?.nombre ?? "Sistema";
-  const datosVista = doc.tipo === "permiso" && cierraPermiso ? { ...doc.datos, ...cierre } : doc.datos;
+  // Datos sensibles (claves del acta): sin permiso llegan ya enmascarados a la plantilla
+  const verSensibles = puedeVerSensibles(u, doc);
+  const datosVista = doc.tipo === "permiso" && cierraPermiso ? { ...doc.datos, ...cierre } : datosPara(doc, verSensibles);
   const cliente = demo.clientes.find((c) => c.id === doc.clienteId);
   const correoCliente = datosLibres.correo || cliente?.correo || "";
   const telCliente = datosLibres.telefono || cliente?.telefono || "";
@@ -414,6 +417,7 @@ function Detalle() {
       <div className="grid gap-4 xl:grid-cols-[1fr_280px]">
         <div className="overflow-x-auto rounded-lg bg-slate-100 p-2 sm:p-4">
           <ConVariante variante={doc.variante} tipo={doc.tipo}>
+            <ConClaves modo={verSensibles ? "revelables" : "ocultas"}>
             <Plantilla
               datos={datosVista}
               codigoDoc={doc.codigo}
@@ -423,6 +427,7 @@ function Detalle() {
               firmar={cierraPermiso ? () => setFirma("cierre") : undefined}
               resaltar={cierraPermiso ? "cierre" : undefined}
             />
+            </ConClaves>
           </ConVariante>
         </div>
         <aside className={u.rol === "cliente" ? "hidden" : "print:hidden h-fit rounded-xl border border-slate-200 bg-white p-4"}>

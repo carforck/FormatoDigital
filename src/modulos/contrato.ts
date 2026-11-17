@@ -178,4 +178,11 @@ export interface ModuloDocumento<D> {
    * cuáles después del paso `despuesDe` y la plantilla los imprime. Por defecto: no.
    */
   equipos?: { despuesDe: string };
+  /**
+   * Datos sensibles del formato (p. ej. las claves del panel de alarma del acta de entrega):
+   * `quitar` los deja vacíos (búsqueda, resúmenes, cualquier texto derivado) y `ocultar` los
+   * enmascara (●●●●): lo que ve o imprime un perfil sin permiso (`puedeVerSensibles`).
+   * Por defecto: el formato no tiene datos sensibles.
+   */
+  sensibles?: { quitar: (datos: D) => D; ocultar: (datos: D) => D };
 }

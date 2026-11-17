@@ -108,6 +108,7 @@ export function actaVacia(fecha: string): DatosActa {
     nombreFirmaCliente: "",
     cedulaFirmaCliente: "",
     tecnico: "",
+    firmaTecnico: "",
   };
 }
 

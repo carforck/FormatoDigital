@@ -113,4 +113,6 @@ export interface DatosActa {
   cedulaFirmaCliente: string;
   /** Nombre del técnico que entrega (el autor por defecto). */
   tecnico: string;
+  /** Firma del técnico que entrega (data URL). */
+  firmaTecnico: string;
 }

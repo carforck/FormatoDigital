@@ -3728,6 +3728,10 @@ async function acta(b, errores) {
   await clic(p, "Continuar");
   await clic(p, "Andrés Camacho Ruiz");
   await sleep(400);
+  await clic(p, "Firmar ahora");
+  await firmar(p);
+  await clic(p, "Continuar");
+  await sleep(400);
   const chat = await p.evaluate(() => [...document.querySelectorAll("main")].map((x) => x.innerText).join(" "));
   ok(chat.includes("registrada(s) (ocultas)") && !CLAVES.some((c) => chat.includes(c)), "el chat no repite ninguna clave");
   h = await hoja();

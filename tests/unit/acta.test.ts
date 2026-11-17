@@ -77,7 +77,7 @@ igual("casillas de la fecha", casillasFecha("2026-11-17"), ["26", "11", "17"]);
 
 // ── Validación
 const vacia = actaVacia("2026-11-17");
-igual("en blanco: lo mínimo pendiente", faltantesActa(vacia), ["Ciudad", "Nombre del cliente", "Cliente nuevo o adición", "Dirección", "Tipo de sistema", "Nombre del técnico", "Firma del cliente"]);
+igual("en blanco: lo mínimo pendiente", faltantesActa(vacia), ["Ciudad", "Nombre del cliente", "Cliente nuevo o adición", "Dirección", "Tipo de sistema", "Nombre del técnico", "Firma del técnico", "Firma del cliente"]);
 const lista: DatosActa = {
   ...vacia,
   ciudad: "Cartagena",
@@ -86,6 +86,7 @@ const lista: DatosActa = {
   direccion: "Calle Ficticia 1 # 2-3",
   sistemas: ["Alarma"],
   tecnico: "Técnico Ficticio",
+  firmaTecnico: "data:image/png;base64,BBBB",
   firmaCliente: "data:image/png;base64,AAAA",
   nombreFirmaCliente: "Persona Inventada",
   cedulaFirmaCliente: "1000000099",
@@ -136,7 +137,9 @@ igual("búsqueda: sin la clave", textoBusqueda(doc).includes("9137") || textoBus
 igual("búsqueda: con el cliente", textoBusqueda(doc).includes("centro comercial inventado"), true);
 igual("título sin claves", tituloDoc(doc), "Centro Comercial Inventado · Alarma");
 const dup = moduloActas.duplicar!(lista, "2026-11-18");
-igual("duplicar: sin claves ni firma", [dup.claveMaestra, dup.usuarios[0].claveTelefonica, dup.firmaCliente, dup.fecha], ["", "", "", "2026-11-18"]);
+igual("duplicar: sin claves ni firma", [dup.claveMaestra, dup.usuarios[0].claveTelefonica, dup.firmaCliente, dup.firmaTecnico, dup.fecha], ["", "", "", "", "2026-11-18"]);
+igual("el paso de firma del técnico no borra la imagen", moduloActas.aplicar("firmaTecnico", "", lista).cambio, {});
+igual("firma del técnico es un paso del asistente", pasos.some((x) => x.id === "firmaTecnico" && x.tipo === "firma"), true);
 
 const us = (id: string, rol: Usuario["rol"], clienteId?: string): Usuario => ({ id, nombre: id, cargo: "", rol, email: "", activo: true, clienteId });
 const autor = us("u-tec1", "tecnico");

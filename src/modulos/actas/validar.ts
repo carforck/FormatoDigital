@@ -20,6 +20,7 @@ export function faltantesActa(d: DatosActa): string[] {
   if (!d.direccion.trim()) f.push("Dirección");
   if (!d.sistemas.length) f.push("Tipo de sistema");
   if (!d.tecnico.trim()) f.push("Nombre del técnico");
+  if (!d.firmaTecnico) f.push("Firma del técnico");
   if (!d.firmaCliente) f.push("Firma del cliente");
   if (d.firmaCliente && (!d.nombreFirmaCliente.trim() || !d.cedulaFirmaCliente.trim())) f.push("Nombre y C.C. de quien firma");
   if (validarClave(d.claveMaestra)) f.push("Clave maestra: de 4 a 8 dígitos");

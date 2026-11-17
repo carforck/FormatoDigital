@@ -88,6 +88,7 @@ export const moduloActas: ModuloDocumento<DatosActa> = {
       materiales: c.materiales.map((m) => ({ ...m, id: idActa("mt") })),
       usuarios: c.usuarios.map((u) => ({ ...u, id: idActa("us") })),
       firmaCliente: "",
+      firmaTecnico: "",
       nombreFirmaCliente: "",
       cedulaFirmaCliente: "",
     };
@@ -201,6 +202,7 @@ export const moduloActas: ModuloDocumento<DatosActa> = {
       omitir: "El cliente firma después",
     },
     { id: "tecnico", tipo: "texto", resaltar: "tecnico", pregunta: "Nombre del técnico que entrega.", sugerencias: sug(datos.tecnico, usuarioNombre) },
+    { id: "firmaTecnico", tipo: "firma", resaltar: "firmaTecnico", pregunta: "Firma del técnico que entrega. Puedes firmar con el dedo desde el celular." },
   ],
 
   aplicar: (id, v, datos) => {
@@ -218,6 +220,8 @@ export const moduloActas: ModuloDocumento<DatosActa> = {
       if (Array.isArray(v)) return { cambio: { nombreFirmaCliente: String(v[0] ?? ""), cedulaFirmaCliente: String(v[1] ?? "").replace(/[^\d.]/g, "") } };
       return { cambio: {} };
     }
+    // La imagen la pone el pad de firma en el formato; el paso no la toca
+    if (id === "firmaTecnico") return { cambio: {} };
     if (id === "materiales") {
       if (!String(v).trim()) return { cambio: {}, mensaje: datos.materiales.length ? `Conservo los ${datos.materiales.length} material(es).` : undefined };
       const r = leerMateriales(String(v), datos.materiales);

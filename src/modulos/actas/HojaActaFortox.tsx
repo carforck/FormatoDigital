@@ -486,10 +486,12 @@ export function HojaActaFortox({ datos, codigoDoc, editar, firmar, resaltar }: P
                 {(datos.cedulaFirmaCliente || editar) && <> · C.C. {campo("cedulaFirmaCliente", { placeholder: editar ? "Cédula" : " " })}</>}
               </div>
             </div>
-            <div className={cn("flex flex-col justify-end text-center", res("tecnico"))}>
-              <div className="text-[10px]">{campo("tecnico")}</div>
-              <div className="border-t border-black pt-0.5 font-bold">Nombre del Técnico</div>
-              <div className="text-[9px]">&nbsp;</div>
+            <div className={cn("text-center", res("firmaTecnico"), res("tecnico"))}>
+              <div className="mx-auto max-w-[220px]">
+                <Firma src={datos.firmaTecnico} etiqueta="técnico" texto="✍ Toca para firmar como técnico" onFirmar={firmar ? () => firmar("firmaTecnico") : undefined} />
+              </div>
+              <div className="border-t border-black pt-0.5 font-bold">Firma y Nombre del Técnico</div>
+              <div className="text-[9px]">{campo("tecnico")}</div>
             </div>
           </div>
 
